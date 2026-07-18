@@ -1,0 +1,2876 @@
+// ============================================================================
+// SCHEMA PRISMA — Módulos: Empreendimentos + Autenticação e Controle de Acesso
+// ----------------------------------------------------------------------------
+// Cobre exatamente o que foi validado até aqui. O Módulo 3 (Clientes) e os
+// campos de módulos futuros (Engenharia, Levantamento, Orçamento, Produção,
+// Financeiro) NÃO entram neste schema ainda — serão adicionados quando os
+// respectivos módulos forem desenvolvidos, sem necessidade de migração
+// destrutiva, apenas extensão (novas tabelas e/ou novos campos opcionais).
+// ============================================================================
+
+generator client {
+  // Usamos o gerador "prisma-client-js" (e não o novo "prisma-client") de
+  // propósito: o novo gerador produz um client em formato ESM por padrão,
+  // o que exigiria "type": "module" no package.json do projeto inteiro —
+  // uma mudança grande que afetaria outros arquivos de configuração
+  // (tailwind.config.ts, postcss.config.js) sem necessidade real agora.
+  // O "prisma-client-js" continua sendo suportado e gera CommonJS,
+  // compatível com a configuração padrão do Next.js 14.
+  provider = "prisma-client-js"
+  output   = "../../../generated/prisma"
+  // engineType = "client" remove o binário nativo Rust (.so.node) do
+  // client gerado. Isso é essencial neste projeto por dois motivos:
+  // (1) evita o problema conhecido de builds Docker em Alpine (musl libc)
+  //     em que o binário do Query Engine não corresponde à plataforma de
+  //     destino ou não é copiado corretamente para a imagem final;
+  // (2) evita falhas no "output: standalone" do Next.js, cujo tracer de
+  //     arquivos frequentemente não identifica/copia o binário nativo do
+  //     Prisma para dentro de .next/standalone.
+  // Exige um driver adapter (@prisma/adapter-pg), que já usamos em
+  // src/infra/db/prisma/client.ts. binaryTargets deixa de ser necessário
+  // com este modo.
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  // A URL de conexão é definida em prisma.config.ts (Prisma 7+),
+  // não diretamente aqui.
+}
+
+// ----------------------------------------------------------------------------
+// ENUMS
+// ----------------------------------------------------------------------------
+
+/// Status macro do Empreendimento ao longo de todo o ciclo de vida do negócio.
+/// "Oportunidade" não é uma entidade separada — é o estado inicial do
+// Status macro do Empreendimento — representa a fase geral em que ele se
+// encontra. Status internos detalhados (ex: passos dentro de Produção)
+// ficam nos módulos específicos (Módulos 6-11), não aqui.
+// ATENÇÃO: ao renomear valores aqui, fazer migration de dados no banco.
+enum StatusEmpreendimento {
+  PROSPECCAO    // Cadastrado, aguardando desenvolvimento comercial
+  COMERCIAL     // Em negociação, levantamento técnico e aprovação inicial
+  ORCAMENTACAO  // Levantamento validado — montagem da proposta
+  NEGOCIACAO    // Proposta pronta, em negociação com o cliente (ajuste de preços)
+  CONTRATADO    // Proposta aprovada, contratos assinados
+  SUPRIMENTOS   // Materiais sendo adquiridos / aguardando fornecedor
+  PRODUCAO      // Kits sendo fabricados na fábrica HGI
+  CONCLUIDO     // Instalação validada pela equipe HGI
+  ARQUIVADO     // Proposta reprovada ou projeto cancelado
+}
+
+// Tipo de evento na timeline do Empreendimento.
+enum TipoEvento {
+  MUDANCA_STATUS  // Mudança de status macro (gerado automaticamente)
+  ANOTACAO        // Anotação manual adicionada por um usuário
+  DOCUMENTO       // Documento enviado/vinculado ao empreendimento
+}
+
+enum TipoEmpreendimento {
+  RESIDENCIAL_VERTICAL
+  RESIDENCIAL_HORIZONTAL
+  COMERCIAL
+  INDUSTRIAL
+  INFRAESTRUTURA
+  LOTEAMENTO
+}
+
+/// Tipo de estrutura — relevante para Engenharia e Orçamentação futuramente.
+enum TipoEstrutura {
+  CONCRETO_ARMADO
+  ALVENARIA_ESTRUTURAL
+  PAREDE_DE_CONCRETO
+  ESTRUTURA_METALICA
+  STEEL_FRAME
+  WOOD_FRAME
+}
+
+// ============================================================================
+// MÓDULO: CLIENTES (CONSTRUTORAS)
+// ============================================================================
+
+// Classificação estratégica da construtora por porte/importância — usada
+// no futuro para priorização de atendimento e condições comerciais.
+// Nenhuma tela ainda usa este campo (sempre null hoje); reservado no
+// schema seguindo o mesmo padrão já usado para Empreendimento.valorEstimado.
+// Tier do cliente — mesmo modelo numérico de 4 níveis usado em
+// TierMultiplicador e Orcamento (0 = altíssimo padrão ... 3 = econômico).
+// O enum antigo TierCliente (TIER_1..3) foi removido por conflitar com o
+// modelo de negócio definido no Módulo 8 (4 tiers, multiplicadores 0-3).
+
+model Cliente {
+  id           String  @id @default(cuid())
+  // Código legível para humanos — gerado automaticamente na criação
+  // (C-0001, C-0002...). Usado em contratos, conversas e planilhas
+  // externas para referenciar a construtora sem usar o UUID interno.
+  codigo       String  @unique @map("codigo")
+  razaoSocial  String  @map("razao_social")
+  nomeFantasia String? @map("nome_fantasia")
+  cnpj         String  @unique
+  email        String?
+  telefone     String?
+  logradouro   String?
+  cidade       String?
+  estado       String? @db.VarChar(2)
+  cep          String?
+  ativo        Boolean @default(true)
+
+  // Tier padrão do cliente (0-3) — define o multiplicador do serviço HGI
+  // na Orçamentação. É herdado pelos empreendimentos ao criá-los, mas pode
+  // ser ajustado individualmente em cada um. Null = ainda não classificado.
+  tier Int?
+
+  contatos        ClienteContato[]
+  empreendimentos Empreendimento[]
+  remessas        Remessa[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([cnpj])
+  @@index([ativo])
+  @@index([tier])
+  @@map("clientes")
+}
+
+model ClienteContato {
+  id        String  @id @default(cuid())
+  clienteId String  @map("cliente_id")
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  nome      String
+  cargo     String?
+  telefone  String?
+  email     String?
+  principal Boolean @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([clienteId])
+  @@map("cliente_contatos")
+}
+
+// ----------------------------------------------------------------------------
+// EMPREENDIMENTO — entidade central do negócio
+// ----------------------------------------------------------------------------
+
+model Empreendimento {
+  id     String @id @default(cuid())
+  // Código legível para humanos — gerado automaticamente na criação
+  // (E-0001, E-0002...). Usado para referenciar o empreendimento em
+  // contratos, planilhas e comunicações externas.
+  codigo String @unique @map("codigo")
+
+  // Informações gerais
+  nome         String
+  // Módulo 3 (Clientes) implementado — clienteNome virou FK real para Cliente.
+  // A migration copia os dados existentes via DEFAULT temporário, então não
+  // há perda de dados. Veja a migration 20260630_modulo_3_clientes para detalhes.
+  clienteId    String  @map("cliente_id")
+  cliente      Cliente @relation(fields: [clienteId], references: [id])
+  cidade       String
+  estado       String  @db.VarChar(2)
+  endereco     String
+  tipo         TipoEmpreendimento
+
+  // Critério de precificação DESTE empreendimento — quando nulo, usa o
+  // padrão global (ConfiguracaoSistema.criterioPrecificacao). Permite que
+  // cada obra escolha entre "Ponto de Teto" (padrão HGI) ou "Metro
+  // Quadrado" (faixa por área privativa), já que projetos diferentes
+  // podem fazer mais sentido precificados de um jeito ou de outro.
+  criterioPrecificacao CriterioPrecificacao?
+
+  registrosProducao RegistroProducao[]
+  movimentacoesEstoque MovimentacaoEstoque[]
+  estoquePorObra EstoqueEmpreendimentoMaterial[]
+  marcosOperacionais MarcoOperacional[]
+  pedidosCompra PedidoCompra[]
+  remessas Remessa[]
+  construtora  String
+  incorporadora String?
+
+  // Engenharia (informações estruturais — usadas futuramente pelos
+  // módulos de Engenharia/Levantamento/Orçamentação)
+  tipoEstrutura      TipoEstrutura?  @map("tipo_estrutura")
+  metodoConstrutivo  String?         @map("metodo_construtivo")
+  tipoLaje           String?         @map("tipo_laje")
+  tipoVedacao         String?         @map("tipo_vedacao")
+
+  // Informações comerciais
+  responsavelComercial   String  @map("responsavel_comercial")
+  status                 StatusEmpreendimento @default(PROSPECCAO)
+
+  // Tier do empreendimento (0-3) — herdado do tier do cliente na criação,
+  // mas ajustável individualmente (decisão de negócio: o tier é do cliente,
+  // porém um empreendimento específico pode ter padrão diferente). É este
+  // valor que a Orçamentação usa como default ao criar um Orcamento.
+  tier                   Int?
+  dataPrevistaInicio     DateTime? @map("data_prevista_inicio")
+  dataPrevistaEntrega    DateTime? @map("data_prevista_entrega")
+
+  // Valor do empreendimento. NÃO é preenchido na prospecção comercial —
+  // o negócio vende industrialização de kits, não material, então o valor
+  // só existe depois que a Engenharia faz o Levantamento Quantitativo e a
+  // Orçamentação (Módulos 7/8) gera o documento orçamentário. Até esses
+  // módulos existirem, este campo permanece null em todos os registros.
+  valorEstimado          Decimal? @map("valor_estimado") @db.Decimal(14, 2)
+
+  // Responsáveis internos. Agora que o Módulo 2 (Autenticação) existe,
+  // estes campos são relações reais com Usuario — exatamente a migração
+  // aditiva (não destrutiva) que já estava prevista desde o Módulo 1.
+  responsavelComercialUserId    String?  @map("responsavel_comercial_user_id")
+  responsavelComercialUser      Usuario? @relation("EmpreendimentoResponsavelComercial", fields: [responsavelComercialUserId], references: [id])
+  responsavelEngenhariaUserId   String?  @map("responsavel_engenharia_user_id")
+  responsavelEngenhariaUser     Usuario? @relation("EmpreendimentoResponsavelEngenharia", fields: [responsavelEngenhariaUserId], references: [id])
+  responsavelOrcamentacaoUserId String?  @map("responsavel_orcamentacao_user_id")
+  responsavelOrcamentacaoUser   Usuario? @relation("EmpreendimentoResponsavelOrcamentacao", fields: [responsavelOrcamentacaoUserId], references: [id])
+
+  // Conclusão de etapa por área — cada uma dispara o avanço automático de
+  // status correspondente (ver concluirEtapaComercial/Engenharia/
+  // Orcamentacao em responsabilidade-actions.ts). Guarda quem concluiu e
+  // quando, pra dar rastreabilidade de quem fez o quê.
+  comercialConcluidoEm      DateTime? @map("comercial_concluido_em")
+  engenhariaConcluidaEm     DateTime? @map("engenharia_concluida_em")
+  orcamentacaoConcluidaEm   DateTime? @map("orcamentacao_concluida_em")
+
+  observacoes String? @db.Text
+
+  // Se este empreendimento terá Hall — pergunta de nível geral do
+  // empreendimento (não por torre/pavimento), feita no cadastro.
+  temHall Boolean @default(false) @map("tem_hall")
+  // Configuração de quantidade de Hall — "TODOS" (calculado automaticamente
+  // como soma dos pavimentos de todas as torres) ou "ESPECIFICO" (número
+  // digitado manualmente). O valor final resolvido vira uma Tipologia
+  // sintética chamada "Hall", sincronizada automaticamente sempre que a
+  // estrutura física é salva — o usuário nunca precisa cadastrar o Hall
+  // manualmente na lista de tipologias.
+  hallTipo                 String? @map("hall_tipo") // "TODOS" | "ESPECIFICO"
+  hallQuantidadeEspecifica Int?    @map("hall_quantidade_especifica")
+
+  // Tipos de kit contratados — cada um é independente, podendo combinar
+  // qualquer subconjunto (ex: só elétrico, elétrico + hidráulico, todos).
+  // Decisivo para o Levantamento Quantitativo e Orçamentação (Módulos 7/8):
+  // o tipo de caixa/kit a produzir depende diretamente dessa combinação.
+  kitEletrico  Boolean @default(false) @map("kit_eletrico")
+  kitHidraulico Boolean @default(false) @map("kit_hidraulico")
+  kitQdc       Boolean @default(false) @map("kit_qdc")
+
+  // Tipos de instalação do kit elétrico — array serializado como JSON.
+  // Define quais tipos de instalação existem no empreendimento (pode ser
+  // mesclado: laje + alvenaria + drywall). Por peça/trecho no levantamento,
+  // o engenheiro especifica qual tipo se aplica a cada ponto.
+  // Isso determina o tipo de caixa a ser usado em cada ponto (Módulo 7).
+  tiposInstalacao String @default("[]") @map("tipos_instalacao") @db.Text
+
+  // Soft delete — quando preenchido, o empreendimento está "excluído"
+  // mas o registro e toda a timeline são preservados no banco.
+  // Apenas Admin e usuários com empreendimento:excluir podem fazer isso.
+  excluidoEm DateTime? @map("excluido_em")
+  excluidoPorId String? @map("excluido_por_id")
+
+  // Estrutura física hierárquica
+  torres Torre[]
+
+  // Tipologias específicas deste empreendimento (não é catálogo compartilhado)
+  tipologias Tipologia[]
+
+  // Timeline — eventos, anotações e documentos do empreendimento
+  eventos    EventoEmpreendimento[]
+  documentos DocumentoEmpreendimento[]
+
+  // Módulo 6 — Engenharia
+  circuitosCatalogo      CircuitoCatalogo[]
+  levantamentosEletricos LevantamentoEletrico[]
+  levantamentosHidraulicos LevantamentoHidraulico[]
+  levantamentosMateriais LevantamentoMateriais[]
+
+  // Módulo 8 — Orçamentação
+  orcamentos             Orcamento[]
+  aprovacoesProposta     AprovacaoProposta[]
+  contaReceber           ContaReceber[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([clienteId])
+  @@index([status])
+  @@index([responsavelComercialUserId])
+  @@index([responsavelEngenhariaUserId])
+  @@index([responsavelOrcamentacaoUserId])
+  @@map("empreendimentos")
+}
+
+// ----------------------------------------------------------------------------
+// TIMELINE DO EMPREENDIMENTO
+// ----------------------------------------------------------------------------
+
+// Registro imutável de tudo que aconteceu com um Empreendimento —
+// mudanças de status (geradas automaticamente pelo sistema), anotações
+// manuais feitas por usuários, e documentos enviados. A timeline é append-
+// only: eventos nunca são editados ou excluídos, só adicionados.
+model EventoEmpreendimento {
+  id               String @id @default(cuid())
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+
+  tipo      TipoEvento
+  titulo    String     // Ex: "Status alterado para Comercial", "Contrato enviado"
+  descricao String?    // Texto livre — obrigatório para anotações, opcional para o resto
+  usuarioId String?    @map("usuario_id")
+  usuario   Usuario?   @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  // Metadados específicos por tipo de evento (guardados como JSON simples)
+  // Ex: { "statusAnterior": "PROSPECCAO", "statusNovo": "COMERCIAL" }
+  meta      String?    @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([empreendimentoId])
+  @@index([createdAt])
+  @@map("eventos_empreendimento")
+}
+
+// Documento vinculado a um Empreendimento — armazena metadados e referência
+// ao arquivo (URL/path). O upload real (storage) será implementado no
+// Módulo 5 (Gestão de Documentos); esta tabela já existe para que a
+// timeline possa registrar documentos mesmo antes do módulo completo.
+model DocumentoEmpreendimento {
+  id               String @id @default(cuid())
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+
+  nome      String  // Nome original do arquivo
+  url       String  // URL/path de armazenamento — para docs sem storage externo, usamos "" e servimos via `conteudo`
+  conteudo  Bytes?  // Conteúdo binário direto no banco (usado por propostas geradas — sem infra de storage externo ainda)
+  tamanho   Int?    // Tamanho em bytes
+  tipo      String? // MIME type (ex: "application/pdf")
+  usuarioId String? @map("usuario_id")
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([empreendimentoId])
+  @@map("documentos_empreendimento")
+}
+
+// ----------------------------------------------------------------------------
+// ESTRUTURA FÍSICA — Torre > Bloco (opcional) > Pavimento > Unidade
+// ----------------------------------------------------------------------------
+// Modelada como hierarquia real desde o início, pois o Levantamento
+// Quantitativo (módulo futuro) precisa saber exatamente em qual Unidade
+// cada kit será instalado — não apenas "quantos apartamentos no total".
+//
+// Bloco é uma camada OPCIONAL: por decisão de produto, o Módulo 4
+// (Cadastro de Empreendimentos) gera a estrutura física apenas como
+// Torre -> Pavimento -> Unidade, sem usar Bloco — o usuário só informa
+// quantidade de torres, pavimentos por torre e unidades por pavimento.
+// Pavimento.blocoId é opcional de propósito: quando blocoId é null,
+// Pavimento.torreId aponta direto para a Torre. O modelo Bloco continua
+// existindo no schema para quando essa camada for necessária (ex: um
+// empreendimento real dividido em blocos dentro de cada torre) — nesse
+// caso futuro, Pavimento passa a usar blocoId em vez de torreId.
+
+model Torre {
+  id               String @id @default(cuid())
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+
+  nome   String  // ex: "Torre 1", "Torre A"
+  ordem  Int     @default(0)
+
+  blocos     Bloco[]
+  // Pavimentos ligados diretamente a esta Torre (quando não há Bloco).
+  pavimentos Pavimento[]
+  remessas   Remessa[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([empreendimentoId])
+  @@map("torres")
+}
+
+model Bloco {
+  id      String @id @default(cuid())
+  torreId String @map("torre_id")
+  torre   Torre  @relation(fields: [torreId], references: [id], onDelete: Cascade)
+
+  nome  String // ex: "Bloco A"
+  ordem Int    @default(0)
+
+  pavimentos Pavimento[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([torreId])
+  @@map("blocos")
+}
+
+model Pavimento {
+  id String @id @default(cuid())
+
+  // Exatamente um destes dois deve estar preenchido (nunca os dois, nunca
+  // nenhum) — validado na camada de aplicação (use-case), não no schema,
+  // pois o Prisma não suporta constraint XOR nativamente.
+  blocoId String? @map("bloco_id")
+  bloco   Bloco?  @relation(fields: [blocoId], references: [id], onDelete: Cascade)
+  torreId String? @map("torre_id")
+  torre   Torre?  @relation(fields: [torreId], references: [id], onDelete: Cascade)
+
+  nome  String // ex: "Pavimento 7", "Térreo"
+  ordem Int    @default(0)
+
+  // Previsão de remessa — preenchida pelo Comercial já na fase de
+  // estrutura física, ANTES do contrato fechar. Vira a fonte única que
+  // alimenta a data prevista da Conta a Receber (Financeiro), a tela de
+  // pedidos liberados (Produção) e o planejamento da fábrica — sem
+  // precisar redigitar a mesma data em três lugares diferentes.
+  dataPrevistaRemessa DateTime? @map("data_prevista_remessa")
+
+  unidades Unidade[]
+  contasReceber ContaReceber[]
+  remessas Remessa[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([blocoId])
+  @@index([torreId])
+  @@map("pavimentos")
+}
+
+model Unidade {
+  id          String @id @default(cuid())
+  pavimentoId String @map("pavimento_id")
+  pavimento   Pavimento @relation(fields: [pavimentoId], references: [id], onDelete: Cascade)
+
+  identificacao String  // ex: "Apto 701", "Sala 12"
+  tipologiaId   String? @map("tipologia_id")
+  tipologia     Tipologia? @relation(fields: [tipologiaId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([pavimentoId])
+  @@index([tipologiaId])
+  @@map("unidades")
+}
+
+// ----------------------------------------------------------------------------
+// TIPOLOGIA — específica de cada Empreendimento (não é catálogo compartilhado)
+// ----------------------------------------------------------------------------
+
+enum StatusProducaoTipologia {
+  ATIVA     // produzindo normalmente
+  STANDBY   // pausada de propósito (ex: cliente pediu, pendência comercial/financeira) — some da fila de urgência
+  CONCLUIDA // já terminou tudo, não aparece mais como pendente
+}
+
+model Tipologia {
+  id               String @id @default(cuid())
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+
+  nome           String  // ex: "Tipo A — 2 quartos"
+  areaPrivativa  Decimal? @map("area_privativa") @db.Decimal(8, 2)
+  // Quantidade de unidades desta tipologia no empreendimento — obrigatório.
+  // Base para consolidar o levantamento (por unidade × quantidade) e a
+  // orçamentação (preço unitário × quantidade), evitando digitar esse
+  // número toda vez que uma proposta é gerada.
+  quantidadeUnidades Int @default(1) @map("quantidade_unidades")
+  descricao      String?  @db.Text
+
+  // Status de produção — permite colocar em stand-by (ex: obra parada
+  // por decisão comercial/financeira) sem mexer no status geral do
+  // empreendimento. Some da fila de risco quando em stand-by, já que
+  // não é "atrasado", é uma pausa intencional.
+  statusProducao StatusProducaoTipologia @default(ATIVA) @map("status_producao")
+
+  unidades   Unidade[]
+  levantamentos LevantamentoEletrico[]
+  movimentacoesEstoque MovimentacaoEstoque[]
+  registrosProducao RegistroProducao[]
+  marcosOperacionais MarcoOperacional[]
+  levantamentosHidraulicos LevantamentoHidraulico[]
+  levantamentosMateriais LevantamentoMateriais[]
+  aprovacoesProposta AprovacaoProposta[]
+  itensRemessa ItemRemessa[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([empreendimentoId])
+  @@map("tipologias")
+}
+
+// ============================================================================
+// MÓDULO: AUTENTICAÇÃO E CONTROLE DE ACESSO (RBAC)
+// ----------------------------------------------------------------------------
+// Usuario é a entidade central. Account/Session/VerificationToken seguem
+// exatamente o schema padrão exigido pelo @next-auth/prisma-adapter (v4) —
+// não alterar os nomes de campo/tabela dessas três sem checar a
+// documentação do adapter, pois ele faz queries diretas nesses nomes.
+//
+// RBAC: Usuario <-N:N-> Papel <-N:N-> Permissao.
+// - Papel é editável pelo Admin via tela (CRUD completo).
+// - Permissao é fixa no código: cada módulo, ao ser construído, declara
+//   as permissões que introduz (chave única "recurso:acao"). Não existe
+//   tela de "criar permissão do zero" — uma permissão só tem efeito real
+//   se algum trecho de código realmente checar por ela.
+// ============================================================================
+
+model Usuario {
+  id       String  @id @default(cuid())
+  nome     String
+  email    String  @unique
+  // Exibidos como "Associado" na Proposta Comercial (rodapé/assinatura) —
+  // opcionais porque nem todo usuário do sistema assina proposta (ex:
+  // Produção, Suprimentos). Sem valor aqui, a proposta mostra "Não
+  // informado" nesse campo em vez de travar a geração.
+  cargo    String?
+  telefone String?
+  // Hash da senha (bcrypt). Nulo é permitido no schema porque o Prisma
+  // Adapter do NextAuth também cria registros de Usuario para logins
+  // OAuth (sem senha) — não usamos OAuth agora, mas o adapter exige que
+  // o campo não seja obrigatório para continuar compatível com o padrão.
+  senhaHash String? @map("senha_hash")
+  ativo    Boolean @default(true)
+
+  // Força a pessoa a trocar a senha antes de acessar qualquer outra tela
+  // — ligado automaticamente quando um Admin cria o usuário ou reseta a
+  // senha de alguém, e no seed do administrador inicial.
+  precisaTrocarSenha Boolean @default(false) @map("precisa_trocar_senha")
+
+  // Autenticação em dois fatores (TOTP — Google Authenticator/Authy).
+  // O segredo só é gravado depois que a pessoa confirma o primeiro código
+  // (evita ativar 2FA "pela metade" com um segredo que ninguém salvou).
+  duploFatorAtivo    Boolean @default(false) @map("duplo_fator_ativo")
+  duploFatorSecreto  String? @map("duplo_fator_secreto")
+  // Admin marca isso pra forçar a pessoa a configurar 2FA antes de
+  // acessar qualquer outra tela — diferente de duploFatorAtivo (que é
+  // "já configurou"), esse é "é obrigado a configurar".
+  duploFatorObrigatorio Boolean @default(false) @map("duplo_fator_obrigatorio")
+
+  // Sessão única — a cada login bem-sucedido, gera um token novo aqui.
+  // Toda requisição autenticada compara o token do JWT com este campo;
+  // se não bater, é uma sessão antiga (alguém logou em outro lugar
+  // depois) e é encerrada automaticamente.
+  sessaoAtualToken String? @map("sessao_atual_token")
+
+  // Reset de senha via link — token é de uso único e expira em 1h.
+  tokenResetSenha       String?   @map("token_reset_senha")
+  tokenResetSenhaExpira DateTime? @map("token_reset_senha_expira")
+
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+
+  papeis   UsuarioPapel[]
+  accounts Account[]
+  sessions Session[]
+
+  empreendimentosComoResponsavelComercial   Empreendimento[] @relation("EmpreendimentoResponsavelComercial")
+  empreendimentosComoResponsavelEngenharia  Empreendimento[] @relation("EmpreendimentoResponsavelEngenharia")
+  empreendimentosComoResponsavelOrcamentacao Empreendimento[] @relation("EmpreendimentoResponsavelOrcamentacao")
+
+  eventosEmpreendimento    EventoEmpreendimento[]
+  documentosEmpreendimento DocumentoEmpreendimento[]
+  levantamentosCriados     LevantamentoEletrico[]
+  levantamentosHidraulicosCriados LevantamentoHidraulico[]
+  levantamentosMateriaisCriados LevantamentoMateriais[]
+  orcamentosCriados        Orcamento[]
+  propostasGeradas         Orcamento[] @relation("PropostasGeradas")
+  orcamentosResponsavel    Orcamento[] @relation("OrcamentosResponsavel")
+  orcamentosAprovados      Orcamento[] @relation("OrcamentosAprovados")
+  aprovacoesPropostaDadas  AprovacaoProposta[]
+  cotacoesCriadas          Cotacao[]
+  cotacoesSelecionadas     Cotacao[] @relation("CotacoesSelecionadas")
+  cotacoesResponsavel      Cotacao[] @relation("CotacoesResponsavel")
+  tabelasPrecoImportadas   TabelaPrecoFornecedor[]
+  orcamentoJornadaResponsavel OrcamentoJornada[] @relation("OrcamentoJornadaResponsavel")
+  negociacoesRegistradas   OrcamentoNegociacao[]
+  contasPagarCriadas       ContaPagar[] @relation("ContasPagarCriadas")
+  contasPagarBaixadas      ContaPagar[] @relation("ContasPagarBaixadas")
+  historicosOrcamento      OrcamentoHistorico[]
+  logsSeguranca            LogSeguranca[]
+  registrosProducaoFeitos     RegistroProducao[] @relation("RegistroProducaoRegistradoPor")
+  registrosProducaoCorrigidos RegistroProducao[] @relation("RegistroProducaoCorrigidoPor")
+  movimentacoesEstoqueFeitas  MovimentacaoEstoque[]
+  pedidosCompraCriados       PedidoCompra[]
+  remessasCriadas             Remessa[] @relation("RemessasCriadas")
+  volumesConferidos           Volume[] @relation("VolumesConferidos")
+  carregamentosCriados        Carregamento[] @relation("CarregamentosCriados")
+  carregamentosLiberados      Carregamento[] @relation("CarregamentosLiberados")
+  expedicaoHistoricoRegistrado ExpedicaoHistorico[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("usuarios")
+}
+
+// ----------------------------------------------------------------------------
+// Tabelas exigidas pelo @next-auth/prisma-adapter (não usamos OAuth hoje,
+// mas o adapter sempre cria/consulta estas tabelas; Account fica vazia
+// na prática enquanto só existir o Credentials Provider).
+// ----------------------------------------------------------------------------
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  usuario Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  usuario Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ----------------------------------------------------------------------------
+// PAPEL — editável pelo Admin via tela (nome, descrição, quais permissões)
+// ----------------------------------------------------------------------------
+
+model Papel {
+  id          String  @id @default(cuid())
+  nome        String  @unique
+  descricao   String?
+
+  usuarios    UsuarioPapel[]
+  permissoes  PapelPermissao[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("papeis")
+}
+
+// ----------------------------------------------------------------------------
+// PERMISSAO — fixa no código. A chave segue o padrão "recurso:acao"
+// (ex: "empreendimento:criar", "financeiro:ver_valores"). Cada módulo,
+// quando construído, faz seed das permissões que introduz.
+// ----------------------------------------------------------------------------
+
+model Permissao {
+  id        String  @id @default(cuid())
+  chave     String  @unique // ex: "empreendimento:criar"
+  descricao String
+
+  papeis PapelPermissao[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("permissoes")
+}
+
+model UsuarioPapel {
+  usuarioId String @map("usuario_id")
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  papelId   String @map("papel_id")
+  papel     Papel   @relation(fields: [papelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([usuarioId, papelId])
+  @@index([papelId])
+  @@map("usuarios_papeis")
+}
+
+model PapelPermissao {
+  papelId     String    @map("papel_id")
+  papel       Papel     @relation(fields: [papelId], references: [id], onDelete: Cascade)
+  permissaoId String    @map("permissao_id")
+  permissao   Permissao @relation(fields: [permissaoId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([papelId, permissaoId])
+  @@index([permissaoId])
+  @@map("papeis_permissoes")
+}
+
+// ============================================================================
+// MÓDULO 8 — ORÇAMENTAÇÃO
+// ============================================================================
+
+// Tabela de preços base de mão de obra HGI por kit e área privativa.
+// O preço final = precoBase × multiplicador do Tier do empreendimento.
+// Administradores ajustam esses valores no módulo de Configurações.
+enum CriterioPrecificacao {
+  AREA        // faixa por m² de área privativa (comportamento original)
+  PONTOS_TETO // faixa por quantidade de pontos de teto (L) da tipologia
+}
+
+model TabelaPrecoBase {
+  id            String  @id @default(cuid())
+  kit           String  // "ELETRICO" | "HIDRAULICO" | "QDC"
+  // Qual critério esta faixa usa — o sistema só aplica as faixas do
+  // critério que estiver ativo em ConfiguracaoSistema.criterioPrecificacao.
+  // As duas listas coexistem na mesma tabela; trocar o critério global não
+  // apaga a outra, só passa a ignorá-la.
+  criterio      CriterioPrecificacao @default(AREA)
+  // Faixa de área privativa (m²) OU de quantidade de pontos de teto,
+  // dependendo do campo `criterio` acima.
+  areaMin       Float   @map("area_min") // ex: 0 (ou "0 pontos" se criterio=PONTOS_TETO)
+  areaMax       Float   @map("area_max") // ex: 55 (ou "15 pontos" se criterio=PONTOS_TETO)
+  descricao     String  // ex: "Kit Elétrico — até 55m²"
+  precoBase     Decimal @map("preco_base") @db.Decimal(10, 2)
+  ativo         Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([kit])
+  @@index([criterio])
+  @@map("tabela_preco_base")
+}
+
+// Configuração única e global do sistema — hoje só guarda o critério de
+// precificação ativo, mas serve como lugar natural pra outras chaves
+// globais que surgirem depois. Sempre uma linha só (id fixo "default").
+model ConfiguracaoSistema {
+  id                   String               @id @default("default")
+  criterioPrecificacao CriterioPrecificacao @default(AREA)
+  saldoCaixaAtual      Decimal              @default(0) @db.Decimal(12, 2)
+
+  // Fórmula do critério PONTOS_TETO — substituiu o sistema de 4 faixas
+  // (Baixo/Médio/Alto/Altíssimo Padrão) por uma fórmula única, mais
+  // simples de entender e editar:
+  //   total = kitValorMinimo + max(0, pontos - kitPontosInclusos) * kitValorPorPontoExtra
+  kitValorMinimo        Decimal @default(550) @db.Decimal(10, 2)
+  kitPontosInclusos     Int     @default(6)
+  kitValorPorPontoExtra Decimal @default(70) @db.Decimal(10, 2)
+
+  // Meta de produção diária, em "U.H." (Unidade Habitacional equivalente)
+  // — mesma meta pra qualquer bancada, o que muda é o U.H. Referência de
+  // cada uma (ver model Bancada) que converte produção bruta pra essa
+  // moeda comum.
+  metaProducaoDiariaUH Decimal @default(50) @db.Decimal(10, 2)
+
+  // Metas de tempo por área (em dias) — pra transformar o "Desempenho
+  // das Áreas" do dashboard de Diretoria em status de verdade
+  // (saudável/atenção/crítico), não só "tem dado ou não tem". Nulo =
+  // meta ainda não definida, área aparece como "sem meta" no scorecard.
+  metaDiasComercial     Decimal? @map("meta_dias_comercial") @db.Decimal(6, 1)
+  metaDiasEngenharia    Decimal? @map("meta_dias_engenharia") @db.Decimal(6, 1)
+  metaDiasOrcamentacao  Decimal? @map("meta_dias_orcamentacao") @db.Decimal(6, 1)
+  metaDiasProducao      Decimal? @map("meta_dias_producao") @db.Decimal(6, 1)
+
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+
+  @@map("configuracao_sistema")
+}
+
+// Multiplicadores por Tier — 4 tiers (0 a 3).
+// Tier 0 = altíssimo padrão, Tier 3 = econômico.
+model TierMultiplicador {
+  id           String  @id @default(cuid())
+  tier         Int     @unique // 0, 1, 2, 3
+  nome         String  // "Altíssimo Padrão", "Alto Padrão", etc.
+  multiplicador Decimal @db.Decimal(5, 2) // ex: 1.50, 1.20, 1.00, 0.80
+  descricao    String? // descrição opcional
+
+  itensServicoOrcamento ItemServicoOrcamento[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("tier_multiplicadores")
+}
+
+// Status do orçamento
+// RASCUNHO → ENVIADO → APROVADO / REPROVADO / REVISAO
+enum StatusOrcamento {
+  EM_LEVANTAMENTO          // sendo montado — equivalente ao antigo Rascunho/Revisão
+  ENVIADO_APROVACAO_GESTOR // enviado, aguardando Diretor/Coordenador
+  ORCAMENTO_APROVADO       // aprovado pela gestão — trava novas revisões
+  ORCAMENTO_DEVOLVIDO      // devolvido pela gestão — volta a ser editável
+}
+
+// Orçamento vinculado ao empreendimento.
+// Pode haver múltiplas revisões (revisao 1, 2, 3...).
+model Orcamento {
+  id               String  @id @default(cuid())
+  empreendimentoId String  @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+
+  revisao          Int     @default(1)
+  status           StatusOrcamento @default(EM_LEVANTAMENTO)
+
+  // Tier aplicado neste orçamento (pode diferir do tier padrão do cliente)
+  tier             Int     @default(2) // 0-3
+
+  // Totais calculados e armazenados para histórico
+  totalServicosHgi Decimal? @map("total_servicos_hgi") @db.Decimal(12, 2)
+  totalMateriais   Decimal? @map("total_materiais") @db.Decimal(12, 2)
+
+  // Novos campos para desagregação financeira (custo vs receita)
+  custoDireto Decimal? @map("custo_direto") @db.Decimal(12, 2)
+  custoIndireto Decimal? @map("custo_indireto") @db.Decimal(12, 2)
+  margemPrevista Decimal? @map("margem_prevista") @db.Decimal(12, 2)
+
+  // Confirmação explícita de que o Bloco 2 (lista de materiais) está
+  // completo e revisado — não basta ter 1 item cadastrado, alguém precisa
+  // confirmar de propósito. Junto com status=ORCAMENTO_APROVADO, libera
+  // a geração da Proposta Comercial.
+  materiaisConferidos Boolean @default(false) @map("materiais_conferidos")
+
+  observacoes      String? @db.Text
+
+  // Rastreamento: quem está trabalhando nisso e quando precisa estar pronto
+  responsavelId String? @map("responsavel_id")
+  responsavel Usuario? @relation("OrcamentosResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  
+  dataPrazo DateTime? @map("data_prazo")
+
+  // Quais levantamentos alimentaram este orçamento (JSON array de IDs)
+  levantamentoEletricoIds String? @map("levantamento_eletrico_ids") @db.Text
+  levantamentoMateriaisIds String? @map("levantamento_materiais_ids") @db.Text
+
+  // Fluxo de aprovação separado do status macro
+  statusAprovacao String @default("NAO_ENVIADO") @map("status_aprovacao")
+  // NAO_ENVIADO | AGUARDANDO_APROVACAO | APROVADO | DEVOLVIDO | REJEITADO | EXPIRADO
+  
+  aprovadoPorId String? @map("aprovado_por_id")
+  aprovadoPor Usuario? @relation("OrcamentosAprovados", fields: [aprovadoPorId], references: [id], onDelete: SetNull)
+  
+  dataAprovacao DateTime? @map("data_aprovacao")
+  motivoDevolucao String? @map("motivo_devolucao") @db.Text
+
+  // Trava de proposta: uma vez gerada, o botão "Gerar Proposta Comercial"
+  // vira consulta pra qualquer papel — só Diretor/Admin pode gerar de novo
+  // (sobrescrevendo). Isso impede duplicidade de propostas enviadas ao
+  // cliente com valores diferentes por engano.
+  propostaGeradaEm   DateTime? @map("proposta_gerada_em")
+  propostaGeradaPorId String?  @map("proposta_gerada_por_id")
+  propostaGeradaPor   Usuario? @relation("PropostasGeradas", fields: [propostaGeradaPorId], references: [id], onDelete: SetNull)
+  propostaDocumentoId String?  @map("proposta_documento_id")
+
+  // Decisão do cliente sobre a proposta gerada — registrada manualmente
+  // pelo Comercial depois de conversar com o cliente.
+  decisaoCliente     String?   @default("PENDENTE") @map("decisao_cliente") // PENDENTE | ACEITA | RECUSADA
+  decisaoClienteEm   DateTime? @map("decisao_cliente_em")
+  decisaoClienteObs  String?   @db.Text @map("decisao_cliente_obs")
+
+  criadoPorId      String? @map("criado_por_id")
+  criadoPor        Usuario? @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  itensServico     ItemServicoOrcamento[]
+  itensMaterial    ItemMaterialOrcamento[]
+  cotacoes         Cotacao[]
+  contasReceber    ContaReceber[]
+  jornada          OrcamentoJornada[]
+  historico        OrcamentoHistorico[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([empreendimentoId])
+  @@index([responsavelId])
+  @@index([statusAprovacao])
+  @@map("orcamentos")
+}
+
+// Item de serviço HGI no orçamento — uma linha por tipologia × kit.
+// Valor = precoBase × multiplicadorTier × quantidadeUnidades
+model ItemServicoOrcamento {
+  id           String   @id @default(cuid())
+  orcamentoId  String   @map("orcamento_id")
+  orcamento    Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+
+  tipologiaId  String?  @map("tipologia_id") // ref à tipologia do empreendimento
+  tipologiaNome String  @map("tipologia_nome") // snapshot do nome
+  kit          String   // "ELETRICO" | "HIDRAULICO" | "QDC"
+
+  quantidade   Int      // nº de unidades desta tipologia
+  precoBase    Decimal  @map("preco_base") @db.Decimal(10, 2)
+  multiplicador Decimal @db.Decimal(5, 2)
+  precoUnitario Decimal @map("preco_unitario") @db.Decimal(10, 2) // precoBase × multiplicador
+  total        Decimal  @db.Decimal(12, 2) // precoUnitario × quantidade
+
+  // Situação da linha — por que pode estar zero ou ajustada
+  situacao String @default("NORMAL")
+  // NORMAL | FORA_DO_ESCOPO | CORTESIA | AJUSTE_MANUAL | ERRO_DE_CALCULO
+  
+  justificativa String? @db.Text // obrigatória se situacao != NORMAL
+
+  // Referência a qual TierMultiplicador foi usado
+  tierMultiplicadorId String? @map("tier_multiplicador_id")
+  tierMultiplicador TierMultiplicador? @relation(fields: [tierMultiplicadorId], references: [id], onDelete: SetNull)
+
+  // Ajuste manual sobre o preço calculado
+  ajusteManual Decimal? @map("ajuste_manual") @db.Decimal(12, 2)
+  ajusteMotivo String? @map("ajuste_motivo") @db.Text
+
+  // Memória de cálculo (JSON snapshot)
+  memoriaCalculo String? @map("memoria_calculo") @db.Text
+  // { formula: "...", etapas: [...], observacoes: "..." }
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([orcamentoId])
+  @@map("itens_servico_orcamento")
+}
+
+// Item de material no orçamento — lista de materiais do levantamento.
+// Preço é opcional — pode ser deixado em branco se cliente tem fornecedor.
+model ItemMaterialOrcamento {
+  id           String   @id @default(cuid())
+  orcamentoId  String   @map("orcamento_id")
+  orcamento    Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+
+  // Referência ao catálogo — presente quando o item veio da busca no
+  // catálogo (MaterialEletricoDialog); ausente em itens digitados à mão.
+  materialEletricoId String?           @map("material_eletrico_id")
+  materialEletrico    MaterialEletrico? @relation(fields: [materialEletricoId], references: [id], onDelete: SetNull)
+
+  tipologiaNome String? @map("tipologia_nome")
+  descricao    String   // nome do material
+  categoria    String?  // snapshot da categoria/fornecedor no momento da inclusão
+  unidade      String   // "m", "un", "rolo"
+  quantidade   Decimal  @db.Decimal(10, 3)
+  precoUnitario Decimal? @map("preco_unitario") @db.Decimal(10, 2) // opcional
+  total        Decimal? @db.Decimal(12, 2) // calculado se preço informado
+
+  // Situação da linha — por que pode estar sem preço
+  situacao String @default("PENDENTE_PRECIFICACAO")
+  // NORMAL | FORA_DO_ESCOPO | CLIENTE_FORNECE | FORNECEDOR_PENDENTE | CORTESIA | ERRO_DE_CALCULO
+  
+  justificativa String? @db.Text // obrigatória se situacao != NORMAL
+
+  // Fornecedor selecionado (de qual cotação veio este preço?)
+  fornecedorSelecionadoId String? @map("fornecedor_selecionado_id")
+  fornecedorSelecionado Fornecedor? @relation(fields: [fornecedorSelecionadoId], references: [id], onDelete: SetNull)
+
+  // Referência à cotação (se veio de uma)
+  cotacaoItemId String? @map("cotacao_item_id")
+  cotacaoItem CotacaoItem? @relation(fields: [cotacaoItemId], references: [id], onDelete: SetNull)
+
+  // Referência à Tabela de Preços (se veio de uma, em vez de Cotação) —
+  // caminho alternativo/complementar: preço-padrão mensal do fornecedor,
+  // aplicado automaticamente, sem precisar de negociação pontual.
+  itemTabelaPrecoId String? @map("item_tabela_preco_id")
+  itemTabelaPreco   ItemTabelaPreco? @relation(fields: [itemTabelaPrecoId], references: [id], onDelete: SetNull)
+
+  // Snapshot da marca no momento da aplicação da Tabela de Preços —
+  // aparece na tela de Orçamento e (depois, fase 2) na Proposta Comercial.
+  marca String?
+
+  // Decomposição do preço (não bundled)
+  precoBase Decimal? @map("preco_base") @db.Decimal(10, 4)
+  frete Decimal @default(0) @db.Decimal(10, 2)
+  impostos Decimal @default(0) @db.Decimal(10, 2)
+  perdas Decimal @default(0) @db.Decimal(10, 2)
+
+  // Memória de cálculo
+  memoriaCalculo String? @map("memoria_calculo") @db.Text
+  // { fórmula, frete incluído?, impostos incluídos?, perdas? }
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([orcamentoId])
+  @@index([fornecedorSelecionadoId])
+  @@map("itens_material_orcamento")
+}
+
+// ============================================================================
+// Catálogo de produtos PEX por fabricante. Pré-carregado com a linha Barbi.
+// Permite adicionar outros fabricantes. Usado no levantamento hidráulico.
+model MaterialPex {
+  id          String  @id @default(cuid())
+  fabricante  String  @default("Barbi")
+  categoria   String  // "Tubo", "Conexão - Cotovelo", "Conexão - Te", etc.
+  nome        String  // "Cotovelo 90°"
+  diametro    String? // "16mm", "20mm", "16x20mm" (redução)
+  unidade     String  @default("un") // "un", "m", "rolo"
+  ativo       Boolean @default(true)
+  obs         String? // observações extras
+
+  itensLevantamento ItemLevantamentoHidraulico[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([fabricante, categoria])
+  @@index([nome])
+  @@map("materiais_pex")
+}
+
+// Catálogo de materiais elétricos e de QDC — mesma lógica do catálogo PEX,
+// mas cobrindo caixas, conectores, cabos de bitola especial, componentes
+// de quadro de distribuição (disjuntores, barramentos, DR) e acabamento
+// elétrico (placas, tomadas). Alimenta o Bloco 2 (Materiais) do Orçamento.
+// Fornecedores de referência: Nanoplásticos, Wago, Davin, TAF, Frontec,
+// Loja Elétrica, B.Lux — vistos na planilha real de proposta da HGI.
+model MaterialEletrico {
+  id          String  @id @default(cuid())
+  // Código interno da HGI (esquema CCEEVV — categoria/bitola-ou-medida/cor
+  // ou variante). Opcional porque materiais antigos (pré-codificação) podem
+  // não ter um; novos cadastros devem sempre vir com código.
+  codigo      String? @unique
+  fabricante  String  // "Nanoplásticos", "Wago", "Davin", "TAF"...
+  categoria   String  // "Caixa", "Conector", "QDC - Quadro", "QDC - Disjuntor"...
+  nome        String  // "Caixa Teto 6 Posições"
+  especificacao String? // detalhe adicional (ex: "24 posições", "1x20A")
+  unidade     String  @default("un")
+  // Preço de referência — usado no Levantamento de Materiais e no
+  // catálogo de busca. Populado inicialmente com dados reais de uma
+  // proposta HGI (QDC Pacaembu).
+  precoUnitario Decimal @default(0) @map("preco_unitario") @db.Decimal(10, 4)
+  kit         String  @default("ELETRICO") // "ELETRICO" | "QDC"
+  ativo       Boolean @default(true)
+  obs         String?
+
+  estoquePorObra       EstoqueEmpreendimentoMaterial[]
+  movimentacoesEstoque MovimentacaoEstoque[]
+  itensPedidoCompra    PedidoCompraItem[]
+
+  itensMaterialOrcamento ItemMaterialOrcamento[]
+  itensLevantamento      ItemLevantamentoMaterial[]
+  ofertasFornecedor      ProdutoFornecedor[]
+  itensCotacao           CotacaoItem[]
+  itensTabelaPreco       ItemTabelaPreco[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([fabricante, categoria])
+  @@index([nome])
+  @@map("materiais_eletrico")
+}
+
+// ============================================================================
+// LEVANTAMENTO DE MATERIAIS — Elétrico / QDC
+// ============================================================================
+// Reaproveita o catálogo MaterialEletrico (já existente, usado também
+// pelo Bloco 2 do Orçamento). Mesmo fluxo de status do hidráulico
+// (RASCUNHO até revisão, VALIDADO só por gestor).
+
+// Levantamento de materiais por tipologia — alimenta o Bloco 2
+// (materiais) do Orçamento quando validado.
+model LevantamentoMateriais {
+  id               String @id @default(cuid())
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+  tipologiaId      String @map("tipologia_id")
+  tipologia        Tipologia @relation(fields: [tipologiaId], references: [id], onDelete: Cascade)
+
+  status String @default("RASCUNHO") // "RASCUNHO" | "VALIDADO"
+
+  // Marca EXATAMENTE quando virou VALIDADO — createdAt/updatedAt não
+  // servem pra isso (updatedAt muda em qualquer edição). Permite medir
+  // "quanto tempo ficou em Rascunho" pra identificar gargalos.
+  validadoEm DateTime? @map("validado_em")
+
+  itens ItemLevantamentoMaterial[]
+
+  criadoPorId String?  @map("criado_por_id")
+  criadoPor   Usuario? @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([empreendimentoId, tipologiaId])
+  @@index([empreendimentoId])
+  @@index([tipologiaId])
+  @@map("levantamentos_materiais")
+}
+
+model ItemLevantamentoMaterial {
+  id             String @id @default(cuid())
+  levantamentoId String @map("levantamento_id")
+  levantamento   LevantamentoMateriais @relation(fields: [levantamentoId], references: [id], onDelete: Cascade)
+
+  materialEletricoId String?           @map("material_eletrico_id")
+  materialEletrico   MaterialEletrico? @relation(fields: [materialEletricoId], references: [id], onDelete: SetNull)
+
+  // Snapshot no momento da inclusão — preserva o histórico mesmo se o
+  // catálogo/preço mudar depois.
+  fabricante    String
+  categoria     String?
+  descricao     String
+  unidade       String
+  precoUnitario Decimal @map("preco_unitario") @db.Decimal(10, 4)
+  quantidade    Float
+
+  // Quebra do cálculo (quantidade por unidade × repetições = quantidade
+  // total) — vem do upload da planilha de materiais por tipologia. Nomes
+  // genéricos porque hoje qualquer material pode ter essa quebra, não só
+  // cabo/eletroduto como antes (@map mantém a coluna física original —
+  // é só um rename no nível do Prisma, sem migração de dado).
+  // Nulos quando o item foi adicionado manualmente (não tem essa quebra).
+  quantidadeUnitaria Float? @map("distancia_por_unidade")
+  repeticoes         Int?   @map("quantidade_apartamentos")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([levantamentoId])
+  @@map("itens_levantamento_material")
+}
+
+
+// ============================================================================
+// Antes de gerar a proposta comercial de uma tipologia, um Diretor ou
+// Coordenador precisa dar o aval — só depois disso o botão "Gerar Proposta"
+// libera. Se qualquer levantamento (elétrico ou hidráulico) daquela
+// tipologia for revalidado DEPOIS do aval, ele fica "obsoleto" e precisa
+// de um novo aval (checado comparando timestamps na camada de aplicação).
+model AprovacaoProposta {
+  id               String @id @default(cuid())
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+  tipologiaId      String @map("tipologia_id")
+  tipologia        Tipologia @relation(fields: [tipologiaId], references: [id], onDelete: Cascade)
+
+  aprovadoPorId String  @map("aprovado_por_id")
+  aprovadoPor   Usuario @relation(fields: [aprovadoPorId], references: [id])
+  observacao    String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([empreendimentoId, tipologiaId])
+  @@map("aprovacoes_proposta")
+}
+
+// ============================================================================
+// Estrutura paralela ao Levantamento Elétrico, mas com entrada manual de
+// itens (via seleção do catálogo PEX ou lançamento livre para os demais
+// subtipos) em vez de import de planilha — o hidráulico não tem uma
+// planilha VBA equivalente à do elétrico.
+
+enum SubtipoHidraulico {
+  ESGOTO
+  PEX
+  AGUA_QUENTE
+  AGUA_FRIA
+}
+
+model LevantamentoHidraulico {
+  id               String @id @default(cuid())
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+  tipologiaId      String @map("tipologia_id")
+  tipologia        Tipologia @relation(fields: [tipologiaId], references: [id], onDelete: Cascade)
+  subtipo          SubtipoHidraulico
+
+  // Mesmo fluxo de status do elétrico: RASCUNHO até revisão, VALIDADO
+  // quando confirmado pelo engenheiro/comercial.
+  status String @default("RASCUNHO")
+
+  validadoEm DateTime? @map("validado_em")
+
+  observacoes String? @db.Text
+
+  itens ItemLevantamentoHidraulico[]
+
+  criadoPorId String?  @map("criado_por_id")
+  criadoPor   Usuario? @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([empreendimentoId, tipologiaId, subtipo])
+  @@index([empreendimentoId])
+  @@index([tipologiaId])
+  @@map("levantamentos_hidraulicos")
+}
+
+model ItemLevantamentoHidraulico {
+  id             String @id @default(cuid())
+  levantamentoId String @map("levantamento_id")
+  levantamento   LevantamentoHidraulico @relation(fields: [levantamentoId], references: [id], onDelete: Cascade)
+
+  // Referência ao catálogo — presente quando o item veio do MaterialPexDialog
+  materialPexId String?      @map("material_pex_id")
+  materialPex   MaterialPex? @relation(fields: [materialPexId], references: [id], onDelete: SetNull)
+
+  // Snapshot dos dados no momento da inclusão — preserva o histórico mesmo
+  // se o catálogo mudar depois, e permite lançamento manual (sem catálogo)
+  // para os subtipos que ainda não têm repositório de materiais.
+  descricao  String
+  categoria  String?
+  diametro   String?
+  unidade    String @default("un")
+  quantidade Float
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([levantamentoId])
+  @@map("itens_levantamento_hidraulico")
+}
+
+// ============================================================================
+// Modelo inspirado na planilha de levantamento da HGI:
+// - Um LevantamentoEletrico por tipologia por empreendimento
+// - N PecaLevantamento por levantamento (PEÇA 01, PEÇA 02...)
+// - N CircuitoPeca por peça (as "linhas filhas" do VBA)
+// - Os totais são calculados pela aplicação, não armazenados
+// ============================================================================
+
+// Catálogo de circuitos do empreendimento — configurável por projeto.
+// Baseado na aba CIRCUITOS da planilha (Iluminação, TUG, Chuveiro...).
+// Um catálogo por empreendimento permite customizar bitolas e fios
+// conforme o projeto elétrico específico.
+model CircuitoCatalogo {
+  id               String @id @default(cuid())
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+
+  numero    Int    // 1, 2, 3... (identificador no projeto)
+  descricao String // "Iluminação", "TUG", "Chuveiro", "Interruptor"...
+  bitola    Float  // 1.5, 2.5, 4, 6 (mm²)
+
+  // Quais fios passam neste circuito
+  temVermelho  Boolean @default(false) @map("tem_vermelho")
+  temPreto     Boolean @default(false) @map("tem_preto")
+  temAzul      Boolean @default(false) @map("tem_azul")
+  temVerde     Boolean @default(false) @map("tem_verde")
+  temAmarelo   Boolean @default(false) @map("tem_amarelo")
+  temBranco    Boolean @default(false) @map("tem_branco")
+  temCinza     Boolean @default(false) @map("tem_cinza")
+
+  circuitosPeca CircuitoPeca[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([empreendimentoId, numero])
+  @@index([empreendimentoId])
+  @@map("circuitos_catalogo")
+}
+
+// Um levantamento elétrico por tipologia por empreendimento.
+// Ex: Empreendimento X, Tipologia "Tipo A 65m²" → um levantamento.
+model LevantamentoEletrico {
+  id               String @id @default(cuid())
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+  tipologiaId      String @map("tipologia_id")
+  tipologia        Tipologia @relation(fields: [tipologiaId], references: [id], onDelete: Cascade)
+
+  // Status do levantamento: RASCUNHO (após import, não confirmado)
+  // ou VALIDADO (confirmado pelo engenheiro — pronto para orçamentação)
+  status    String @default("RASCUNHO") // "RASCUNHO" | "VALIDADO"
+
+  validadoEm DateTime? @map("validado_em")
+
+  // Metadados do levantamento
+  revisao   Int     @default(1)
+  observacoes String? @db.Text
+
+  // Configuração de pé-direito (usado no cálculo de verticais)
+  peDireito Float @default(2.8) @map("pe_direito") // metros
+
+  // Totais "oficiais" lidos DIRETO da tabela consolidada da planilha
+  // importada (não recalculados) — quando presente, tem prioridade sobre
+  // o cálculo próprio (calcularTotais) nas sugestões de material. JSON:
+  // { cabos: [{bitola, cor, metros}], eletrodutos: [{diametro, metros}] }
+  totaisImportadosJson String? @map("totais_importados_json") @db.Text
+
+  pecas PecaLevantamento[]
+
+  criadoPorId String? @map("criado_por_id")
+  criadoPor   Usuario? @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([empreendimentoId, tipologiaId])
+  @@index([empreendimentoId])
+  @@index([tipologiaId])
+  @@map("levantamentos_eletricos")
+}
+
+// Tipo de posicionamento do eletroduto — onde ele passa fisicamente.
+enum TipoEletroduto {
+  LAJE     // Na laje (horizontal no teto)
+  VERTICAL // Na parede (descida/subida)
+  PISO     // No piso
+}
+
+// Uma peça = um trecho físico do eletroduto entre dois pontos.
+// Ex: PEÇA 01 = trecho L1→L2, na laje, 2.4m de eletroduto.
+// Cada peça pode ter N circuitos passando (CircuitoPeca).
+model PecaLevantamento {
+  id                   String @id @default(cuid())
+  levantamentoId       String @map("levantamento_id")
+  levantamento         LevantamentoEletrico @relation(fields: [levantamentoId], references: [id], onDelete: Cascade)
+
+  numero    Int    // 1, 2, 3... (ordem da peça)
+  kit       TipoEletroduto @default(LAJE)
+  local     String? // ambiente (ex: "Dormitório 2", "Circulação")
+  trecho    String  // ex: "L1-L2", "QDC-L1", "T16-T17"
+  obs       String? // observações (ex: "DIVERGE DO PROJ")
+
+  // Medidas físicas (metros)
+  vertical1 Float @default(0) @map("vertical_1") // descida inicial
+  laje1     Float @default(0) @map("laje_1")      // trecho na laje (ida)
+  horiz     Float @default(0)                      // distância horizontal
+  laje2     Float @default(0) @map("laje_2")      // trecho na laje (volta)
+  vertical2 Float @default(0) @map("vertical_2")  // subida final
+
+  // Eletroduto
+  diametro  String @default("3/4\"")  // "3/4\"", "1\"", "1.1/4\""
+  sobra     Float  @default(0.3)      // sobra técnica padrão
+
+  // Circuitos que passam por esta peça (as "linhas filhas" do VBA)
+  circuitos CircuitoPeca[]
+  registrosProducao RegistroProducao[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([levantamentoId])
+  @@map("pecas_levantamento")
+}
+
+// Um circuito passando por uma peça.
+// Ex: PEÇA 01 tem 2 circuitos: Iluminação (1.5mm²) e TUG (2.5mm²).
+// O campo "eletroReal" é calculado pela aplicação:
+//   eletroReal = vertical1 + laje1 + horiz + laje2 + vertical2 + sobra
+//   (herdado da peça pai, com sobra própria se diferente)
+model CircuitoPeca {
+  id      String @id @default(cuid())
+  pecaId  String @map("peca_id")
+  peca    PecaLevantamento @relation(fields: [pecaId], references: [id], onDelete: Cascade)
+
+  // Referência ao catálogo (opcional — permite circuito avulso)
+  catalogoId String?           @map("catalogo_id")
+  catalogo   CircuitoCatalogo? @relation(fields: [catalogoId], references: [id], onDelete: SetNull)
+
+  // Dados do circuito nesta peça (podem sobrescrever o catálogo)
+  bitola    Float  // mm²
+  circuito  Int?   // número do circuito (1, 2, 3...)
+
+  // Quais fios passam (X = passa, vazio = não passa)
+  temVermelho Boolean @default(false) @map("tem_vermelho")
+  temPreto    Boolean @default(false) @map("tem_preto")
+  temAzul     Boolean @default(false) @map("tem_azul")
+  temVerde    Boolean @default(false) @map("tem_verde") // terra
+  temAmarelo  Boolean @default(false) @map("tem_amarelo") // paralelo
+  temBranco   Boolean @default(false) @map("tem_branco")  // retorno
+  temCinza    Boolean @default(false) @map("tem_cinza")  // fase extra — algumas plantas usam
+
+  // Identificador de retorno (ex: "A", "B", "C", "CP.1")
+  identRetorno String? @map("ident_retorno")
+
+  // Flags especiais
+  ehParalelo Boolean @default(false) @map("eh_paralelo")
+  ehRetorno  Boolean @default(false) @map("eh_retorno")
+
+  // Sobra específica desta linha (se diferente da peça)
+  sobraOverride Float? @map("sobra_override")
+
+  // Distância própria desta linha, quando diferente da peça — importação
+  // "PARAMETROS" precisa disso: várias linhas de fio no mesmo trecho
+  // físico podem ter comprimentos ligeiramente diferentes entre si, mas
+  // o ELETRODUTO (peça) só deve ser contado uma vez por trecho, não uma
+  // vez por linha de fio.
+  horizOverride Float? @map("horiz_override")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([pecaId])
+  @@index([catalogoId])
+  @@map("circuitos_peca")
+}
+
+
+// =============================================================================
+// MÓDULO FORNECEDORES
+// =============================================================================
+
+/**
+ * Categorias de material/serviço que um fornecedor pode suprir.
+ * Permite que a Orçamentação filtre fornecedores por tipo de insumo
+ * (ex: ao orçar eletrodutos, listar só os que têm ELETRODUTOS).
+ */
+enum TipoFornecedor {
+  ELETRODUTOS       // Eletrodutos, conexões, curvas
+  CABOS             // Cabos e fios elétricos
+  QUADROS           // QD, QF, cubículos, disjuntores
+  LUMINARIAS        // Luminárias, spots, drivers LED
+  TOMADAS_INTERRUPTORES
+  MATERIAIS_HIDRAULICOS
+  MATERIAIS_CIVIS   // Massa corrida, rejuntes, colas etc.
+  FERRAMENTAS       // Equipamentos / locação
+  SERVICOS          // Serviços terceirizados (ex: inspeção termográfica)
+  OUTROS
+}
+
+/**
+ * Fornecedor de materiais e serviços da HGI Group.
+ * Relacionado à Orçamentação: um ItemOrcamento pode ter o fornecedor
+ * preferencial definido aqui. Também usado no módulo de Estoque.
+ */
+model Fornecedor {
+  id            String   @id @default(cuid())
+  codigo        String   @unique
+  razaoSocial   String   @map("razao_social")
+  nomeFantasia  String?  @map("nome_fantasia")
+  cnpj          String   @unique
+  email         String?
+  telefone      String?
+  logradouro    String?
+  cidade        String?
+  estado        String?
+  cep           String?
+  observacoes   String?
+  ativo         Boolean  @default(true)
+
+  // Que tipos de material/serviço este fornecedor oferece (multi-valor)
+  tipos         TipoFornecedor[]
+
+  // Contatos do fornecedor (mesmo padrão de ClienteContato)
+  contatos      FornecedorContato[]
+  pedidosCompra PedidoCompra[]
+
+  // Lista de produtos que este fornecedor oferece, com preços aproximados.
+  // Base pra gerar cotações a partir do levantamento consolidado.
+  produtosOferecidos ProdutoFornecedor[]
+
+  // Cotações geradas para este fornecedor
+  cotacoes      Cotacao[]
+
+  // Itens de orçamento onde este fornecedor foi o selecionado
+  itensMaterialOrcamentoSelecionado ItemMaterialOrcamento[]
+
+  // Tabelas de preço padrão importadas (histórico completo, nunca sobrescrito)
+  tabelasPreco TabelaPrecoFornecedor[]
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([ativo])
+  @@index([cnpj])
+  @@map("fornecedores")
+}
+
+model FornecedorContato {
+  id            String    @id @default(cuid())
+  fornecedorId  String    @map("fornecedor_id")
+  fornecedor    Fornecedor @relation(fields: [fornecedorId], references: [id], onDelete: Cascade)
+
+  nome          String
+  cargo         String?
+  telefone      String?
+  email         String?
+  principal     Boolean   @default(false)
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([fornecedorId])
+  @@map("fornecedor_contatos")
+}
+
+// ============================================================================
+// PRODUTOS DO FORNECEDOR + COTAÇÕES
+// ============================================================================
+// Modelagem em duas camadas conforme decidido:
+//  1. ProdutoFornecedor  → lista de preços "aproximados" do fornecedor
+//                          (o que ele já manda por WhatsApp). Referencia o
+//                          MaterialEletrico do catálogo global para permitir
+//                          matching exato quando geramos cotações.
+//  2. Cotacao/CotacaoItem → documento gerado por fornecedor a partir do
+//                          levantamento consolidado do empreendimento.
+//                          Snapshot puro: fica congelado mesmo se o
+//                          catálogo mudar depois.
+
+// Item da lista de produtos de um fornecedor específico, com preço editável.
+// Vira o precoUnitario inicial do CotacaoItem quando uma cotação é gerada.
+model ProdutoFornecedor {
+  id                 String @id @default(cuid())
+  fornecedorId       String @map("fornecedor_id")
+  fornecedor         Fornecedor @relation(fields: [fornecedorId], references: [id], onDelete: Cascade)
+
+  // Referência ao catálogo global — determina o "que" está sendo cotado.
+  // O consolidado do levantamento (que já usa materialEletricoId) faz
+  // matching exato por essa FK. Se um item existir no catálogo mas não
+  // estiver aqui, o fornecedor simplesmente não cota aquele item.
+  materialEletricoId String @map("material_eletrico_id")
+  materialEletrico   MaterialEletrico @relation(fields: [materialEletricoId], references: [id], onDelete: Cascade)
+
+  // Código/SKU que ESSE fornecedor usa pro produto (ex: "CX42ECO"), quando
+  // conhecido. Aprendido automaticamente na primeira vez que alguém
+  // confirma manualmente o match durante a importação de PDF de cotação
+  // — depois disso, futuras importações do mesmo fornecedor casam esse
+  // item sozinhas, sem precisar de descrição (que às vezes nem existe
+  // como texto extraível no PDF do fornecedor — ver extrair-precos-cotacao.ts).
+  codigoFornecedor String? @map("codigo_fornecedor")
+
+  // Preço aproximado — o que o fornecedor cobra normalmente. Editável.
+  // Se estiver zerado, bloqueia geração da cotação até ser preenchido.
+  precoUnitario Decimal @default(0) @map("preco_unitario") @db.Decimal(10, 4)
+
+  observacoes String?
+  ativo       Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Um fornecedor não pode ter o mesmo material duas vezes.
+  @@unique([fornecedorId, materialEletricoId])
+  // Um fornecedor não pode ter o mesmo código de produto mapeado pra dois
+  // materiais diferentes (evita aprendizado errado sobrescrever um bom).
+  // NULL não conta como duplicata (Postgres trata cada NULL como distinto).
+  @@unique([fornecedorId, codigoFornecedor])
+  @@index([fornecedorId])
+  @@index([materialEletricoId])
+  @@map("produtos_fornecedor")
+}
+
+// ============================================================================
+// TABELA DE PREÇOS DO FORNECEDOR — lista de preço padrão mensal, importada
+// de uma planilha padronizada da empresa. Conceito DIFERENTE de Cotação
+// (que é negociação pontual por projeto) e de ProdutoFornecedor (preço
+// único/atual, sem histórico, usado hoje só pela Cotação) — aqui cada
+// importação vira um registro histórico permanente, nunca sobrescrito.
+// ============================================================================
+
+model TabelaPrecoFornecedor {
+  id           String     @id @default(cuid())
+  fornecedorId String     @map("fornecedor_id")
+  fornecedor   Fornecedor @relation(fields: [fornecedorId], references: [id], onDelete: Cascade)
+
+  nome            String // ex: "Julho/2026"
+  vigenciaInicio  DateTime @map("vigencia_inicio")
+  vigenciaFim     DateTime @map("vigencia_fim")
+  dataImportacao  DateTime @default(now()) @map("data_importacao")
+
+  usuarioImportacaoId String  @map("usuario_importacao_id")
+  usuarioImportacao   Usuario @relation(fields: [usuarioImportacaoId], references: [id])
+
+  // Ativa | Expirada | Futura — controlado manualmente (decisão do
+  // Henrique: não calcular automaticamente pelas datas de vigência).
+  status String @default("ATIVA")
+
+  observacoes String? @db.Text
+
+  itens ItemTabelaPreco[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([fornecedorId])
+  @@index([fornecedorId, status])
+  @@map("tabelas_preco_fornecedor")
+}
+
+model ItemTabelaPreco {
+  id       String                @id @default(cuid())
+  tabelaId String                @map("tabela_id")
+  tabela   TabelaPrecoFornecedor @relation(fields: [tabelaId], references: [id], onDelete: Cascade)
+
+  // Casamento pelo Código Interno do Material (MaterialEletrico.codigo) —
+  // igual ao upload do Levantamento de Materiais. Nulo só seria possível
+  // se o material do catálogo fosse apagado depois (SetNull) — na
+  // importação em si, todo código sem match bloqueia o salvamento.
+  materialEletricoId String?           @map("material_eletrico_id")
+  materialEletrico   MaterialEletrico? @relation(fields: [materialEletricoId], references: [id], onDelete: SetNull)
+
+  // Snapshot da linha da planilha no momento da importação.
+  descricao     String
+  unidade       String
+  valorUnitario Decimal @map("valor_unitario") @db.Decimal(10, 4)
+  marca         String
+  prazoEntrega  String? @map("prazo_entrega")
+  observacoes   String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  itensOrcamento ItemMaterialOrcamento[]
+
+  @@index([tabelaId])
+  @@index([materialEletricoId])
+  @@map("itens_tabela_preco")
+}
+
+enum StatusCotacao {
+  RASCUNHO   // sendo montada — preços editáveis
+  ENVIADA    // enviada pro fornecedor externamente (WhatsApp/email/PDF)
+  RESPONDIDA // fornecedor respondeu — HGI atualizou os preços
+  ACEITA     // escolhida — alimenta o Bloco 2 do Orçamento
+  RECUSADA   // descartada
+}
+
+// Cotação = documento gerado pra UM fornecedor a partir do levantamento
+// consolidado. Vive dentro de um Orçamento. Podem existir várias por
+// orçamento — uma por fornecedor consultado.
+model Cotacao {
+  id             String @id @default(cuid())
+  orcamentoId    String @map("orcamento_id")
+  orcamento      Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+
+  fornecedorId   String @map("fornecedor_id")
+  fornecedor     Fornecedor @relation(fields: [fornecedorId], references: [id])
+
+  numero         String @unique  // "COT-2025-001" — sequência global anual
+  status         StatusCotacao @default(RASCUNHO)
+
+  observacoes    String? @db.Text
+  validadeAte    DateTime? @map("validade_ate")
+
+  // Totais calculados quando a cotação sai de RASCUNHO. Separados por kit
+  // para espelhar o cabeçalho do documento QDC (TOTAL ELÉTRICA / TOTAL P/ QDC).
+  totalEletrica  Decimal? @map("total_eletrica") @db.Decimal(12, 2)
+  totalQdc       Decimal? @map("total_qdc") @db.Decimal(12, 2)
+  totalGeral     Decimal? @map("total_geral") @db.Decimal(12, 2)
+
+  // Itens do levantamento que NÃO estão no cadastro deste fornecedor.
+  // Guardados como JSON pra mostrar "N itens não cotáveis" na tela.
+  // Formato: [{ descricao, fabricante, quantidade, kit }]
+  itensNaoCotaveis String? @map("itens_nao_cotaveis") @db.Text
+
+  // Rastreamento: quem gerencia esta cotação
+  responsavelId String? @map("responsavel_id")
+  responsavel Usuario? @relation("CotacoesResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+
+  // Informações do fornecedor sobre entrega
+  dataPrazo DateTime? @map("data_prazo")
+  frete Decimal? @db.Decimal(10, 2)
+  condicaoPagamento String? @map("condicao_pagamento")  // À Vista, 30 dias, etc.
+  disponibilidade String?  // Imediata, Sob encomenda, etc.
+
+  // Seleção desta cotação (por que escolheu esta?)
+  selecionadaEm DateTime? @map("selecionada_em")
+  selecionadaPorId String? @map("selecionada_por_id")
+  selecionadaPor Usuario? @relation("CotacoesSelecionadas", fields: [selecionadaPorId], references: [id], onDelete: SetNull)
+  
+  motivoSelecao String? @map("motivo_selecao") @db.Text  // Por que essa cotação?
+
+  // Histórico de preços (JSON array)
+  historicoPrecos String? @map("historico_precos") @db.Text
+  // [{ versao, dataMudanca, totalAnterior, totalNovo, observacoes }]
+
+  itens          CotacaoItem[]
+  pedidosCompra  PedidoCompra[]
+  negociacoes    OrcamentoNegociacao[]
+
+  criadaPorId    String? @map("criada_por_id")
+  criadaPor      Usuario? @relation(fields: [criadaPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([orcamentoId])
+  @@index([fornecedorId])
+  @@index([status])
+  @@map("cotacoes")
+}
+
+// Linha da cotação — snapshot congelado no momento da geração.
+// A FK a MaterialEletrico é opcional apenas para rastreio (link "ver no
+// catálogo"); os campos exibidos vêm do snapshot para preservar integridade
+// histórica se o catálogo mudar depois.
+model CotacaoItem {
+  id                 String @id @default(cuid())
+  cotacaoId          String @map("cotacao_id")
+  cotacao            Cotacao @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
+
+  materialEletricoId String? @map("material_eletrico_id")
+  materialEletrico   MaterialEletrico? @relation(fields: [materialEletricoId], references: [id], onDelete: SetNull)
+
+  // Snapshot — congelado no momento da geração
+  descricao   String
+  fabricante  String
+  unidade     String
+  kit         String  // "ELETRICO" | "QDC"
+
+  // Decimal na quantidade porque cabo/tubo é medido em metros fracionários
+  quantidade    Decimal @db.Decimal(10, 2)
+  precoUnitario Decimal @db.Decimal(10, 4)
+  total         Decimal @db.Decimal(12, 2)
+
+  ordem       Int @default(0)
+  observacao  String?
+
+  // Relacionamento reverso: quais itens de material vieram desta cotação
+  itensMaterialOrcamento ItemMaterialOrcamento[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([cotacaoId])
+  @@map("cotacao_itens")
+}
+
+// ============================================================================
+// MÓDULO FINANCEIRO — Fase 1 (fundação)
+//
+// Origem: estudo de consultoria sobre a planilha CUSTOS_ONLINE (15 abas)
+// mantida manualmente pelo administrativo. Este é o primeiro pedaço do
+// roadmap proposto: Empresas do Grupo, Categorias de Despesa e Contas a
+// Pagar (fixas recorrentes, parceladas e avulsas). As próximas fases
+// (Contas a Receber conectado ao Empreendimento, Fluxo de Caixa Projetado,
+// Impostos, Linhas de Crédito) vêm depois, sobre esta base.
+// ============================================================================
+
+model EmpresaGrupo {
+  id    String  @id @default(cuid())
+  nome  String  @unique // ex: "ConstruApp Fábrica", "ConstruApp Projetos"
+  ativo Boolean @default(true)
+
+  contasPagar     ContaPagar[]
+  contasFixas     ContaFixaModelo[]
+  contasReceber   ContaReceber[]
+  remessas        Remessa[]
+  motoristas      Motorista[]
+  veiculos        Veiculo[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("empresas_grupo")
+}
+
+enum ComportamentoCusto {
+  FIXO       // não varia com o volume de produção (aluguel, salários, seguros)
+  SEMIFIXO   // parcialmente fixo/variável (água, energia — semifixo) ou
+             // acompanha o volume mas com faixas (semivariável — cópias, marketing)
+  VARIAVEL   // varia proporcionalmente ao volume produzido/vendido (embalagem, combustível)
+}
+
+enum NaturezaGasto {
+  CUSTO    // ligado à produção/fábrica (mão de obra de produção, matéria-prima)
+  DESPESA  // ligado a vendas/administrativo/financeiro (comissão, salário do escritório)
+}
+
+enum ApropriacaoGasto {
+  DIRETO    // identificável direto num produto/obra específica, sem rateio
+  INDIRETO  // não é atribuível a um produto específico sem método de rateio
+}
+
+model CategoriaDespesa {
+  id    String  @id @default(cuid())
+  nome  String  @unique // ex: "Folha de Pagamento", "Aluguel", "Frete"
+  ativo Boolean @default(true)
+
+  // Classificação de custos/despesas — 3 eixos independentes que se
+  // combinam (ex: Aluguel = Fixo + Custo + Indireto). Nulos até alguém
+  // classificar; contas com categoria não-classificada aparecem como
+  // "não classificado" no dashboard de custos, em vez de quebrar.
+  comportamento ComportamentoCusto?
+  natureza      NaturezaGasto?
+  apropriacao   ApropriacaoGasto?
+
+  contasPagar ContaPagar[]
+  contasFixas ContaFixaModelo[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("categorias_despesa")
+}
+
+// Regra recorrente de uma conta fixa mensal (ex: Aluguel, todo dia 10 útil).
+// Não é o lançamento em si — é o "molde" a partir do qual lançamentos
+// mensais (ContaPagar) são gerados, um por mês, via ação explícita
+// ("gerar contas do mês").
+model ContaFixaModelo {
+  id    String @id @default(cuid())
+
+  empresaId   String           @map("empresa_id")
+  empresa     EmpresaGrupo     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  categoriaId String           @map("categoria_id")
+  categoria   CategoriaDespesa @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
+
+  descricao          String  // ex: "Aluguel", "Cartão de Crédito 06/36"
+  valor              Decimal @db.Decimal(12, 2)
+  diaUtilVencimento  Int     // ex: 5 = "5º dia útil do mês"
+  ativo              Boolean @default(true)
+  observacoes        String? @db.Text
+
+  contasGeradas ContaPagar[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([empresaId])
+  @@map("contas_fixas_modelo")
+}
+
+enum TipoContaPagar {
+  FIXA      // gerada a partir de um ContaFixaModelo
+  PARCELADA // parte de um parcelamento (cartão, imposto, frete...)
+  AVULSA    // lançamento pontual, sem repetição
+}
+
+model ContaPagar {
+  id String @id @default(cuid())
+
+  empresaId   String           @map("empresa_id")
+  empresa     EmpresaGrupo     @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  categoriaId String           @map("categoria_id")
+  categoria   CategoriaDespesa @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
+
+  // Se veio de uma regra recorrente — preenchido só quando tipo=FIXA.
+  contaFixaModeloId String?          @map("conta_fixa_modelo_id")
+  contaFixaModelo   ContaFixaModelo? @relation(fields: [contaFixaModeloId], references: [id], onDelete: SetNull)
+
+  descricao       String
+  tipo            TipoContaPagar @default(AVULSA)
+  valor           Decimal        @db.Decimal(12, 2)
+  dataVencimento  DateTime       @map("data_vencimento")
+
+  // Mês/ano que essa conta representa — preenchido só quando tipo=FIXA,
+  // com o (ano, mes) recebido por gerarContasFixasDoMes. Existe separado de
+  // dataVencimento (que pode ser ajustada manualmente depois) justamente
+  // para servir de chave de idempotência: a constraint única abaixo garante
+  // no PRÓPRIO BANCO que não é possível gerar 2 lançamentos do mesmo modelo
+  // pro mesmo mês, mesmo sob cliques simultâneos (nunca confiar só em
+  // checagem por código — mesma lição do C2/C3.1-A com arquivar/restaurar).
+  anoReferencia Int? @map("ano_referencia")
+  mesReferencia Int? @map("mes_referencia")
+
+  // Parcelamento — só preenchido quando tipo=PARCELADA (ex: "7 de 36").
+  parcelaAtual Int? @map("parcela_atual")
+  parcelaTotal Int? @map("parcela_total")
+
+  pago   Boolean   @default(false)
+  pagoEm DateTime? @map("pago_em")
+
+  observacoes String? @db.Text
+
+  criadoPorId String?  @map("criado_por_id")
+  criadoPor   Usuario? @relation("ContasPagarCriadas", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  pagoPorId   String?  @map("pago_por_id")
+  pagoPor     Usuario? @relation("ContasPagarBaixadas", fields: [pagoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([empresaId])
+  @@index([categoriaId])
+  @@index([pago, dataVencimento])
+  @@unique([contaFixaModeloId, anoReferencia, mesReferencia])
+  @@map("contas_pagar")
+}
+
+// ============================================================================
+// MÓDULO FINANCEIRO — Fase 2 (Contas a Receber conectado ao Empreendimento)
+//
+// Nasce automaticamente quando um Empreendimento vira CONTRATADO (mesmo
+// gatilho que já existe pra avanço automático de status) — não precisa
+// digitar de novo o valor do contrato, ele já vem do Orçamento aprovado.
+// ============================================================================
+
+enum TipoContaReceber {
+  ENTRADA // 20% do contrato, devido 28 dias após a assinatura
+  REMESSA // parcela proporcional a 1 pavimento entregue
+}
+
+model ContaReceber {
+  id String @id @default(cuid())
+
+  empreendimentoId String         @map("empreendimento_id") // não é mais único — 1 empreendimento tem 1 entrada + N remessas
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+  orcamentoId      String?        @map("orcamento_id") // qual revisão gerou esse valor
+  orcamento        Orcamento?     @relation(fields: [orcamentoId], references: [id], onDelete: SetNull)
+
+  tipo TipoContaReceber @default(ENTRADA)
+
+  // Preenchido só em REMESSA — qual pavimento esse valor corresponde.
+  pavimentoId String?     @map("pavimento_id")
+  pavimento   Pavimento?  @relation(fields: [pavimentoId], references: [id], onDelete: SetNull)
+
+  // Opcional — qual empresa do grupo vai faturar essa obra. Fica em
+  // branco na criação automática; alguém do financeiro atribui depois.
+  empresaId String?       @map("empresa_id")
+  empresa   EmpresaGrupo? @relation(fields: [empresaId], references: [id], onDelete: SetNull)
+
+  valor Decimal @db.Decimal(12, 2)
+
+  // Remessa nasce sem data — só ganha `dataPrevista` quando alguém
+  // registra que o pavimento foi enviado (dataEnvio + 28 dias). Entrada
+  // já nasce com a data certa (contratação + 28 dias).
+  dataEnvio     DateTime? @map("data_envio")
+  dataPrevista  DateTime? @map("data_prevista")
+
+  recebido   Boolean   @default(false)
+  recebidoEm DateTime? @map("recebido_em")
+
+  observacoes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([empresaId])
+  @@index([empreendimentoId])
+  @@index([recebido, dataPrevista])
+  @@map("contas_receber")
+}
+
+// ============================================================================
+// MÓDULO SEGURANÇA DA INFORMAÇÃO — Fase 1 (log de segurança + bloqueio por
+// tentativas de login). Auditoria feita em 07/07/2026 encontrou: upload de
+// documento vulnerável a XSS armazenado (corrigido), ausência de headers de
+// segurança (corrigido), ausência de proteção contra força bruta no login
+// e de log de eventos de segurança (este módulo resolve os dois).
+// ============================================================================
+
+enum TipoLogSeguranca {
+  LOGIN_SUCESSO
+  LOGIN_FALHA
+  LOGIN_BLOQUEADO   // tentativa recusada por excesso de falhas recentes
+  PERMISSAO_NEGADA
+  SENHA_RESET_SOLICITADO
+  SENHA_RESET_CONCLUIDO
+  DUPLO_FATOR_ATIVADO
+  DUPLO_FATOR_DESATIVADO
+  DUPLO_FATOR_FALHA
+  LOGOUT_INATIVIDADE
+  SESSAO_ANTERIOR_ENCERRADA
+}
+
+model LogSeguranca {
+  id String @id @default(cuid())
+
+  tipo  TipoLogSeguranca
+  email String // sempre preenchido, mesmo se o usuário não existir (tentativa com e-mail inválido)
+
+  usuarioId String?  @map("usuario_id")
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  detalhes String? @db.Text // ex: "Permissão exigida: empreendimento:excluir"
+  ip       String? // capturado quando disponível (nem sempre é, depende do proxy)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email, createdAt])
+  @@index([tipo, createdAt])
+  @@map("logs_seguranca")
+}
+
+// ============================================================================
+// Módulo: Produção — controle das 5 bancadas físicas de industrialização
+// (Corte de Fio, Corte de Eletroduto, Kit Polvo, Fechamento, Finalização).
+// Substitui a planilha manual de produtividade — mesma lógica de "U.H."
+// (Unidade Habitacional equivalente) já usada, só que calculada automática.
+// ============================================================================
+
+enum UnidadeMedidaBancada {
+  METROS
+  PECAS
+}
+
+// Qual fórmula usar pra calcular a quantidade bruta a partir da peça
+// escolhida — cabo e eletroduto usam medidas diferentes da MESMA peça
+// (calculadas pelo Levantamento Elétrico), contagem é só "1 peça = 1
+// unidade" (Kit Polvo, Fechamento, Finalização).
+enum TipoCalculoBancada {
+  CABO        // soma o comprimento real dos circuitos da peça (com sobra)
+  ELETRODUTO  // comprimento físico do eletroduto da peça (sem sobra)
+  CONTAGEM    // 1 peça = 1 unidade, sem cálculo de metragem
+}
+
+// As 5 bancadas físicas — cadastro fixo (não se espera criar novas com
+// frequência), mas em tabela (não enum) porque o U.H. Referência precisa
+// ser editável pelo Admin/Coordenador (ex: Finalização varia por semana
+// conforme o mix de produto, como já acontecia na planilha).
+model Bancada {
+  id     String @id @default(cuid())
+  nome   String @unique // "Corte de Fio", "Corte de Eletroduto", "Kit Polvo", "Fechamento", "Finalização"
+  ordem  Int    @unique // 1 a 5, define a sequência do processo físico
+
+  unidadeMedida UnidadeMedidaBancada @map("unidade_medida")
+  tipoCalculo   TipoCalculoBancada   @default(CONTAGEM) @map("tipo_calculo")
+
+  // Quantidade bruta (na unidade acima) que equivale a 1 "U.H." — ex:
+  // 126,1 metros de fio cortado = 1 U.H. Ajustável, não fixo no código.
+  uhReferencia Decimal @map("uh_referencia") @db.Decimal(10, 4)
+
+  ativo Boolean @default(true)
+
+  registros RegistroProducao[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("bancadas")
+}
+
+// Operador de bancada — cadastro simples, SEM login/senha própria (quem
+// acessa o tablet é o líder da bancada, com usuário normal do sistema;
+// o operador é só um nome escolhido numa lista pra saber quem produziu
+// o quê).
+model OperadorProducao {
+  id    String  @id @default(cuid())
+  nome  String
+  ativo Boolean @default(true)
+
+  registros RegistroProducao[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("operadores_producao")
+}
+
+// Cada lançamento de produção — um operador, numa bancada, produzindo
+// pra uma obra específica, numa quantidade e hora exatas. Pode haver
+// vários por dia (a cada lote/corte), não é um total fechado no fim do
+// turno.
+enum TurnoProducao {
+  MANHA
+  TARDE
+  NOITE
+}
+
+model RegistroProducao {
+  id String @id @default(cuid())
+
+  bancadaId String  @map("bancada_id")
+  bancada   Bancada @relation(fields: [bancadaId], references: [id], onDelete: Restrict)
+
+  operadorId String           @map("operador_id")
+  operador   OperadorProducao @relation(fields: [operadorId], references: [id], onDelete: Restrict)
+
+  empreendimentoId String         @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Restrict)
+
+  tipologiaId String    @map("tipologia_id")
+  tipologia   Tipologia @relation(fields: [tipologiaId], references: [id], onDelete: Restrict)
+
+  pecaId String            @map("peca_id")
+  peca   PecaLevantamento  @relation(fields: [pecaId], references: [id], onDelete: Restrict)
+
+  // Quantas repetições daquela peça (uma por unidade da tipologia) foram
+  // concluídas nesse lançamento — pode ser parcial (ex: 5 de 27
+  // apartamentos, se não deu tempo de terminar a tipologia toda no dia).
+  unidadesConcluidas Int @map("unidades_concluidas")
+
+  // Turno em que a produção foi feita — pra separar manhã/tarde/noite
+  // quando mais de um turno trabalha na mesma bancada no mesmo dia (sem
+  // isso, tudo virava um "hoje" só, misturado).
+  turno TurnoProducao @default(MANHA)
+
+  // Quantidade bruta CALCULADA a partir da peça × unidadesConcluidas,
+  // conforme o tipoCalculo da bancada (cabo, eletroduto ou contagem) —
+  // não é digitada pelo operador, é derivada automaticamente. Guardada
+  // aqui pra não precisar recalcular toda vez que alguém olhar o
+  // histórico (e pra manter o valor congelado mesmo se a peça for
+  // editada depois).
+  quantidade Decimal @db.Decimal(10, 2)
+
+  registradoPorUserId String  @map("registrado_por_user_id")
+  registradoPor       Usuario @relation("RegistroProducaoRegistradoPor", fields: [registradoPorUserId], references: [id], onDelete: Restrict)
+
+  // Correção — preenchido só se um supervisor editou o valor original
+  // depois. Mantém rastro de quem mudou, quando, e o valor anterior.
+  valorOriginal      Decimal?  @db.Decimal(10, 2) @map("valor_original")
+  corrigidoPorUserId String?   @map("corrigido_por_user_id")
+  corrigidoPor       Usuario?  @relation("RegistroProducaoCorrigidoPor", fields: [corrigidoPorUserId], references: [id], onDelete: SetNull)
+  corrigidoEm        DateTime? @map("corrigido_em")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([bancadaId, createdAt])
+  @@index([empreendimentoId])
+  @@index([operadorId, createdAt])
+  @@map("registros_producao")
+}
+
+// ============================================================================
+// Módulo: Suprimentos / Estoque — fundação pra liberar produção só quando
+// o material realmente estiver disponível (recebido + com saldo).
+// ============================================================================
+
+enum TipoMovimentacaoEstoque {
+  ENTRADA          // material recebido do fornecedor, dá entrada no saldo
+  SAIDA_PRODUCAO    // baixa automática ao iniciar produção de uma tipologia
+  AJUSTE            // correção manual (inventário, avaria, etc.) — pode ser positivo ou negativo
+}
+
+// Saldo de material EM ESTOQUE, por OBRA — cada empreendimento recebe seu
+// próprio material (não é um armazém genérico compartilhado entre obras
+// diferentes). Cache atualizado a cada movimentação, pra não somar o
+// histórico toda hora — o histórico auditável de verdade fica em
+// MovimentacaoEstoque.
+model EstoqueEmpreendimentoMaterial {
+  id String @id @default(cuid())
+
+  empreendimentoId String         @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+
+  materialEletricoId String           @map("material_eletrico_id")
+  materialEletrico    MaterialEletrico @relation(fields: [materialEletricoId], references: [id], onDelete: Restrict)
+
+  saldo Decimal @default(0) @db.Decimal(12, 3)
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([empreendimentoId, materialEletricoId])
+  @@map("estoque_empreendimento_material")
+}
+
+model MovimentacaoEstoque {
+  id String @id @default(cuid())
+
+  materialEletricoId String           @map("material_eletrico_id")
+  materialEletrico    MaterialEletrico @relation(fields: [materialEletricoId], references: [id], onDelete: Restrict)
+
+  tipo TipoMovimentacaoEstoque
+
+  // Positivo em ENTRADA e AJUSTE-pra-cima; negativo em SAIDA_PRODUCAO e
+  // AJUSTE-pra-baixo — o saldo é sempre a SOMA de todas as movimentações,
+  // então o sinal já carrega a direção, sem precisar de campo separado.
+  quantidade Decimal @db.Decimal(12, 3)
+
+  // OBRIGATÓRIO — todo material chega e sai vinculado a uma obra
+  // específica (não existe estoque genérico/compartilhado). tipologiaId
+  // continua opcional (só preenchido em SAIDA_PRODUCAO, pra saber qual
+  // tipologia daquela obra consumiu).
+  empreendimentoId String         @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Restrict)
+  tipologiaId      String?         @map("tipologia_id")
+  tipologia        Tipologia?      @relation(fields: [tipologiaId], references: [id], onDelete: SetNull)
+
+  observacao String? @db.Text
+
+  registradoPorUserId String  @map("registrado_por_user_id")
+  registradoPor       Usuario @relation(fields: [registradoPorUserId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([materialEletricoId, createdAt])
+  @@index([empreendimentoId, tipologiaId])
+  @@map("movimentacoes_estoque")
+}
+
+// ============================================================================
+// Marco Operacional — registro genérico de "isso aconteceu nessa data",
+// reaproveitável pra medir tempo entre QUALQUER par de etapas do
+// operacional (Suprimentos → Produção, Levantamento → Orçamento, etc.),
+// sem precisar adicionar um campo de data específico em cada tabela
+// toda vez que surge uma nova medição.
+// ============================================================================
+
+enum EtapaOperacional {
+  LEVANTAMENTO_ELETRICO_VALIDADO
+  LEVANTAMENTO_HIDRAULICO_VALIDADO
+  LEVANTAMENTO_MATERIAIS_VALIDADO
+  MATERIAL_COMPLETO      // todos os materiais necessários da tipologia chegaram (saldo >= necessário)
+  PRODUCAO_INICIADA      // iniciarProducaoTipologia foi chamado com sucesso
+}
+
+model MarcoOperacional {
+  id String @id @default(cuid())
+
+  empreendimentoId String         @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+
+  tipologiaId String?    @map("tipologia_id")
+  tipologia   Tipologia? @relation(fields: [tipologiaId], references: [id], onDelete: Cascade)
+
+  etapa      EtapaOperacional
+  ocorridoEm DateTime         @default(now()) @map("ocorrido_em")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([empreendimentoId, tipologiaId, etapa])
+  @@map("marcos_operacionais")
+}
+
+// ============================================================================
+// Pedido de Compra — o elo que faltava entre "cotação aceita" e "material
+// recebido". Sem isso, o sistema sabia comparar "recebido" contra "o que a
+// obra precisa" (Levantamento), mas não contra "o que foi PEDIDO ao
+// fornecedor" — não dava pra saber se um pedido está atrasado ou se
+// chegou menos do que foi encomendado.
+// ============================================================================
+
+enum StatusPedidoCompra {
+  AGUARDANDO_CONFIRMACAO // pedido emitido, fornecedor ainda não confirmou
+  CONFIRMADO             // fornecedor confirmou prazo/quantidade
+  EM_TRANSITO
+  ENTREGUE_PARCIAL       // já recebeu algo, mas não tudo
+  ENTREGUE_COMPLETO
+  CANCELADO
+}
+
+model PedidoCompra {
+  id String @id @default(cuid())
+
+  numero String @unique // "PC-2026-001" — sequência global anual, mesmo padrão da Cotação
+
+  cotacaoId String  @map("cotacao_id")
+  cotacao   Cotacao @relation(fields: [cotacaoId], references: [id], onDelete: Restrict)
+
+  fornecedorId String     @map("fornecedor_id")
+  fornecedor   Fornecedor @relation(fields: [fornecedorId], references: [id])
+
+  empreendimentoId String         @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Restrict)
+
+  status StatusPedidoCompra @default(AGUARDANDO_CONFIRMACAO)
+
+  dataPedido           DateTime  @default(now()) @map("data_pedido")
+  dataPrevistaEntrega  DateTime? @map("data_prevista_entrega")
+  dataConfirmadoEm     DateTime? @map("data_confirmado_em")
+
+  itens PedidoCompraItem[]
+
+  criadoPorId String? @map("criado_por_id")
+  criadoPor   Usuario? @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([empreendimentoId, status])
+  @@index([fornecedorId])
+  @@map("pedidos_compra")
+}
+
+model PedidoCompraItem {
+  id String @id @default(cuid())
+
+  pedidoId String       @map("pedido_id")
+  pedido   PedidoCompra @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  materialEletricoId String           @map("material_eletrico_id")
+  materialEletrico    MaterialEletrico @relation(fields: [materialEletricoId], references: [id], onDelete: Restrict)
+
+  descricao        String  // congelado no momento do pedido, não muda se o catálogo mudar depois
+  quantidadePedida Decimal @map("quantidade_pedida") @db.Decimal(12, 3)
+  // Soma do que já entrou via MovimentacaoEstoque vinculada a esse item —
+  // atualizado a cada recebimento, pra saber "falta receber quanto".
+  quantidadeRecebida Decimal @default(0) @map("quantidade_recebida") @db.Decimal(12, 3)
+  precoUnitario      Decimal @map("preco_unitario") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([pedidoId])
+  @@map("itens_pedido_compra")
+}
+
+// ============================================================================
+// ORÇAMENTAÇÃO — Rastreamento de Jornada, Histórico e Negociações
+// ============================================================================
+
+// Rastreamento de etapas do orçamento — por qual estágio ele passou
+model OrcamentoJornada {
+  id String @id @default(cuid())
+  orcamentoId String @map("orcamento_id")
+  orcamento Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  
+  // Etapas: LEVANTAMENTOS, COMPOSICAO, MATERIAIS, COTACOES, REVISAO, APROVACAO, PROPOSTA
+  etapa String
+  
+  // Estados: NAO_INICIADA, EM_ANDAMENTO, CONCLUIDA, BLOQUEADA, DEVOLVIDA, APROVADA, CANCELADA
+  status String @default("NAO_INICIADA")
+  
+  responsavelId String? @map("responsavel_id")
+  responsavel Usuario? @relation("OrcamentoJornadaResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  
+  dataInicio DateTime? @map("data_inicio")
+  dataPrevista DateTime? @map("data_prevista")
+  dataConclusao DateTime? @map("data_conclusao")
+  
+  // Se bloqueada, qual é o motivo?
+  motivoBloqueio String? @map("motivo_bloqueio") @db.Text
+  
+  // Pendências para desbloqueio (JSON array)
+  pendencias String? @db.Text
+  // [{ descricao, responsavel, dataVencimento }]
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  @@unique([orcamentoId, etapa])
+  @@index([orcamentoId, status])
+  @@map("orcamento_jornada")
+}
+
+// Auditoria completa — toda alteração é registrada
+model OrcamentoHistorico {
+  id String @id @default(cuid())
+  orcamentoId String @map("orcamento_id")
+  orcamento Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  
+  // Tipo de alteração
+  tipoAlteracao String
+  // CRIACAO, ITEM_ADICIONADO, ITEM_EDITADO, ITEM_REMOVIDO, COTACAO_SELECIONADA, 
+  // STATUS_MUDOU, APROVACAO_ENVIADA, APROVACAO_CONCEDIDA
+  
+  // Qual recurso foi alterado?
+  recursoTipo String?  // ItemServicoOrcamento, ItemMaterialOrcamento, Cotacao, OrcamentoJornada
+  recursoId String? @map("recurso_id")
+  
+  // Snapshots (JSON)
+  valorAnterior String? @map("valor_anterior") @db.Text
+  valorNovo String? @map("valor_novo") @db.Text
+  
+  justificativa String? @db.Text
+  
+  registradoPorId String @map("registrado_por_id")
+  registradoPor Usuario @relation(fields: [registradoPorId], references: [id], onDelete: Restrict)
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@index([orcamentoId, createdAt])
+  @@index([tipoAlteracao])
+  @@map("orcamento_historico")
+}
+
+// Histórico de negociação com fornecedores
+model OrcamentoNegociacao {
+  id String @id @default(cuid())
+  cotacaoId String @map("cotacao_id")
+  cotacao Cotacao @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
+  
+  // Tipo: SOLICITACAO, RESPOSTA, CONTRAPROPOSTA, DOCUMENTO, ANOTACAO
+  tipo String
+  
+  descricao String @db.Text
+  dataResposta DateTime? @map("data_resposta")
+  
+  registradoPorId String @map("registrado_por_id")
+  registradoPor Usuario @relation(fields: [registradoPorId], references: [id], onDelete: Restrict)
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@index([cotacaoId, createdAt])
+  @@map("orcamento_negociacoes")
+}
+
+// ============================================================================
+// EXPEDIÇÃO — núcleo operacional (v2, revisado após diagnóstico aprovado
+// com ajustes obrigatórios)
+//
+// Escopo desta etapa: NÃO inclui romaneio, PDF, assinatura eletrônica, link
+// pro cliente, WhatsApp, rastreamento, mapa, roteirização ou relatórios
+// avançados — só a estrutura operacional de controle.
+//
+// Decisões registradas:
+// 1. Quantidade de cada ItemRemessa é digitada manualmente — a Produção não
+//    quebra "kits finalizados" por tipo de kit hoje, só agrega globalmente.
+// 2. Remessa.empresaId é obrigatório e selecionado manualmente na criação —
+//    não existe hoje vínculo Empreendimento→EmpresaGrupo pra herdar
+//    automaticamente. Ver observação de acesso por empresa no fim do bloco.
+// 3. Fonte de verdade de quantidades: Item → Volume → Carregamento. Todo
+//    material, embalado ou não (volume tipo AVULSO), passa por um Volume
+//    antes de entrar num Carregamento. ItemCarregamento é sempre derivado
+//    da soma dos ItemVolume dos volumes vinculados — nunca editado direto.
+// ============================================================================
+
+enum StatusRemessa {
+  RASCUNHO
+  AGUARDANDO_SEPARACAO
+  EM_SEPARACAO
+  AGUARDANDO_CONFERENCIA
+  EM_CONFERENCIA
+  LIBERADA_CARREGAMENTO
+  PARCIALMENTE_EXPEDIDA
+  TOTALMENTE_EXPEDIDA
+  EM_TRANSITO
+  ENTREGUE
+  CANCELADA
+}
+
+enum StatusItemRemessa {
+  PENDENTE
+  SEPARADO
+  CONFERIDO
+  CARREGADO
+  DIVERGENTE
+}
+
+enum StatusVolume {
+  ABERTO
+  CONFERIDO
+  ALOCADO
+  EMBARCADO
+  CANCELADO
+}
+
+enum TipoVolume {
+  CAIXA
+  PALETE
+  FEIXE
+  AVULSO
+  KIT
+  OUTRO
+}
+
+// Fluxo obrigatório: CONFERIDO → LIBERADO → CARREGADO → SAIDA_REGISTRADA →
+// ENTREGUE. CANCELADO é permitido a partir de qualquer estado anterior a
+// SAIDA_REGISTRADA (depois de expedido, não cancela mais nesta etapa).
+enum StatusCarregamento {
+  RASCUNHO
+  EM_PREPARACAO
+  AGUARDANDO_CONFERENCIA
+  CONFERIDO
+  LIBERADO
+  CARREGADO
+  SAIDA_REGISTRADA
+  ENTREGUE
+  CANCELADO
+}
+
+enum TipoTransporte {
+  PROPRIO
+  TERCEIRO
+}
+
+// Reaproveita a nomenclatura já usada em Empreendimento.kitEletrico/
+// kitHidraulico/kitQdc e ItemServicoOrcamento.kit — não é uma entidade nova
+// de catálogo, só o tipo de kit sendo remetido (não existe tabela
+// "Produto"/"Kit" separada no sistema hoje).
+enum TipoKitExpedicao {
+  ELETRICO
+  HIDRAULICO
+  QDC
+}
+
+// Centraliza os tipos de evento do histórico — evita strings soltas
+// divergentes ("SAIDA_REGISTRADA" vs "REGISTRO_SAIDA" vs "CARREGAMENTO_SAIU").
+enum TipoEventoExpedicao {
+  REMESSA_CRIADA
+  REMESSA_CANCELADA
+  SEPARACAO_INICIADA
+  ITEM_SEPARADO
+  SEPARACAO_FINALIZADA
+  CONFERENCIA_INICIADA
+  ITEM_CONFERIDO
+  CONFERENCIA_FINALIZADA
+  VOLUME_CRIADO
+  VOLUME_CANCELADO
+  ITEM_VINCULADO_VOLUME
+  CARREGAMENTO_CRIADO
+  VOLUME_VINCULADO_CARREGAMENTO
+  VOLUME_DESVINCULADO_CARREGAMENTO
+  CARREGAMENTO_LIBERADO
+  CARREGAMENTO_MARCADO_CARREGADO
+  SAIDA_REGISTRADA
+  CARREGAMENTO_CANCELADO
+  ENTREGA_CONFIRMADA
+}
+
+enum StatusIdempotencyKey {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Transportadora {
+  id       String  @id @default(cuid())
+  nome     String
+  cnpj     String?
+  telefone String?
+  ativo    Boolean @default(true)
+
+  motoristas    Motorista[]
+  veiculos      Veiculo[]
+  carregamentos Carregamento[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("transportadoras")
+}
+
+model Motorista {
+  id       String  @id @default(cuid())
+  nome     String
+  cpf      String?
+  cnh      String?
+  telefone String?
+
+  // Obrigatório — "motorista e veículo devem possuir empresaId e status".
+  empresaId String       @map("empresa_id")
+  empresa   EmpresaGrupo @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+
+  // Opcional — motorista pode ser autônomo/próprio, sem transportadora.
+  transportadoraId String?         @map("transportadora_id")
+  transportadora   Transportadora? @relation(fields: [transportadoraId], references: [id], onDelete: SetNull)
+
+  tipo  TipoTransporte @default(TERCEIRO)
+  ativo Boolean        @default(true)
+
+  carregamentos Carregamento[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([transportadoraId])
+  @@index([empresaId])
+  @@map("motoristas")
+}
+
+model Veiculo {
+  id           String   @id @default(cuid())
+  placa        String
+  modelo       String?
+  capacidadeKg Decimal? @map("capacidade_kg") @db.Decimal(10, 2)
+
+  empresaId String       @map("empresa_id")
+  empresa   EmpresaGrupo @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+
+  transportadoraId String?         @map("transportadora_id")
+  transportadora   Transportadora? @relation(fields: [transportadoraId], references: [id], onDelete: SetNull)
+
+  tipo  TipoTransporte @default(TERCEIRO)
+  ativo Boolean        @default(true)
+
+  carregamentos Carregamento[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Placa única DENTRO da empresa (estratégia multiempresa) — não
+  // globalmente única, pra não impedir frotas registradas independentemente
+  // por empresa do grupo.
+  @@unique([empresaId, placa])
+  @@index([transportadoraId])
+  @@map("veiculos")
+}
+
+// Contador atômico de sequencial de Remessa por empresa+ano — usado com
+// UPDATE...RETURNING (ou INSERT...ON CONFLICT DO UPDATE) atômico, sem
+// depender de MAX+1 (que tem janela de corrida sob concorrência real).
+model RemessaContador {
+  empresaId      String @map("empresa_id")
+  ano            Int
+  ultimoNumero   Int    @default(0) @map("ultimo_numero")
+
+  @@id([empresaId, ano])
+  @@map("remessa_contadores")
+}
+
+model Remessa {
+  id String @id @default(cuid())
+
+  empresaId String       @map("empresa_id")
+  empresa   EmpresaGrupo @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+
+  // Numeração multiempresa: única dentro da empresa+ano, não globalmente.
+  // numero é o texto de exibição ("R-2026-0001"), derivado de ano+sequencial
+  // no momento da criação via RemessaContador (atômico).
+  ano        Int
+  sequencial Int
+  numero     String @map("numero") // "R-2026-0001" — só pra exibição/busca
+
+  clienteId String  @map("cliente_id")
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+
+  empreendimentoId String         @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Restrict)
+
+  origem String? // ex: "Fábrica Uberlândia"
+
+  torreId     String?    @map("torre_id")
+  torre       Torre?     @relation(fields: [torreId], references: [id], onDelete: SetNull)
+  pavimentoId String?    @map("pavimento_id")
+  pavimento   Pavimento? @relation(fields: [pavimentoId], references: [id], onDelete: SetNull)
+  etapa       String?
+
+  // Copiado do Empreendimento no momento da criação — nunca lido de novo do
+  // Empreendimento depois. Mudanças futuras no cadastro do empreendimento
+  // NÃO alteram remessas já criadas.
+  enderecoEntrega String @map("endereco_entrega")
+
+  status StatusRemessa @default(RASCUNHO)
+
+  // Contador interno pro número do Carregamento (escopado dentro desta
+  // Remessa) — incrementado atomicamente via UPDATE...RETURNING, sem
+  // precisar de uma tabela de contador separada pra esse caso.
+  proximoNumeroCarregamento Int @default(1) @map("proximo_numero_carregamento")
+
+  dataSaidaPrevista   DateTime? @map("data_saida_prevista")
+  dataEntregaPrevista DateTime? @map("data_entrega_prevista")
+
+  observacoes String? @db.Text
+
+  criadoPorId String  @map("criado_por_id")
+  criadoPor   Usuario @relation("RemessasCriadas", fields: [criadoPorId], references: [id], onDelete: Restrict)
+
+  itens         ItemRemessa[]
+  volumes       Volume[]
+  carregamentos Carregamento[]
+  historico     ExpedicaoHistorico[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  // Soft delete — nunca excluir fisicamente remessa com movimentação. Só
+  // rascunhos 100% vazios (sem item/volume/carregamento) podem ser
+  // excluídos de verdade, via fluxo de aplicação dedicado (não Cascade).
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([empresaId, ano, sequencial])
+  @@unique([empresaId, numero])
+  @@index([empreendimentoId, status])
+  @@index([clienteId])
+  @@index([status])
+  @@map("remessas")
+}
+
+model ItemRemessa {
+  id        String  @id @default(cuid())
+  remessaId String  @map("remessa_id")
+  remessa   Remessa @relation(fields: [remessaId], references: [id], onDelete: Restrict)
+
+  tipologiaId String    @map("tipologia_id")
+  tipologia   Tipologia @relation(fields: [tipologiaId], references: [id], onDelete: Restrict)
+  tipoKit     TipoKitExpedicao @map("tipo_kit")
+
+  // Fotografia operacional — congelada no momento da criação, preserva
+  // histórico mesmo que Tipologia/catálogo mudem depois.
+  tipologiaNome String  @map("tipologia_nome")
+  codigo        String?
+  descricao     String
+  unidade       String  @default("kit")
+  torre         String?
+  pavimento     String?
+  etapa         String?
+  apartamento   String? // unidade específica ou faixa, ex: "701-708"
+
+  quantidadePrevista  Int @map("quantidade_prevista")
+  quantidadeSeparada  Int @default(0) @map("quantidade_separada")
+  quantidadeConferida Int @default(0) @map("quantidade_conferida")
+
+  // Reservado em carregamentos ainda sem saída registrada. += ao vincular
+  // volume a carregamento; -= ao cancelar carregamento OU ao registrar saída.
+  quantidadeAlocada Int @default(0) @map("quantidade_alocada")
+
+  // Fisicamente no veículo, AINDA sem saída registrada. Não acumula — volta
+  // a 0 quando a saída é registrada (vira quantidadeExpedida) ou quando o
+  // carregamento é cancelado depois de já marcado como CARREGADO.
+  quantidadeCarregada Int @default(0) @map("quantidade_carregada")
+
+  // Só muda quando a saída é registrada. NUNCA regride (kits expedidos não
+  // voltam a ficar disponíveis).
+  quantidadeExpedida Int @default(0) @map("quantidade_expedida")
+
+  // saldoDisponivel NÃO é armazenado — calculado na leitura:
+  //   saldoDisponivel = quantidadeConferida - quantidadeAlocada - quantidadeExpedida
+
+  status     StatusItemRemessa @default(PENDENTE)
+  observacao String?
+
+  itensVolume       ItemVolume[]
+  itensCarregamento ItemCarregamento[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([remessaId])
+  @@index([tipologiaId])
+  @@map("itens_remessa")
+}
+
+model Volume {
+  id        String  @id @default(cuid())
+  remessaId String  @map("remessa_id")
+  remessa   Remessa @relation(fields: [remessaId], references: [id], onDelete: Restrict)
+
+  numeroVolume Int        @map("numero_volume") // sequencial dentro da remessa
+  tipo         TipoVolume @default(CAIXA)
+  codigoQr     String?    @map("codigo_qr")
+  descricao    String?
+  peso         Decimal?   @db.Decimal(10, 3)
+  lacre        String?
+
+  status     StatusVolume @default(ABERTO)
+  observacao String?
+
+  conferidoPorId String?   @map("conferido_por_id")
+  conferidoPor   Usuario?  @relation("VolumesConferidos", fields: [conferidoPorId], references: [id], onDelete: SetNull)
+  conferidoEm    DateTime? @map("conferido_em")
+
+  itens               ItemVolume[]
+  volumesCarregamento VolumeCarregamento[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([remessaId, numeroVolume])
+  @@index([remessaId])
+  @@index([status])
+  @@map("volumes")
+}
+
+model ItemVolume {
+  id            String      @id @default(cuid())
+  volumeId      String      @map("volume_id")
+  volume        Volume      @relation(fields: [volumeId], references: [id], onDelete: Restrict)
+  itemRemessaId String      @map("item_remessa_id")
+  itemRemessa   ItemRemessa @relation(fields: [itemRemessaId], references: [id], onDelete: Restrict)
+
+  quantidade Int
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([volumeId])
+  @@index([itemRemessaId])
+  @@map("itens_volume")
+}
+
+model Carregamento {
+  id        String  @id @default(cuid())
+  remessaId String  @map("remessa_id")
+  remessa   Remessa @relation(fields: [remessaId], references: [id], onDelete: Restrict)
+
+  numero Int // sequencial DENTRO da remessa (1, 2, 3...) — via Remessa.proximoNumeroCarregamento
+
+  status StatusCarregamento @default(RASCUNHO)
+
+  transportadoraId String?         @map("transportadora_id")
+  transportadora   Transportadora? @relation(fields: [transportadoraId], references: [id], onDelete: SetNull)
+  motoristaId      String?         @map("motorista_id")
+  motorista        Motorista?      @relation(fields: [motoristaId], references: [id], onDelete: SetNull)
+  veiculoId        String?         @map("veiculo_id")
+  veiculo          Veiculo?        @relation(fields: [veiculoId], references: [id], onDelete: SetNull)
+
+  // Congelada no momento do carregamento — preserva o registro mesmo se o
+  // veículo mudar de placa depois.
+  placa String?
+
+  dataCarregamento DateTime? @map("data_carregamento")
+  dataSaida        DateTime? @map("data_saida")
+
+  observacao String?
+
+  criadoPorId   String  @map("criado_por_id")
+  criadoPor     Usuario @relation("CarregamentosCriados", fields: [criadoPorId], references: [id], onDelete: Restrict)
+  liberadoPorId String? @map("liberado_por_id")
+  liberadoPor   Usuario? @relation("CarregamentosLiberados", fields: [liberadoPorId], references: [id], onDelete: SetNull)
+
+  itens     ItemCarregamento[]
+  volumes   VolumeCarregamento[]
+  historico ExpedicaoHistorico[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([remessaId, numero])
+  @@index([remessaId])
+  @@index([status])
+  @@map("carregamentos")
+}
+
+// Sempre derivado da soma dos ItemVolume dos volumes vinculados a este
+// carregamento — nunca editado diretamente pelo usuário. Recalculado pelas
+// actions de vincular/desvincular volume. A liberação do carregamento
+// valida que soma(ItemCarregamento) === soma(ItemVolume dos volumes
+// vinculados); qualquer divergência bloqueia a liberação.
+model ItemCarregamento {
+  id             String       @id @default(cuid())
+  carregamentoId String       @map("carregamento_id")
+  carregamento   Carregamento @relation(fields: [carregamentoId], references: [id], onDelete: Restrict)
+  itemRemessaId  String       @map("item_remessa_id")
+  itemRemessa    ItemRemessa  @relation(fields: [itemRemessaId], references: [id], onDelete: Restrict)
+
+  quantidade Int
+  observacao String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([carregamentoId, itemRemessaId])
+  @@index([carregamentoId])
+  @@index([itemRemessaId])
+  @@map("itens_carregamento")
+}
+
+model VolumeCarregamento {
+  id             String       @id @default(cuid())
+  carregamentoId String       @map("carregamento_id")
+  carregamento   Carregamento @relation(fields: [carregamentoId], references: [id], onDelete: Restrict)
+  volumeId       String       @map("volume_id")
+  volume         Volume       @relation(fields: [volumeId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([carregamentoId, volumeId])
+  @@index([carregamentoId])
+  @@index([volumeId])
+  @@map("volumes_carregamento")
+}
+
+// Histórico append-only — nunca editado nem excluído. Ligado diretamente a
+// Remessa (obrigatório) e opcionalmente a Carregamento, em vez de um par
+// genérico entidade/entidadeId — permite consulta direta indexada por
+// qualquer um dos dois.
+model ExpedicaoHistorico {
+  id String @id @default(cuid())
+
+  empresaId String @map("empresa_id")
+
+  remessaId      String        @map("remessa_id")
+  remessa        Remessa       @relation(fields: [remessaId], references: [id], onDelete: Restrict)
+  carregamentoId String?       @map("carregamento_id")
+  carregamento   Carregamento? @relation(fields: [carregamentoId], references: [id], onDelete: Restrict)
+
+  tipoEvento     TipoEventoExpedicao @map("tipo_evento")
+  statusAnterior String?             @map("status_anterior")
+  statusNovo     String              @map("status_novo")
+
+  usuarioId String  @map("usuario_id")
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  dadosAntes  Json? @map("dados_antes")
+  dadosDepois Json? @map("dados_depois")
+  observacao  String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([remessaId, createdAt])
+  @@index([carregamentoId, createdAt])
+  @@map("expedicao_historico")
+}
+
+// Idempotência genérica — reutilizável por qualquer módulo do sistema, não
+// só Expedição. Chave+operação+empresa criadas e concluídas DENTRO da MESMA
+// transação da operação principal: se a operação falhar, a linha
+// PROCESSING é revertida junto (nunca fica travada indefinidamente).
+model IdempotencyKey {
+  id          String               @id @default(cuid())
+  empresaId   String               @map("empresa_id")
+  chave       String
+  operacao    String
+  // Hash do payload da requisição — uma retentativa com a mesma chave mas
+  // conteúdo diferente é recusada (não silenciosamente ignorada).
+  requestHash String               @map("request_hash")
+  status      StatusIdempotencyKey @default(PROCESSING)
+  resultadoId String?              @map("resultado_id")
+  resposta    Json?
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+  expiresAt   DateTime? @map("expires_at")
+
+  @@unique([empresaId, operacao, chave])
+  @@map("idempotency_keys")
+}

@@ -1,0 +1,103 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: erp_engenharia
+    # SEM "ports:" aqui de propósito — em produção o Postgres não precisa
+    # ficar acessível fora da rede interna do Docker. Só o "app" e o
+    # "migrate" falam com ele, pelo nome do serviço ("db").
+    volumes:
+      - erp_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp -d erp_engenharia"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://erp:${POSTGRES_PASSWORD}@db:5432/erp_engenharia?schema=public"
+      NODE_ENV: production
+      NEXTAUTH_SECRET: "${NEXTAUTH_SECRET}"
+      NEXTAUTH_URL: "${NEXTAUTH_URL}"
+      RESEND_API_KEY: "${RESEND_API_KEY}"
+      EMAIL_FROM: "${EMAIL_FROM}"
+    # SEM "ports: 3000:3000" exposto direto ao mundo — o Caddy é quem fala
+    # com a internet (80/443) e repassa pro app por dentro da rede Docker.
+    # ATENÇÃO — TESTE LOCAL: porta aberta direto pro navegador (localhost:3000
+    # ou IP da rede local) pra facilitar testar sem precisar de domínio/HTTPS.
+    #
+    # ANTES DE IR PRO SERVIDOR REAL (Vultr/Google/etc), REMOVA este bloco
+    # "ports" — em produção de verdade, só o Caddy deve ficar exposto
+    # (com HTTPS), nunca o app direto. Deixar isso em produção significa
+    # que qualquer um pode acessar o sistema sem passar pelo HTTPS.
+    ports:
+      - "3000:3000"
+    expose:
+      - "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Reverse proxy com HTTPS automático (Let's Encrypt) — só precisa do
+  # domínio apontando pro IP do servidor que o Caddy cuida do certificado
+  # sozinho, renovação incluída. Zero configuração manual de SSL.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  # Mesmo serviço administrativo do compose de dev — usado só sob demanda
+  # pra rodar `db push`, `generate` e seed. Não fica rodando o tempo todo.
+  #
+  # Uso:
+  #   docker compose -f docker-compose.prod.yml --profile tools run --rm migrate npx prisma db push
+  #   docker compose -f docker-compose.prod.yml --profile tools run --rm migrate npm run db:seed
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    working_dir: /app
+    environment:
+      DATABASE_URL: "postgresql://erp:${POSTGRES_PASSWORD}@db:5432/erp_engenharia?schema=public"
+      SEED_ADMIN_EMAIL: "${SEED_ADMIN_EMAIL}"
+      SEED_ADMIN_PASSWORD: "${SEED_ADMIN_PASSWORD}"
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["tools"]
+
+  # Portainer — painel web pra visualizar containers, CPU/memória de cada
+  # um, logs em tempo real, e reiniciar serviços sem precisar de SSH.
+  # Acesso: http://SEU_IP:9000 (defina a senha de admin no primeiro acesso,
+  # tem um prazo curto pra isso — se demorar, precisa recriar o container).
+  portainer:
+    image: portainer/portainer-ce:latest
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
+volumes:
+  erp_postgres_data:
+  caddy_data:
+  caddy_config:
+  portainer_data:

@@ -1,0 +1,79 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: erp_dev_password
+      POSTGRES_DB: erp_engenharia
+    ports:
+      # Exposto na máquina host na porta 5433 (não 5432) para evitar
+      # conflito com um PostgreSQL que já possa estar instalado/rodando
+      # localmente na máquina. A porta interna entre os containers
+      # continua 5432 — não precisa mudar nada no DATABASE_URL do "app".
+      - "5433:5432"
+    volumes:
+      - erp_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp -d erp_engenharia"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # Dentro da rede do Docker Compose, o Postgres é alcançado pelo nome
+      # do serviço ("db"), não por "localhost".
+      DATABASE_URL: "postgresql://erp:erp_dev_password@db:5432/erp_engenharia?schema=public"
+      NODE_ENV: production
+      # Lidos do arquivo .env na raiz do projeto (Docker Compose carrega
+      # esse arquivo automaticamente). Garanta que NEXTAUTH_SECRET esteja
+      # definido lá antes de subir os containers.
+      NEXTAUTH_SECRET: "${NEXTAUTH_SECRET}"
+      NEXTAUTH_URL: "${NEXTAUTH_URL:-http://localhost:3000}"
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Serviço administrativo (não fica "rodando" por padrão) usado para
+  # rodar migrations e o seed do banco. Reaproveita o estágio "builder" do
+  # Dockerfile, que já tem o Prisma CLI, tsx e todo o código-fonte —
+  # evita inflar a imagem de produção do serviço "app" só para isso.
+  #
+  # Uso:
+  #   docker compose run --rm migrate npx prisma migrate deploy
+  #   docker compose run --rm migrate npm run db:seed
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    working_dir: /app
+    environment:
+      DATABASE_URL: "postgresql://erp:erp_dev_password@db:5432/erp_engenharia?schema=public"
+      SEED_ADMIN_EMAIL: "${SEED_ADMIN_EMAIL:-admin@hgigroup.com.br}"
+      SEED_ADMIN_PASSWORD: "${SEED_ADMIN_PASSWORD:-TrocarSenha123!}"
+    volumes:
+      # CRÍTICO: sem este volume, qualquer migration criada com
+      # "prisma migrate dev" dentro do container é perdida assim que o
+      # container é recriado — o arquivo .sql da migration nunca chega a
+      # existir na sua máquina, só dentro do container efêmero. Isso causa
+      # "drift detected" toda vez que o comando roda de novo, porque o
+      # Postgres "lembra" que a migration já foi aplicada, mas a pasta
+      # local volta a ficar vazia. Este bind mount liga a pasta de
+      # migrations do container diretamente à pasta local do projeto,
+      # então os arquivos gerados ficam salvos de verdade e versionáveis.
+      - ./src/infra/db/prisma/migrations:/app/src/infra/db/prisma/migrations
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["tools"]
+
+volumes:
+  erp_postgres_data:

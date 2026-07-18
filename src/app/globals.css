@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── TEMA CLARO ─────────────────────────────────────────────────── */
+    --background: 0 0% 100%;
+    --foreground: 215 20% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 20% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 20% 14%;
+
+    /* Primária: laranja ConstructApp/HGI (#FF731D) */
+    --primary: 23 100% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 16% 96%;
+    --secondary-foreground: 215 20% 18%;
+
+    --muted: 215 16% 96%;
+    --muted-foreground: 215 10% 46%;
+
+    --accent: 23 100% 95%;
+    --accent-foreground: 23 85% 32%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 55% 32%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 42%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 215 14% 91%;
+    --input: 215 14% 88%;
+    --ring: 23 90% 50%;
+
+    /* Grafite institucional (#2A2F36) — sidebar */
+    --graphite: 215 12% 19%;
+    --graphite-foreground: 0 0% 98%;
+
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    /* ── TEMA DARK ───────────────────────────────────────────────────── */
+    /* Baseado no design enviado: fundo #131009, painel #17130E          */
+
+    --background: 30 15% 6%;        /* #131009 */
+    --foreground: 34 33% 92%;       /* #EDE7DE */
+
+    --card: 30 18% 8%;              /* #17130E */
+    --card-foreground: 34 33% 92%;  /* #EDE7DE */
+
+    --popover: 30 18% 8%;
+    --popover-foreground: 34 33% 92%;
+
+    /* Primária: laranja mantido — identidade da marca */
+    --primary: 23 100% 56%;         /* #FF731D */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 30 14% 11%;        /* ~#1D1811 */
+    --secondary-foreground: 34 20% 75%;
+
+    --muted: 30 14% 11%;
+    --muted-foreground: 30 10% 55%; /* #8C847A */
+
+    --accent: 23 60% 18%;           /* laranja escuro sutil */
+    --accent-foreground: 23 100% 70%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 45% 38%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 85% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 30 12% 14%;           /* rgba(255,255,255,0.06) equivalente */
+    --input: 30 12% 16%;
+    --ring: 23 90% 50%;
+
+    /* Grafite no dark — sidebar usa o mesmo fundo escuro */
+    --graphite: 30 18% 8%;
+    --graphite-foreground: 34 33% 92%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

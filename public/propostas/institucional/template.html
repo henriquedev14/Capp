@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @font-face { font-family: 'Montserrat'; src: local('Montserrat'); }
+    body { margin: 0; background: #E9E7E2; }
+    @media print {
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      *, *::before, *::after {
+        animation-delay: -99s !important; animation-duration: .001s !important;
+        animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+        animation-play-state: running !important; transition-duration: 0s !important;
+      }
+    }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&amp;family=Open+Sans:wght@400;600;700&amp;display=swap" rel="stylesheet">
+</helmet>
+<x-import component-from-global-scope="deck-stage" from="./deck-stage.js" width="794" height="1123" hint-size="100%,100%" data-uneditable="">
+
+<section data-deck-active data-label="Capa" data-speaker-notes="Capa aprovada — não alterar." style="position:relative;width:794px;height:1123px;background:#fff;">
+  <img src="assets/capa-nomad-nometa.png" alt="Capa" style="width:100%;height:100%;object-fit:cover;display:block;">
+</section>
+
+<section data-deck-active data-label="Resumo Executivo" data-speaker-notes="Carta assinada por José Wilson. Máx 90 palavras no texto de abertura." style="position:relative;width:794px;height:1123px;background:#FAFAF8;font-family:'Open Sans',sans-serif;padding:76px 78px 64px;box-sizing:border-box;color:#2B2B2B;">
+  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:2.5px;color:{{ orange }};text-transform:uppercase;">Resumo Executivo</div>
+  <h1 style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:32px;color:{{ navy }};margin:14px 0 8px;line-height:1.2;">Uma solução, resumida em um minuto</h1>
+  <div style="width:48px;height:3px;background:{{ orange }};margin:0 0 34px;"></div>
+
+  <p style="font-size:16px;line-height:1.8;color:#3A3A3A;max-width:600px;margin:0 0 42px;">
+    Apresentamos a solução de industrialização elétrica para o <strong>{{ projectName }}</strong>, em {{ location }}: kits elétricos embutidos em estrutura de concreto armado para as {{ uhCount }}, produzidos em ambiente fabril com rastreabilidade, padronização e redução de retrabalho em obra. Este documento apresenta a solução técnica, o processo de industrialização, o escopo, o investimento e os próximos passos para aprovação.
+  </p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:26px 30px;padding:28px 0;border-top:1px solid #E4E1DA;border-bottom:1px solid #E4E1DA;margin-bottom:40px;">
+    <div><div style="font-size:11px;letter-spacing:1.3px;color:{{ orange }};font-weight:700;text-transform:uppercase;">Cliente</div><div style="font-size:16px;font-weight:600;margin-top:5px;">{{ clientName }}</div></div>
+    <div><div style="font-size:11px;letter-spacing:1.3px;color:{{ orange }};font-weight:700;text-transform:uppercase;">Empreendimento</div><div style="font-size:16px;font-weight:600;margin-top:5px;">{{ projectName }}</div></div>
+    <div><div style="font-size:11px;letter-spacing:1.3px;color:{{ orange }};font-weight:700;text-transform:uppercase;">Localização</div><div style="font-size:16px;font-weight:600;margin-top:5px;">{{ location }}</div></div>
+    <div><div style="font-size:11px;letter-spacing:1.3px;color:{{ orange }};font-weight:700;text-transform:uppercase;">Unidades habitacionais</div><div style="font-size:16px;font-weight:600;margin-top:5px;">{{ uhCount }}</div></div>
+    <div><div style="font-size:11px;letter-spacing:1.3px;color:{{ orange }};font-weight:700;text-transform:uppercase;">Sistema construtivo</div><div style="font-size:16px;font-weight:600;margin-top:5px;">Estrutura de concreto armado</div></div>
+    <div><div style="font-size:11px;letter-spacing:1.3px;color:{{ orange }};font-weight:700;text-transform:uppercase;">Industrialização</div><div style="font-size:16px;font-weight:600;margin-top:5px;">Fábrica Uberlândia-MG</div></div>
+  </div>
+
+  <div style="display:flex;gap:24px;margin-bottom:30px;">
+    <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="4">
+      <div style="flex:1;">
+        <div style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:21px;color:{{ orange }};">{{ item.n }}</div>
+        <div style="font-size:12.5px;font-weight:600;color:{{ navy }};margin-top:5px;line-height:1.4;">{{ item.label }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="position:absolute;left:78px;right:78px;bottom:60px;">
+    <div style="font-size:14.5px;line-height:1.6;color:#3A3A3A;">Atenciosamente,</div>
+    <div style="margin-top:18px;font-family:'Montserrat',sans-serif;font-weight:700;font-size:16.5px;color:{{ navy }};">{{ headOpsName }}</div>
+    <div style="font-size:13px;color:#6B6B6B;">Head de Operações — ConstruAPP | Grupo HGI</div>
+    <div style="margin-top:22px;font-size:10.5px;color:#9A9A94;border-top:1px solid #E4E1DA;padding-top:10px;">Este documento é confidencial e destinado exclusivamente ao uso do cliente aqui identificado.</div>
+  </div>
+</section>
+
+<section data-deck-active data-label="Solução Técnica" data-speaker-notes="4 grupos, ícones minimalistas, até 3 fotos técnicas." style="position:relative;width:794px;height:1123px;background:#FAFAF8;font-family:'Open Sans',sans-serif;padding:76px 78px 64px;box-sizing:border-box;color:#2B2B2B;">
+  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:2.5px;color:{{ orange }};text-transform:uppercase;">Solução Técnica</div>
+  <h1 style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:30px;color:{{ navy }};margin:14px 0 8px;">O que será industrializado</h1>
+  <div style="width:48px;height:3px;background:{{ orange }};margin:0 0 44px;"></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:38px 40px;margin-bottom:44px;">
+    <sc-for list="{{ techGroups }}" as="g" hint-placeholder-count="4">
+      <div>
+        <div style="width:30px;height:30px;border-radius:50%;background:{{ navy }};color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;font-weight:700;font-size:13px;margin-bottom:16px;">{{ g.n }}</div>
+        <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:16px;color:{{ navy }};">{{ g.title }}</div>
+        <div style="font-size:13px;color:{{ orange }};font-weight:600;margin:7px 0 12px;">{{ g.tagline }}</div>
+        <ul style="margin:0;padding-left:15px;font-size:13.5px;line-height:1.85;color:#3A3A3A;">
+          <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+            <li>{{ it }}</li>
+          </sc-for>
+        </ul>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:18px;">
+    <sc-for list="{{ techPhotos }}" as="p" hint-placeholder-count="3">
+      <div style="height:170px;min-width:0;overflow:hidden;">
+        <img alt="{{ p.label }}" src="{{ p.src }}" style="width:100%;height:100%;max-width:100%;object-fit:contain;border-radius:2px;background:#F1EFEA;display:block;">
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section data-deck-active data-label="Processo de Industrialização" data-speaker-notes="5 etapas + 3 benefícios." style="position:relative;width:794px;height:1123px;background:#FAFAF8;font-family:'Open Sans',sans-serif;padding:76px 78px 64px;box-sizing:border-box;color:#2B2B2B;">
+  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:2.5px;color:{{ orange }};text-transform:uppercase;">Processo</div>
+  <h1 style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:32px;color:{{ navy }};margin:14px 0 8px;">Da engenharia à entrega em obra</h1>
+  <div style="width:48px;height:3px;background:{{ orange }};margin:0 0 36px;"></div>
+
+  <div style="display:flex;flex-direction:column;">
+    <sc-for list="{{ processSteps }}" as="s" hint-placeholder-count="5">
+      <div style="display:flex;gap:24px;align-items:flex-start;padding:18px 0;">
+        <div style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:26px;color:{{ orange }};width:46px;">{{ s.n }}</div>
+        <div>
+          <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:16px;color:{{ navy }};">{{ s.title }}</div>
+          <div style="font-size:13.5px;color:#3A3A3A;margin-top:5px;line-height:1.6;">{{ s.desc }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="margin-top:56px;padding-top:26px;border-top:1px solid #E4E1DA;">
+    <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.8px;text-transform:uppercase;color:{{ orange }};margin-bottom:22px;">Por que industrializar</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;">
+      <sc-for list="{{ processBenefits }}" as="b" hint-placeholder-count="3">
+        <div>
+          <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:15px;color:{{ navy }};margin-bottom:6px;">{{ b.title }}</div>
+          <div style="font-size:12.5px;line-height:1.6;color:#3A3A3A;">{{ b.desc }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section data-deck-active data-label="Escopo e Limites" data-speaker-notes="Matriz Incluído / Não incluído + notas." style="position:relative;width:794px;height:1123px;background:#FAFAF8;font-family:'Open Sans',sans-serif;padding:76px 78px 64px;box-sizing:border-box;color:#2B2B2B;">
+  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:2.5px;color:{{ orange }};text-transform:uppercase;">Escopo</div>
+  <h1 style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:32px;color:{{ navy }};margin:14px 0 8px;">Escopo claramente definido</h1>
+  <div style="width:48px;height:3px;background:{{ orange }};margin:0 0 36px;"></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:36px;margin-bottom:34px;">
+    <div>
+      <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:14px;color:{{ navy }};letter-spacing:0.8px;text-transform:uppercase;margin-bottom:14px;">Incluído</div>
+      <sc-for list="{{ included }}" as="it" hint-placeholder-count="6">
+        <div style="display:flex;gap:9px;font-size:13.5px;line-height:1.6;color:#3A3A3A;padding:8px 0;border-bottom:1px solid #EFEDE8;">
+          <span style="color:{{ orange }};font-weight:700;">✓</span><span>{{ it }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div>
+      <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:14px;color:#6B6B6B;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:14px;">Não incluído</div>
+      <sc-for list="{{ excluded }}" as="it" hint-placeholder-count="6">
+        <div style="display:flex;gap:9px;font-size:13.5px;line-height:1.6;color:#6B6B6B;padding:8px 0;border-bottom:1px solid #EFEDE8;">
+          <span style="color:#B7B4AC;font-weight:700;">–</span><span>{{ it }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="background:#F1EFEA;padding:20px 24px;border-left:3px solid {{ orange }};">
+    <div style="font-size:12.5px;line-height:1.7;color:#3A3A3A;margin-bottom:10px;">Caixas e eletrodutos embutidos em paredes de alvenaria e drywall são fornecidos a granel.</div>
+    <div style="font-size:12.5px;line-height:1.7;color:#3A3A3A;">Alterações de projetos, materiais, circuitos ou padrões após a aprovação poderão gerar revisão de quantitativos, prazos e valores.</div>
+  </div>
+</section>
+
+<section data-deck-active data-label="Investimento" data-speaker-notes="Sem dados bancários; sem tabela analítica aqui." style="position:relative;width:794px;height:1123px;background:#FAFAF8;font-family:'Open Sans',sans-serif;padding:76px 78px 60px;box-sizing:border-box;color:#2B2B2B;">
+  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:2.5px;color:{{ orange }};text-transform:uppercase;">Investimento</div>
+  <h1 style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:32px;color:{{ navy }};margin:14px 0 8px;">Investimento da solução</h1>
+  <div style="width:48px;height:3px;background:{{ orange }};margin:0 0 42px;"></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;background:#E4E1DA;margin-bottom:46px;">
+    <div style="background:{{ navy }};color:#fff;padding:32px 30px;">
+      <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#8FA0C4;">Mão de obra</div>
+      <div style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:27px;color:{{ orange }};margin-top:14px;">{{ laborUnit }}</div>
+      <div style="font-size:12.5px;color:#B9C2D6;margin-top:4px;">por unidade habitacional</div>
+      <div style="height:1px;background:#2E3F63;margin:22px 0;"></div>
+      <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:20px;">{{ laborTotal }}</div>
+      <div style="font-size:11.5px;color:#8FA0C4;margin-top:2px;">total do contrato</div>
+    </div>
+    <div style="background:#FAFAF8;padding:32px 30px;">
+      <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#8A8A82;">Materiais — estimativa</div>
+      <div style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:27px;color:{{ orange }};margin-top:14px;">{{ materialUnit }}</div>
+      <div style="font-size:12.5px;color:#6B6B6B;margin-top:4px;">por unidade habitacional</div>
+      <div style="height:1px;background:#E4E1DA;margin:22px 0;"></div>
+      <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:20px;color:{{ navy }};">{{ materialTotal }}</div>
+      <div style="font-size:11.5px;color:#8A8A82;margin-top:2px;">total estimado</div>
+    </div>
+  </div>
+
+  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.8px;text-transform:uppercase;color:{{ navy }};margin-bottom:18px;">Composição dos materiais</div>
+  <div style="margin-bottom:24px;">
+    <sc-for list="{{ materialBreakdown }}" as="row" hint-placeholder-count="5">
+      <div style="padding:12px 0;border-bottom:1px solid #EFEDE8;">
+        <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:{{ row.barMargin }};">
+          <span style="color:{{ row.textColor }};font-weight:{{ row.weight }};">{{ row.label }}</span>
+          <span style="font-weight:{{ row.weight }};color:{{ navy }};">{{ row.value }}</span>
+        </div>
+        <sc-if value="{{ row.showBar }}" hint-placeholder-val="{{ true }}">
+          <div style="height:4px;background:#EFEDE8;">
+            <div style="height:100%;width:{{ row.pct }};background:{{ orange }};"></div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="font-size:12px;line-height:1.65;color:#6B6B6B;font-style:italic;margin-bottom:38px;">O valor dos materiais possui natureza estimativa e poderá variar conforme quantitativos finais, cotações, impostos, fretes e especificações aprovadas.</div>
+
+  <div style="border-top:2px solid {{ navy }};padding-top:20px;">
+    <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:0.8px;text-transform:uppercase;color:{{ navy }};margin-bottom:16px;">Condições principais</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 28px;">
+      <sc-for list="{{ conditions }}" as="c" hint-placeholder-count="6">
+        <div style="display:flex;gap:9px;font-size:12.5px;line-height:1.65;color:#3A3A3A;padding:7px 0;">
+          <span style="color:{{ orange }};">—</span><span>{{ c }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+
+
+<sc-for list="{{ gruposAnexo }}" as="grupo" hint-placeholder-count="2">
+<section data-deck-active data-label="Anexo — Memoria de Materiais" data-speaker-notes="Uma pagina por fabricante - quantidade dinamica conforme o Levantamento de Materiais." style="position:relative;width:794px;height:1123px;background:#FAFAF8;font-family:'Open Sans',sans-serif;padding:70px 76px 58px;box-sizing:border-box;color:#2B2B2B;">
+  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:2.5px;color:{{ orange }};text-transform:uppercase;">Anexo</div>
+  <h1 style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:24px;color:{{ navy }};margin:12px 0 22px;">Memoria estimativa - {{ grupo.titulo }}</h1>
+
+  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;color:#fff;background:{{ navy }};padding:8px 12px;">{{ grupo.tituloTabela }}</div>
+  <sc-for list="{{ grupo.itens }}" as="r" hint-placeholder-count="7">
+    <div style="display:grid;grid-template-columns:2.6fr 0.6fr 1fr 1fr 1fr;font-size:12px;padding:7px 12px;background:{{ r.bg }};">
+      <span>{{ r.desc }}</span><span style="text-align:center;">{{ r.und }}</span><span style="text-align:right;">{{ r.qty }}</span><span style="text-align:right;">{{ r.unit }}</span><span style="text-align:right;font-weight:{{ r.weight }};">{{ r.total }}</span>
+    </div>
+  </sc-for>
+  <div style="display:flex;justify-content:space-between;background:{{ navy }};color:#fff;padding:11px 12px;margin-top:18px;font-family:'Montserrat',sans-serif;font-weight:700;font-size:13px;">
+    <span>{{ grupo.subtotalLabel }}</span><span>{{ grupo.subtotalValor }}</span>
+  </div>
+
+  <div style="position:absolute;left:76px;right:76px;bottom:58px;font-size:10.5px;color:#8A8A82;border-top:1px solid #E4E1DA;padding-top:9px;">Valores estimativos conforme Levantamento de Materiais validado. Nao recalculado.</div>
+</section>
+</sc-for>
+<section data-deck-active data-label="Aceite e Próximos Passos" data-speaker-notes="Sem testemunha, salvo exigência jurídica." style="position:relative;width:794px;height:1123px;background:#FAFAF8;font-family:'Open Sans',sans-serif;padding:76px 78px 56px;box-sizing:border-box;color:#2B2B2B;">
+  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:2.5px;color:{{ orange }};text-transform:uppercase;">Aceite</div>
+  <h1 style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:32px;color:{{ navy }};margin:14px 0 8px;">Próximos passos</h1>
+  <div style="width:48px;height:3px;background:{{ orange }};margin:0 0 30px;"></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px 20px;margin-bottom:30px;">
+    <sc-for list="{{ nextSteps }}" as="s" hint-placeholder-count="6">
+      <div style="display:flex;gap:9px;align-items:flex-start;">
+        <div style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:15px;color:{{ orange }};">{{ s.n }}</div>
+        <div style="font-size:12.5px;line-height:1.4;color:{{ navy }};font-weight:600;">{{ s.label }}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="background:#F1EFEA;padding:20px 24px;border-left:3px solid {{ navy }};font-size:13px;line-height:1.7;color:#3A3A3A;margin-bottom:28px;">
+    Declaro que li e compreendi o escopo, os valores, as premissas e as condições comerciais apresentados nesta proposta e manifesto concordância com a contratação da solução descrita.
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;font-size:12.5px;color:#3A3A3A;">
+    <div>
+      <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.8px;text-transform:uppercase;color:{{ navy }};margin-bottom:12px;">Contratante</div>
+      <div style="border-bottom:1px solid #C9C6BE;padding:9px 0;">Nome:</div>
+      <div style="border-bottom:1px solid #C9C6BE;padding:9px 0;">Cargo:</div>
+      <div style="border-bottom:1px solid #C9C6BE;padding:9px 0;">CPF:</div>
+      <div style="border-bottom:1px solid #C9C6BE;padding:9px 0;">Assinatura:</div>
+    </div>
+    <div>
+      <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.8px;text-transform:uppercase;color:{{ navy }};margin-bottom:12px;">Contratada</div>
+      <div style="border-bottom:1px solid #C9C6BE;padding:9px 0;">Representante:</div>
+      <div style="border-bottom:1px solid #C9C6BE;padding:9px 0;">CPF:</div>
+      <div style="border-bottom:1px solid #C9C6BE;padding:9px 0;">Assinatura:</div>
+      <div style="border-bottom:1px solid #C9C6BE;padding:9px 0;">Data:</div>
+    </div>
+  </div>
+
+  <div style="position:absolute;left:78px;right:78px;bottom:60px;font-size:13px;line-height:1.7;color:{{ navy }};">
+    <div>Agradecemos a oportunidade de contribuir com o {{ projectName }}.</div>
+    <div style="font-weight:600;margin-top:4px;">Conte com a ConstruAPP e o Grupo HGI para uma industrialização mais segura, organizada e eficiente.</div>
+  </div>
+</section>
+
+</x-import>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;clientName&quot;: { &quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;AORB&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Campos do template&quot; },
+  &quot;projectName&quot;: { &quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;Nomad Modern Life&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Campos do template&quot; },
+  &quot;location&quot;: { &quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;Goiânia-GO&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Campos do template&quot; },
+  &quot;uhCount&quot;: { &quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;551 unidades habitacionais&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Campos do template&quot; },
+  &quot;headOpsName&quot;: { &quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;José Wilson&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Campos do template&quot; },
+  &quot;laborUnit&quot;: { &quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;R$ 870,50 / U.H&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Investimento&quot; },
+  &quot;laborTotal&quot;: { &quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;R$ 479.645,50&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Investimento&quot; },
+  &quot;materialUnit&quot;: { &quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;R$ 1.905,91 / U.H&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Investimento&quot; },
+  &quot;materialTotal&quot;: { &quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;R$ 1.050.158,44&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Investimento&quot; }
+}">
+class Component extends DCLogic {
+  renderVals() {
+    const navy = '#14213D';
+    const orange = '#D9711E';
+
+    const zebra = (rows) => rows.map((r, i) => ({ ...r, bg: i % 2 === 0 ? '#FFFFFF' : '#F1EFEA', weight: r.bold ? 700 : 400 }));
+
+    return {
+      navy, orange,
+      clientName: this.props.clientName ?? 'AORB',
+      projectName: this.props.projectName ?? 'Nomad Modern Life',
+      location: this.props.location ?? 'Goiânia-GO',
+      uhCount: this.props.uhCount ?? '551 unidades habitacionais',
+      headOpsName: this.props.headOpsName ?? 'José Wilson',
+
+      navItems: [
+        { n: '01', label: 'Solução técnica' },
+        { n: '02', label: 'Processo de industrialização' },
+        { n: '03', label: 'Escopo' },
+        { n: '04', label: 'Investimento' },
+      ],
+
+      techGroups: [
+        { n: '01', title: 'Infraestrutura e Caixas', tagline: 'Base pronta para receber a instalação', items: ['Caixa de teto multiposições (10 posições)', 'Caixa SafeBox', 'Caixas de parede 4x2 e 4x4'] },
+        { n: '02', title: 'Eletrodutos', tagline: 'Infraestrutura compatível com o padrão da edificação', items: ['Corrugado reforçado PVC 25 mm', 'Corrugado reforçado PVC 32 mm', 'Fixação padronizada por pavimento'] },
+        { n: '03', title: 'Cabeamento Elétrico', tagline: 'Cabos identificados, prontos para montagem', items: ['2,5 mm² — iluminação, tomadas e ar-condicionado', '6,0 mm² — chuveiro', 'Identificação por cores conforme função'] },
+        { n: '04', title: 'Conectividade', tagline: 'Conexões rápidas e seguras, sem emendas improvisadas', items: ['Conectores Wago de engate rápido', '2, 3 e 5 polos', 'Padronização por unidade'] },
+      ],
+      techPhotos: [
+        { id: 'tech-photo-1', label: 'Foto — caixas e componentes', src: 'assets/foto-caixas.png' },
+        { id: 'tech-photo-2', label: 'Foto — organização dos condutores', src: 'assets/foto-organizacao-condutores.png' },
+        { id: 'tech-photo-3', label: 'Foto — conectores montados', src: 'assets/foto-conectores.png' },
+      ],
+
+      processSteps: [
+        { n: '01', title: 'Projetos', desc: 'Consolidação dos projetos complementares recebidos.' },
+        { n: '02', title: 'Engenharia', desc: 'Detalhamento técnico dos kits por unidade.' },
+        { n: '03', title: 'Industrialização', desc: 'Montagem em ambiente fabril, fora do canteiro.' },
+        { n: '04', title: 'Controle de qualidade', desc: 'Verificação técnica de cada conjunto produzido.' },
+        { n: '05', title: 'Expedição', desc: 'Envio programado conforme cronograma de obra.' },
+      ],
+      processBenefits: [
+        { title: 'Padronização', desc: 'Mesmo padrão técnico repetido em todos os pavimentos.' },
+        { title: 'Rastreabilidade', desc: 'Cada kit identificado e vinculado à sua unidade.' },
+        { title: 'Previsibilidade', desc: 'Cronograma de obra menos sujeito a imprevistos.' },
+      ],
+
+      included: [
+        'Kits elétricos das unidades habitacionais',
+        'Kits dos halls efetivamente considerados',
+        'Caixas, eletrodutos, cabos e conectores descritos',
+        'Preparação e identificação dos conjuntos',
+        'Industrialização em ambiente fabril',
+        'Controle de qualidade',
+      ],
+      excluded: [
+        'Sistemas especiais das unidades',
+        'Alimentadores e prumadas principais',
+        'Escadarias e elevadores',
+        'Acabamentos elétricos e sensores',
+        'Instalações externas às unidades',
+        'CFTV, incêndio, automação e sistemas equivalentes',
+      ],
+
+      laborUnit: this.props.laborUnit ?? 'R$ 870,50 / U.H',
+      laborTotal: this.props.laborTotal ?? 'R$ 479.645,50',
+      materialUnit: this.props.materialUnit ?? 'R$ 1.905,91 / U.H',
+      materialTotal: this.props.materialTotal ?? 'R$ 1.050.158,44',
+
+      materialBreakdown: (() => {
+        const rows = [
+          { label: 'Caixas e acessórios', value: 'R$ 115.640,00', amount: 115640.00 },
+          { label: 'Eletrodutos', value: 'R$ 165.060,00', amount: 165060.00 },
+          { label: 'Cabos elétricos', value: 'R$ 721.730,00', amount: 721730.00 },
+          { label: 'Conectores, frete e impostos', value: 'R$ 47.728,44', amount: 47728.44 },
+        ];
+        const total = 1050158.44;
+        const withBars = rows.map(r => ({ ...r, showBar: true, pct: ((r.amount / total) * 100).toFixed(1) + '%', weight: 600, textColor: '#3A3A3A', barMargin: '10px' }));
+        withBars.push({ label: 'Total estimado', value: 'R$ 1.050.158,44', showBar: false, weight: 700, textColor: navy, barMargin: '0px' });
+        return withBars;
+      })(),
+
+      conditions: [
+        'Faturamento dos materiais direto ao cliente',
+        'Entrega na fábrica de Uberlândia-MG',
+        'Responsabilidade pelo frete: [INFORMAÇÃO A CONFIRMAR]',
+        'Validade da proposta: [INFORMAÇÃO A CONFIRMAR]',
+        'Início da produção mediante aprovação formal do escopo',
+        'Alterações após aprovação geram revisão de quantitativos, prazos e valores',
+      ],
+
+      nextSteps: [
+        { n: '01', label: 'Validação do escopo' },
+        { n: '02', label: 'Aprovação comercial' },
+        { n: '03', label: 'Consolidação dos projetos' },
+        { n: '04', label: 'Validação do padrão técnico' },
+        { n: '05', label: 'Programação da produção' },
+        { n: '06', label: 'Planejamento das remessas' },
+      ],
+
+      boxesTable: zebra([
+        { desc: 'Caixa octagonal 8 entradas', und: 'UN', qty: '3.500', unit: 'R$ 2,51', total: 'R$ 8.785,00' },
+        { desc: 'Caixa octagonal 10 entradas', und: 'UN', qty: '2.300', unit: 'R$ 4,93', total: 'R$ 11.339,00' },
+        { desc: 'Caixa 4x2 drywall', und: 'UN', qty: '4.800', unit: 'R$ 2,90', total: 'R$ 13.920,00' },
+        { desc: 'Caixa 4x2 alvenaria', und: 'UN', qty: '8.900', unit: 'R$ 2,51', total: 'R$ 22.339,00' },
+        { desc: 'Caixa SafeBox', und: 'UN', qty: '12.500', unit: 'R$ 3,97', total: 'R$ 49.625,00' },
+        { desc: 'Luva 3/4"', und: 'UN', qty: '12.500', unit: 'R$ 0,47', total: 'R$ 5.875,00' },
+        { desc: 'Pino lacre', und: 'UN', qty: '22.100', unit: 'R$ 0,17', total: 'R$ 3.757,00' },
+        { desc: 'Subtotal Nanoplasticos', und: '', qty: '', unit: '', total: 'R$ 115.640,00', bold: true },
+      ]),
+      conduitsTable: zebra([
+        { desc: 'Eletroduto reforçado corrugado PVC Tflex 25 mm', und: 'M', qty: '63.000', unit: 'R$ 2,62', total: 'R$ 165.060,00' },
+        { desc: 'Eletroduto reforçado corrugado PVC Tflex 32 mm (sem projeto de comunicação)', und: 'M', qty: '0', unit: 'R$ 3,55', total: 'R$ 0,00' },
+        { desc: 'Subtotal Barbi', und: '', qty: '', unit: '', total: 'R$ 165.060,00', bold: true },
+      ]),
+      cablesTable: zebra([
+        { desc: 'Cabo flex 2,5 mm² 750V vermelho', und: 'M', qty: '22.000', unit: 'R$ 2,35', total: 'R$ 51.700,00' },
+        { desc: 'Cabo flex 2,5 mm² 750V preto', und: 'M', qty: '63.200', unit: 'R$ 2,35', total: 'R$ 148.520,00' },
+        { desc: 'Cabo flex 2,5 mm² 750V azul', und: 'M', qty: '78.600', unit: 'R$ 2,35', total: 'R$ 184.710,00' },
+        { desc: 'Cabo flex 2,5 mm² 750V verde', und: 'M', qty: '53.800', unit: 'R$ 2,35', total: 'R$ 126.430,00' },
+        { desc: 'Cabo flex 2,5 mm² 750V amarelo', und: 'M', qty: '26.200', unit: 'R$ 2,35', total: 'R$ 61.570,00' },
+        { desc: 'Cabo flex 2,5 mm² 750V branco', und: 'M', qty: '21.000', unit: 'R$ 2,35', total: 'R$ 49.350,00' },
+        { desc: 'Cabo flex 6,0 mm² 750V vermelho', und: 'M', qty: '6.500', unit: 'R$ 5,10', total: 'R$ 33.150,00' },
+        { desc: 'Cabo flex 6,0 mm² 750V azul', und: 'M', qty: '6.500', unit: 'R$ 5,10', total: 'R$ 33.150,00' },
+        { desc: 'Cabo flex 6,0 mm² 750V verde', und: 'M', qty: '6.500', unit: 'R$ 5,10', total: 'R$ 33.150,00' },
+        { desc: 'Subtotal Cabel', und: '', qty: '', unit: '', total: 'R$ 721.730,00', bold: true },
+      ]),
+      connectorsTable: zebra([
+        { desc: 'Conector Wago 2 polos', und: 'UN', qty: '18.800', unit: 'R$ 0,54', total: 'R$ 10.152,00' },
+        { desc: 'Conector Wago 3 polos', und: 'UN', qty: '11.400', unit: 'R$ 0,66', total: 'R$ 7.524,00' },
+        { desc: 'Conector Wago 5 polos', und: 'UN', qty: '15.100', unit: 'R$ 0,90', total: 'R$ 13.590,00' },
+        { desc: 'Conector Wago 8 polos', und: 'UN', qty: '8.000', unit: 'R$ 1,30', total: 'R$ 10.400,00' },
+        { desc: 'Frete Wago', und: 'UN', qty: '1', unit: 'R$ 2.000,00', total: 'R$ 2.000,00' },
+        { desc: 'Imposto IPI Wago', und: 'UN', qty: '1', unit: 'R$ 4.062,44', total: 'R$ 4.062,44' },
+        { desc: 'Subtotal Wago', und: '', qty: '', unit: '', total: 'R$ 47.728,44', bold: true },
+      ]),
+    };
+  }
+}
+
+</script>
+<script>
+addEventListener('load', () => {
+  (async () => {
+    try { await document.fonts.ready; } catch (e) {}
+    const imgs = Array.from(document.images).filter((i) => !i.complete);
+    await Promise.race([
+      Promise.allSettled(imgs.map((i) => i.decode())),
+      new Promise((r) => setTimeout(r, 8000)),
+    ]);
+    setTimeout(() => window.print(), 500);
+  })();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# Troque pelo seu domínio real (ex: construapp.com.br).
+# O Caddy detecta automaticamente e emite/renova o certificado
+# Let's Encrypt sozinho — não precisa configurar nada de SSL manualmente.
+seu-dominio.com.br {
+	reverse_proxy app:3000
+
+	# Compressão automática (gzip/zstd) — deixa o app mais rápido sem
+	# precisar configurar nada no Next.js.
+	encode gzip zstd
+
+	# Logs de acesso, úteis pra diagnosticar problemas depois.
+	log {
+		output file /data/access.log
+		format json
+	}
+}

@@ -1,0 +1,31 @@
+# Dependências
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Ambiente / segredos — NUNCA versionar
+.env
+.env.local
+.env.production
+.env*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+
+# Backups de .env que já existiam na VM — nunca versionar
+.env.save
+.env.save.*
+
+# Zips de deploy — não devem entrar no histórico do git
+*.zip
