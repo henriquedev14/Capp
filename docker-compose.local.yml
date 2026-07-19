@@ -1,0 +1,4 @@
+services:
+  migrate:
+    volumes:
+      - ./src/infra/db/prisma/migrations:/app/src/infra/db/prisma/migrations

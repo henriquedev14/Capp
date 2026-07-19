@@ -2066,4 +2066,3 @@ ALTER TABLE "expedicao_historico" ADD CONSTRAINT "expedicao_historico_carregamen
 -- AddForeignKey
 ALTER TABLE "expedicao_historico" ADD CONSTRAINT "expedicao_historico_usuario_id_fkey" FOREIGN KEY ("usuario_id") REFERENCES "usuarios"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
-heitor_gouveia@construapp-producao:~/erp-engenharia$ 
