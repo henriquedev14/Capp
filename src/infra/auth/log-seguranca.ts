@@ -1,4 +1,5 @@
 import { prisma } from "@/infra/db/prisma/client";
+import { logger } from "@/infra/logger/logger";
 
 const LIMITE_TENTATIVAS = 5;
 const JANELA_MINUTOS = 15;
@@ -35,7 +36,7 @@ export async function registrarLogSeguranca(dados: {
       },
     });
   } catch (e) {
-    console.error("[log-seguranca] falha ao registrar evento:", e);
+    logger.error({ tipo: dados.tipo, email: dados.email, erro: e instanceof Error ? e.message : String(e) }, "falha ao registrar evento de segurança");
   }
 }
 

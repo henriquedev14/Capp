@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/infra/db/prisma/client";
+import { logger } from "@/infra/logger/logger";
 import { exigirPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empreendimento-ativo";
@@ -12,77 +13,135 @@ interface Resultado {
   ok?: boolean;
 }
 
+interface OfertaComparacao {
+  fornecedorId: string;
+  fornecedorNome: string;
+  marca: string;
+  valorUnitario: number;
+  itemTabelaPrecoId: string;
+}
+
+interface ItemComparacao {
+  itemOrcamentoId: string;
+  descricao: string;
+  quantidade: number;
+  unidade: string;
+  precoAtual: number | null;
+  ofertas: OfertaComparacao[];
+}
+
 /**
- * Aplica a Tabela de Preços Padrão dos fornecedores selecionados a todos
- * os itens do Bloco 2 (materiais) do orçamento — pra cada material,
- * procura entre os fornecedores selecionados (na ordem em que foram
- * escolhidos = prioridade) e usa o primeiro que tiver aquele material
- * numa tabela ATIVA. Isso SUBSTITUI o preço/marca que estava lá (do
- * catálogo, por padrão) — quem quiser manter o preço de catálogo em
- * algum item específico, não seleciona fornecedor pra ele depois (via
- * ajuste manual).
+ * Mostra TODAS as ofertas de cada fornecedor selecionado pro mesmo
+ * material, lado a lado — não escolhe nada sozinho. O usuário decide por
+ * item na tela antes de confirmar (ver `confirmarAplicacaoTabelaPreco`).
  */
-export async function aplicarTabelaPrecoOrcamento(
+export async function compararOfertasTabelaPreco(
   orcamentoId: string,
-  empreendimentoId: string,
   fornecedorIds: string[]
-): Promise<Resultado & { aplicados?: number; semMatch?: number }> {
+): Promise<{ erro: string } | { ok: true; itens: ItemComparacao[]; totalSemOferta: number }> {
   await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
-  const bloqueio = await verificarEmpreendimentoAtivo(empreendimentoId);
-  if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
 
   if (fornecedorIds.length === 0) return { erro: "Selecione ao menos um fornecedor." };
 
   const tabelasAtivas = await prisma.tabelaPrecoFornecedor.findMany({
     where: { fornecedorId: { in: fornecedorIds }, status: "ATIVA" },
     orderBy: { dataImportacao: "desc" },
-    include: { itens: true },
+    include: { itens: true, fornecedor: { select: { razaoSocial: true, nomeFantasia: true } } },
   });
 
-  // Uma oferta por material — respeita a ORDEM de fornecedorIds recebida
-  // (é a prioridade escolhida pelo usuário na tela).
-  const ofertaPorMaterial = new Map<string, { itemTabelaPrecoId: string; valorUnitario: number; marca: string; fornecedorId: string }>();
+  // Uma tabela (a mais recente) por fornecedor selecionado.
+  const tabelaPorFornecedor = new Map<string, (typeof tabelasAtivas)[number]>();
   for (const fornecedorId of fornecedorIds) {
     const tabela = tabelasAtivas.find((t) => t.fornecedorId === fornecedorId);
-    if (!tabela) continue;
-    for (const item of tabela.itens) {
-      if (!item.materialEletricoId) continue;
-      if (ofertaPorMaterial.has(item.materialEletricoId)) continue;
-      ofertaPorMaterial.set(item.materialEletricoId, {
-        itemTabelaPrecoId: item.id,
-        valorUnitario: Number(item.valorUnitario),
-        marca: item.marca,
-        fornecedorId,
-      });
-    }
+    if (tabela) tabelaPorFornecedor.set(fornecedorId, tabela);
   }
 
   const itensOrcamento = await prisma.itemMaterialOrcamento.findMany({
     where: { orcamentoId, materialEletricoId: { not: null } },
   });
 
-  let aplicados = 0;
+  const itens: ItemComparacao[] = [];
+  let totalSemOferta = 0;
+
   for (const item of itensOrcamento) {
     if (!item.materialEletricoId) continue;
-    const oferta = ofertaPorMaterial.get(item.materialEletricoId);
-    if (!oferta) continue;
 
-    await prisma.itemMaterialOrcamento.update({
-      where: { id: item.id },
-      data: {
-        precoUnitario: oferta.valorUnitario,
-        total: Number(item.quantidade) * oferta.valorUnitario,
-        fornecedorSelecionadoId: oferta.fornecedorId,
-        itemTabelaPrecoId: oferta.itemTabelaPrecoId,
+    // Uma oferta por fornecedor selecionado (na ordem escolhida) — só
+    // entra na lista se aquele fornecedor tiver esse material.
+    const ofertas: OfertaComparacao[] = [];
+    for (const fornecedorId of fornecedorIds) {
+      const tabela = tabelaPorFornecedor.get(fornecedorId);
+      if (!tabela) continue;
+      const oferta = tabela.itens.find((i) => i.materialEletricoId === item.materialEletricoId);
+      if (!oferta) continue;
+      ofertas.push({
+        fornecedorId,
+        fornecedorNome: tabela.fornecedor.nomeFantasia ?? tabela.fornecedor.razaoSocial,
         marca: oferta.marca,
+        valorUnitario: Number(oferta.valorUnitario),
+        itemTabelaPrecoId: oferta.id,
+      });
+    }
+
+    if (ofertas.length === 0) {
+      totalSemOferta++;
+      continue;
+    }
+
+    itens.push({
+      itemOrcamentoId: item.id,
+      descricao: item.descricao,
+      quantidade: Number(item.quantidade),
+      unidade: item.unidade,
+      precoAtual: item.precoUnitario != null ? Number(item.precoUnitario) : null,
+      ofertas,
+    });
+  }
+
+  return { ok: true, itens, totalSemOferta };
+}
+
+/**
+ * Aplica as escolhas feitas na tela de comparação — uma por item, cada
+ * uma apontando pro `itemTabelaPrecoId` escolhido especificamente (não
+ * decide nada automaticamente, só grava o que o usuário já escolheu).
+ */
+export async function confirmarAplicacaoTabelaPreco(
+  empreendimentoId: string,
+  escolhas: { itemOrcamentoId: string; fornecedorId: string; itemTabelaPrecoId: string; valorUnitario: number; marca: string }[]
+): Promise<Resultado & { aplicados?: number }> {
+  const sessao = await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
+  const bloqueio = await verificarEmpreendimentoAtivo(empreendimentoId);
+  if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
+
+  for (const escolha of escolhas) {
+    const item = await prisma.itemMaterialOrcamento.findUnique({ where: { id: escolha.itemOrcamentoId } });
+    if (!item) continue;
+    await prisma.itemMaterialOrcamento.update({
+      where: { id: escolha.itemOrcamentoId },
+      data: {
+        precoUnitario: escolha.valorUnitario,
+        total: Number(item.quantidade) * escolha.valorUnitario,
+        fornecedorSelecionadoId: escolha.fornecedorId,
+        itemTabelaPrecoId: escolha.itemTabelaPrecoId,
+        marca: escolha.marca,
         situacao: "NORMAL",
       },
     });
-    aplicados++;
   }
 
+  logger.info(
+    {
+      empreendimentoId,
+      usuarioId: sessao.user.id,
+      itensAplicados: escolhas.length,
+      fornecedoresIds: Array.from(new Set(escolhas.map((e) => e.fornecedorId))),
+    },
+    "tabela de preços aplicada a itens de orçamento"
+  );
+
   revalidatePath(`/empreendimentos/${empreendimentoId}/orcamento`);
-  return { ok: true, aplicados, semMatch: itensOrcamento.length - aplicados };
+  return { ok: true, aplicados: escolhas.length };
 }
 
 /**
