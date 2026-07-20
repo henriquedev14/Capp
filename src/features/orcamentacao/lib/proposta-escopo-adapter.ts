@@ -116,6 +116,7 @@ export function montarEscopoTemplate(data: PropostaInstitucionalData): EscopoTem
     itens: zebra(
       g.itens.map((item) => ({
         desc: item.descricao,
+        marca: item.marca,
         und: item.unidade,
         qty: formatNum(item.quantidade),
         unit: formatBRL(item.valorUnitario),
