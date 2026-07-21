@@ -1,3 +1,5 @@
+const { withSentryConfig } = require("@sentry/nextjs");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -37,4 +39,11 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withSentryConfig(nextConfig, {
+  // Sem org/project/authToken — não fazemos upload de source maps por
+  // enquanto (isso exigiria um token de autenticação do Sentry, fora do
+  // escopo desta tarefa). O plugin só pula essa etapa com um aviso, sem
+  // quebrar o build. Stack trace ainda funciona, só aparece no código
+  // "empacotado" em vez do código-fonte original.
+  silent: true,
+});

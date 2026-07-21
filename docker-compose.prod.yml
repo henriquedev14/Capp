@@ -29,6 +29,7 @@ services:
       NEXTAUTH_URL: "${NEXTAUTH_URL}"
       RESEND_API_KEY: "${RESEND_API_KEY}"
       EMAIL_FROM: "${EMAIL_FROM}"
+      NEXT_PUBLIC_SENTRY_DSN: "${NEXT_PUBLIC_SENTRY_DSN}"
     # SEM "ports: 3000:3000" exposto direto ao mundo — o Caddy é quem fala
     # com a internet (80/443) e repassa pro app por dentro da rede Docker.
     # ATENÇÃO — TESTE LOCAL: porta aberta direto pro navegador (localhost:3000
