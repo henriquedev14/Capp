@@ -1,7 +1,8 @@
-import type { LevantamentoMateriais } from "@/core/orcamentacao/entities/material-catalogo";
+import type { ItemMaterialOrcamento } from "@/core/orcamentacao/entities/orcamento";
 
 export interface ItemAnexoProposta {
   descricao: string;
+  marca: string;
   unidade: string;
   quantidade: number;
   valorUnitario: number;
@@ -19,70 +20,55 @@ export interface AnexoMateriaisProposta {
   totalGeral: number;
 }
 
+const SEM_FORNECEDOR = "A definir";
+const NAO_INFORMADO_ANEXO = "Não informado";
+
 /**
- * Monta o anexo de materiais da Proposta Comercial, agrupado por fabricante
- * (ex: "WAGO — CONECTORES"), somando a Quantidade Total do Levantamento de
- * Materiais entre TODAS as tipologias do empreendimento — mesma agregação
- * usada na aba Consolidado do Levantamento, só que aqui com valor monetário
- * (a aba Consolidado propositalmente não mostra preço, é outra tela/outro
- * propósito).
+ * Monta o anexo de materiais da Proposta Comercial, agrupado pelo
+ * FORNECEDOR REAL selecionado no Orçamento (Bloco 2) — não mais pelo
+ * catálogo genérico do Levantamento. Isso garante que TODOS os
+ * fornecedores aplicados via Tabela de Preços (ou Cotação) apareçam
+ * separados na Proposta, com a marca real de cada um.
  *
- * Some materiais podem não ter fabricante real cadastrado no catálogo ainda
- * (ficam como "Genérico" — ver conta-fixa... não, ver seed do catálogo) —
- * nesse caso todos caem num grupo "Genérico" só, em vez de divididos por
- * marca. Isso é esperado até o catálogo ser completado com fabricante real
- * por item.
+ * Item sem fornecedor selecionado ainda (preço de catálogo/estimativa,
+ * nunca precificado por Tabela de Preços ou Cotação) cai no grupo
+ * "A definir" — visível de propósito, pra ficar claro que ainda falta
+ * decidir o fornecedor daquele material antes de fechar.
  */
-export function montarAnexoMateriaisProposta(levantamentos: LevantamentoMateriais[]): AnexoMateriaisProposta {
-  // chave = fabricante -> (chave do item -> acumulado)
-  const porFabricante = new Map<
-    string,
-    Map<string, { descricao: string; unidade: string; quantidade: number; valorTotal: number; precoUnitario: number }>
-  >();
+export function montarAnexoMateriaisPorFornecedor(
+  itensOrcamento: ItemMaterialOrcamento[],
+  nomeFornecedorPorId: Map<string, string>
+): AnexoMateriaisProposta {
+  const porFornecedor = new Map<string, ItemAnexoProposta[]>();
 
-  for (const lev of levantamentos) {
-    for (const item of lev.itens) {
-      const fabricante = item.fabricante || "Genérico";
-      const chaveItem = item.materialCatalogoId ? `cat:${item.materialCatalogoId}` : `desc:${item.descricao}`;
+  for (const item of itensOrcamento) {
+    const nomeFornecedor = item.fornecedorSelecionadoId
+      ? nomeFornecedorPorId.get(item.fornecedorSelecionadoId) ?? SEM_FORNECEDOR
+      : SEM_FORNECEDOR;
 
-      if (!porFabricante.has(fabricante)) porFabricante.set(fabricante, new Map());
-      const grupo = porFabricante.get(fabricante)!;
-
-      const valorLinha = item.quantidade * item.precoUnitario;
-      const atual = grupo.get(chaveItem);
-      if (atual) {
-        atual.quantidade += item.quantidade;
-        atual.valorTotal += valorLinha;
-      } else {
-        grupo.set(chaveItem, {
-          descricao: item.descricao,
-          unidade: item.unidade,
-          quantidade: item.quantidade,
-          valorTotal: valorLinha,
-          precoUnitario: item.precoUnitario,
-        });
-      }
-    }
+    if (!porFornecedor.has(nomeFornecedor)) porFornecedor.set(nomeFornecedor, []);
+    porFornecedor.get(nomeFornecedor)!.push({
+      descricao: item.descricao,
+      marca: item.marca || NAO_INFORMADO_ANEXO,
+      unidade: item.unidade,
+      quantidade: item.quantidade,
+      valorUnitario: item.precoUnitario ?? 0,
+      valorTotal: item.total ?? 0,
+    });
   }
 
-  const grupos: GrupoAnexoProposta[] = Array.from(porFabricante.entries())
-    .map(([fabricante, itensMap]) => {
-      const itens: ItemAnexoProposta[] = Array.from(itensMap.values())
-        .map((i) => ({
-          descricao: i.descricao,
-          unidade: i.unidade,
-          quantidade: i.quantidade,
-          valorUnitario: i.precoUnitario,
-          valorTotal: i.valorTotal,
-        }))
-        .sort((a, b) => a.descricao.localeCompare(b.descricao));
-      return {
-        fabricante,
-        itens,
-        subtotal: itens.reduce((s, i) => s + i.valorTotal, 0),
-      };
-    })
-    .sort((a, b) => a.fabricante.localeCompare(b.fabricante));
+  const grupos: GrupoAnexoProposta[] = Array.from(porFornecedor.entries())
+    .map(([fabricante, itens]) => ({
+      fabricante,
+      itens: itens.sort((a, b) => a.descricao.localeCompare(b.descricao)),
+      subtotal: itens.reduce((s, i) => s + i.valorTotal, 0),
+    }))
+    // "A definir" sempre por último — grupos com fornecedor real primeiro.
+    .sort((a, b) => {
+      if (a.fabricante === SEM_FORNECEDOR) return 1;
+      if (b.fabricante === SEM_FORNECEDOR) return -1;
+      return a.fabricante.localeCompare(b.fabricante);
+    });
 
   return {
     grupos,
