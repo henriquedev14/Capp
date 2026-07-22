@@ -28,6 +28,13 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# Variáveis NEXT_PUBLIC_* precisam existir NO MOMENTO do `next build` — o
+# Next.js as grava direto no bundle do navegador nessa hora. Passar isso só
+# como variável de runtime do container (no docker-compose) não adianta,
+# porque o build já aconteceu antes disso. Por isso vira ARG aqui.
+ARG NEXT_PUBLIC_SENTRY_DSN
+ENV NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN}
+
 # O Prisma Client precisa existir ANTES do `next build`, já que o código da
 # aplicação importa tipos gerados a partir de src/generated/prisma.
 RUN npx prisma generate
