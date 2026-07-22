@@ -4,6 +4,7 @@ import "./globals.css";
 import { SessionProvider } from "@/features/auth/components/session-provider";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { AutoLogoutProvider } from "@/features/auth/components/auto-logout-provider";
+import { SentryClientInit } from "@/components/sentry-client-init";
 
 // Antes usava next/font/google (Inter), que baixa a fonte do
 // fonts.googleapis.com durante o build — se a rede do ambiente de build
@@ -24,6 +25,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className="font-sans">
+        <SentryClientInit />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
