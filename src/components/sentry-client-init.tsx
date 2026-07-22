@@ -10,6 +10,10 @@ Sentry.init({
   debug: true,
 });
 
+const eventId = Sentry.captureException(new Error("Teste Sentry 6 - captureException direto"));
+console.log("[SentryClientInit] captureException chamado, eventId:", eventId);
+Sentry.flush(3000).then(() => console.log("[SentryClientInit] flush concluido"));
+
 export function SentryClientInit() {
   return null;
 }
