@@ -21,6 +21,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: "${NEXT_PUBLIC_SENTRY_DSN}"
     restart: unless-stopped
     environment:
       DATABASE_URL: "postgresql://erp:${POSTGRES_PASSWORD}@db:5432/erp_engenharia?schema=public"
@@ -74,6 +76,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: builder
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: "${NEXT_PUBLIC_SENTRY_DSN}"
     working_dir: /app
     environment:
       DATABASE_URL: "postgresql://erp:${POSTGRES_PASSWORD}@db:5432/erp_engenharia?schema=public"
