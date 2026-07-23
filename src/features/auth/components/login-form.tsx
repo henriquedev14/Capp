@@ -10,6 +10,7 @@ import { Loader2, ShieldCheck, ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Form,
   FormControl,
@@ -22,15 +23,6 @@ import {
 import { loginSchema, type LoginFormValues } from "@/features/auth/schemas/login-schema";
 import { verificarPrecisaDuploFator } from "@/features/auth/actions/duplo-fator-actions";
 
-/**
- * Formulário de login. Usa o Credentials Provider do NextAuth — sem
- * login social por agora, conforme decidido no Módulo 2.
- *
- * Fluxo em 2 etapas quando a conta tem 2FA ativado: primeiro valida
- * e-mail/senha (via verificarPrecisaDuploFator, sem criar sessão), e só
- * então mostra o campo de código — o signIn de verdade (que grava o log
- * de segurança) só acontece na etapa final, com tudo junto.
- */
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -182,8 +174,7 @@ export function LoginForm() {
                 </Link>
               </div>
               <FormControl>
-                <Input
-                  type="password"
+                <PasswordInput
                   placeholder="••••••••"
                   autoComplete="current-password"
                   {...field}
