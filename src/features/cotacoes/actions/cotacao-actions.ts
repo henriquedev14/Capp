@@ -7,6 +7,7 @@ import { prisma } from "@/infra/db/prisma/client";
 import { authOptions } from "@/infra/auth/auth-options.full";
 import { exigirPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
+import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empreendimento-ativo";
 import { consolidarLevantamentoMateriais } from "@/features/cotacoes/lib/consolidar-levantamento";
 import { proximoNumeroCotacao } from "@/features/cotacoes/lib/numero-cotacao";
 
@@ -178,6 +179,9 @@ export async function gerarCotacoes(
   });
   if (!orcamento) return { erro: "Orçamento não encontrado." };
 
+  const bloqueio = await verificarEmpreendimentoAtivo(orcamento.empreendimentoId);
+  if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
+
   const consolidado = await consolidarLevantamentoMateriais(orcamento.empreendimentoId);
   if (consolidado.itens.length === 0) {
     return { erro: "Nenhum item consolidado — valide o levantamento primeiro." };
@@ -325,9 +329,17 @@ export async function atualizarPrecoCotacaoItem(
 
   const item = await prisma.cotacaoItem.findUnique({
     where: { id: itemId },
-    select: { cotacao: { select: { id: true, status: true, orcamentoId: true } }, quantidade: true },
+    select: {
+      cotacao: {
+        select: { id: true, status: true, orcamentoId: true, orcamento: { select: { empreendimentoId: true } } },
+      },
+      quantidade: true,
+    },
   });
   if (!item) return { erro: "Item não encontrado." };
+
+  const bloqueio = await verificarEmpreendimentoAtivo(item.cotacao.orcamento.empreendimentoId);
+  if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
 
   // Cotação aceita ou recusada é imutável
   if (item.cotacao.status === "ACEITA" || item.cotacao.status === "RECUSADA") {
@@ -382,6 +394,9 @@ export async function mudarStatusCotacao(
     select: { status: true, orcamentoId: true, orcamento: { select: { empreendimentoId: true } } },
   });
   if (!cotacao) return { erro: "Cotação não encontrada." };
+
+  const bloqueio = await verificarEmpreendimentoAtivo(cotacao.orcamento.empreendimentoId);
+  if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
 
   // Regras de transição minimalistas: só bloqueia mudança PARA ACEITA/RECUSADA
   // se já existe uma ACEITA no mesmo orçamento (só uma vencedora por vez).
@@ -483,6 +498,9 @@ export async function deletarCotacao(
     select: { status: true, orcamento: { select: { empreendimentoId: true } } },
   });
   if (!cotacao) return { erro: "Cotação não encontrada." };
+
+  const bloqueio = await verificarEmpreendimentoAtivo(cotacao.orcamento.empreendimentoId);
+  if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
 
   if (cotacao.status === "ACEITA") {
     return { erro: "Não é possível deletar uma cotação aceita. Recuse-a primeiro." };
