@@ -6,6 +6,7 @@ import { ShieldCheck, ShieldOff, Loader2, Check, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   iniciarConfiguracao2FA,
   confirmarAtivacao2FA,
@@ -133,12 +134,11 @@ export function DuploFatorManager({ ativo: ativoInicial, obrigatorio }: Props) {
       <Card>
         <CardContent className="flex flex-col gap-3 pt-5">
           <p className="text-sm text-foreground">Confirma sua senha atual pra desativar o 2FA:</p>
-          <input
-            type="password"
+          <PasswordInput
             value={senhaAtual}
             onChange={(e) => setSenhaAtual(e.target.value)}
             placeholder="Senha atual"
-            className="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive/30"
+            className="focus-visible:ring-destructive/30"
           />
           {erro && <p className="text-xs text-destructive">{erro}</p>}
           <div className="flex justify-end gap-2">
