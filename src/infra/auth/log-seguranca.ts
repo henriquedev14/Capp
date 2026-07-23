@@ -61,3 +61,20 @@ export async function verificarBloqueioLogin(email: string): Promise<boolean> {
   });
   return tentativasFalhas >= LIMITE_TENTATIVAS;
 }
+
+/**
+ * Verifica se um e-mail já pediu reset de senha demais nos últimos 15
+ * minutos (3 ou mais) — evita spam de e-mail pro mesmo destinatário e
+ * uso abusivo do endpoint de reset como vetor de enumeração/incômodo.
+ */
+export async function verificarBloqueioResetSenha(email: string): Promise<boolean> {
+  const desde = new Date(Date.now() - JANELA_MINUTOS * 60 * 1000);
+  const pedidosRecentes = await prisma.logSeguranca.count({
+    where: {
+      email: email.toLowerCase().trim(),
+      tipo: "SENHA_RESET_SOLICITADO",
+      createdAt: { gte: desde },
+    },
+  });
+  return pedidosRecentes >= 3;
+}
