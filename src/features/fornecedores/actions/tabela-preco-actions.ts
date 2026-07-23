@@ -38,7 +38,7 @@ export async function validarPlanilhaTabelaPreco(
       totalInconsistencias: number;
     }
 > {
-  await exigirPermissao(PERMISSOES.FORNECEDOR_EDITAR);
+  await exigirPermissao(PERMISSOES.FORNECEDOR_GERENCIAR_PRECOS);
 
   const arquivo = formData.get("arquivo");
   if (!arquivo || !(arquivo instanceof File)) {
@@ -99,7 +99,7 @@ export async function importarTabelaPreco(input: {
     materialEletricoId: string | null;
   }[];
 }): Promise<Resultado & { tabelaId?: string }> {
-  const sessao = await exigirPermissao(PERMISSOES.FORNECEDOR_EDITAR);
+  const sessao = await exigirPermissao(PERMISSOES.FORNECEDOR_GERENCIAR_PRECOS);
 
   if (!input.nome.trim()) return { erro: "Dê um nome pra essa tabela (ex: Julho/2026)." };
   if (!input.vigenciaInicio || !input.vigenciaFim) {
@@ -205,7 +205,7 @@ export async function buscarTabelaPrecoComItens(tabelaId: string) {
  * sempre IMPORTAR DE NOVO (nova tabela), nunca apagar a antiga.
  */
 export async function excluirTabelaPreco(tabelaId: string, fornecedorId: string): Promise<Resultado> {
-  await exigirPermissao(PERMISSOES.FORNECEDOR_EDITAR);
+  await exigirPermissao(PERMISSOES.FORNECEDOR_GERENCIAR_PRECOS);
   await prisma.tabelaPrecoFornecedor.delete({ where: { id: tabelaId } });
   revalidatePath(`/fornecedores/${fornecedorId}`);
   return { ok: true };
@@ -216,7 +216,7 @@ export async function atualizarStatusTabelaPreco(
   fornecedorId: string,
   status: "ATIVA" | "EXPIRADA" | "FUTURA"
 ): Promise<Resultado> {
-  await exigirPermissao(PERMISSOES.FORNECEDOR_EDITAR);
+  await exigirPermissao(PERMISSOES.FORNECEDOR_GERENCIAR_PRECOS);
   await prisma.tabelaPrecoFornecedor.update({ where: { id: tabelaId }, data: { status } });
   revalidatePath(`/fornecedores/${fornecedorId}`);
   return { ok: true };
