@@ -10,12 +10,10 @@ import { validarSenhaForte } from "@/core/auth/validar-senha";
 
 const VALIDADE_TOKEN_MS = 60 * 60 * 1000; // 1 hora
 
-/**
- * Solicita o reset de senha — SEMPRE retorna a mesma mensagem de sucesso,
- * exista ou não o e-mail no sistema. Isso evita que alguém use esse
- * formulário pra descobrir quais e-mails estão cadastrados (enumeração de
- * usuários).
- */
+function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 export async function solicitarResetSenha(
   email: string
 ): Promise<{ ok: true; avisoSemEmail?: boolean }> {
@@ -26,7 +24,6 @@ export async function solicitarResetSenha(
   });
 
   if (!usuario || !usuario.ativo) {
-    // Não revela nada — só finge que enviou.
     return { ok: true };
   }
 
@@ -35,7 +32,7 @@ export async function solicitarResetSenha(
 
   await prisma.usuario.update({
     where: { id: usuario.id },
-    data: { tokenResetSenha: token, tokenResetSenhaExpira: expira },
+    data: { tokenResetSenha: hashToken(token), tokenResetSenhaExpira: expira },
   });
 
   await registrarLogSeguranca({
@@ -53,10 +50,6 @@ export async function solicitarResetSenha(
     corpoTexto: `Olá, ${usuario.nome}.\n\nRecebemos um pedido pra redefinir sua senha. Clique no link abaixo (válido por 1 hora):\n\n${link}\n\nSe você não pediu isso, ignore este e-mail.`,
   });
 
-  // Se o e-mail não pôde ser enviado de verdade (Resend não configurado),
-  // avisa quem chamou essa action — útil pro admin, que provavelmente é
-  // quem está testando isso agora, saber que precisa olhar o log do
-  // servidor pra pegar o link manualmente.
   return { ok: true, avisoSemEmail: !enviado };
 }
 
@@ -64,7 +57,7 @@ export async function validarTokenResetSenha(
   token: string
 ): Promise<{ valido: boolean; nome?: string }> {
   const usuario = await prisma.usuario.findFirst({
-    where: { tokenResetSenha: token },
+    where: { tokenResetSenha: hashToken(token) },
     select: { nome: true, tokenResetSenhaExpira: true },
   });
   if (!usuario || !usuario.tokenResetSenhaExpira || usuario.tokenResetSenhaExpira < new Date()) {
@@ -83,7 +76,7 @@ export async function redefinirSenhaComToken(
   }
 
   const usuario = await prisma.usuario.findFirst({
-    where: { tokenResetSenha: token },
+    where: { tokenResetSenha: hashToken(token) },
     select: { id: true, email: true, tokenResetSenhaExpira: true },
   });
   if (!usuario || !usuario.tokenResetSenhaExpira || usuario.tokenResetSenhaExpira < new Date()) {
