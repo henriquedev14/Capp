@@ -11,6 +11,23 @@
 
 export type EscopoTemplate = Record<string, unknown>;
 
+/**
+ * Escapa caracteres especiais de HTML — Tarefa 1.2.4 (achado de
+ * segurança da auditoria). Sem isso, um nome de cliente/observação
+ * contendo `<script>`, `<img onerror=...>` etc. seria inserido cru no
+ * HTML que o Chromium renderiza antes de virar PDF — o Chromium executa
+ * JavaScript normalmente nesse processo, então isso não é só "quebra
+ * visual", é injeção de verdade.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function getPath(scope: EscopoTemplate, path: string): unknown {
   return path.split(".").reduce<unknown>((acc, key) => {
     if (acc == null || typeof acc !== "object") return undefined;
@@ -71,7 +88,7 @@ export function renderTemplateHtml(html: string, scope: EscopoTemplate): string 
     path = path.trim();
     if (path === "true") return "true";
     const val = getPath(scope, path);
-    return val === undefined || val === null ? "" : String(val);
+    return val === undefined || val === null ? "" : escapeHtml(String(val));
   });
 
   return html;
