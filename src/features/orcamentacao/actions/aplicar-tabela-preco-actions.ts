@@ -39,7 +39,7 @@ export async function compararOfertasTabelaPreco(
   orcamentoId: string,
   fornecedorIds: string[]
 ): Promise<{ erro: string } | { ok: true; itens: ItemComparacao[]; totalSemOferta: number }> {
-  await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
+  await exigirPermissao(PERMISSOES.ORCAMENTO_APLICAR_PRECO);
 
   if (fornecedorIds.length === 0) return { erro: "Selecione ao menos um fornecedor." };
 
@@ -110,7 +110,7 @@ export async function confirmarAplicacaoTabelaPreco(
   empreendimentoId: string,
   escolhas: { itemOrcamentoId: string; fornecedorId: string; itemTabelaPrecoId: string; valorUnitario: number; marca: string }[]
 ): Promise<Resultado & { aplicados?: number }> {
-  const sessao = await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
+  const sessao = await exigirPermissao(PERMISSOES.ORCAMENTO_APLICAR_PRECO);
   const bloqueio = await verificarEmpreendimentoAtivo(empreendimentoId);
   if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
 
@@ -153,7 +153,7 @@ export async function definirFornecedorItemOrcamento(
   empreendimentoId: string,
   fornecedorId: string | null
 ): Promise<Resultado> {
-  await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
+  await exigirPermissao(PERMISSOES.ORCAMENTO_APLICAR_PRECO);
   const bloqueio = await verificarEmpreendimentoAtivo(empreendimentoId);
   if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
 
