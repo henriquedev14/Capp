@@ -13,6 +13,8 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx src/infra/db/prisma/seed.ts",
     "db:debug-login": "tsx src/infra/db/prisma/debug-login.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:expedicao-a2": "tsx src/infra/db/prisma/teste-a2-status-operacional-remessa.ts",
     "test:empreendimento-c2c3": "tsx src/infra/db/prisma/teste-c2c3-arquivar-empreendimento.ts"
   },
@@ -65,6 +67,7 @@
     "@types/pg": "^8.11.10",
     "@types/bcryptjs": "^2.4.6",
     "@types/qrcode": "^1.5.5",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8"
   }
 }
