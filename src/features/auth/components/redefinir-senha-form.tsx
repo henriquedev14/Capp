@@ -104,3 +104,18 @@ export function RedefinirSenhaForm({ token, valido, nome }: Props) {
               onChange={(e) => setConfirmacao(e.target.value)}
               required
             />
+          </div>
+          {erro && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {erro}
+            </div>
+          )}
+          <Button type="submit" disabled={salvando}>
+            {salvando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />}
+            Redefinir senha
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
