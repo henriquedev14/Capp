@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/infra/db/prisma/client";
 import { exigirPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
+import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empreendimento-ativo";
 
 function revalidar() {
   revalidatePath("/suprimentos");
@@ -48,6 +49,9 @@ export async function criarPedidoCompra(
   if (!cotacao) return { erro: "Cotação não encontrada." };
   if (cotacao.status !== "ACEITA") return { erro: "Só é possível gerar Pedido de Compra a partir de uma cotação aceita." };
 
+  const bloqueio = await verificarEmpreendimentoAtivo(cotacao.orcamento.empreendimentoId);
+  if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
+
   const itensComCatalogo = cotacao.itens.filter((i) => i.materialEletricoId);
   if (itensComCatalogo.length === 0) {
     return { erro: "Essa cotação não tem itens com vínculo de catálogo — não dá pra gerar pedido rastreável." };
@@ -87,6 +91,14 @@ export async function confirmarPedidoCompra(
   } catch (e) {
     return { erro: e instanceof Error ? e.message : "Não autorizado." };
   }
+  const pedido = await prisma.pedidoCompra.findUnique({
+    where: { id: pedidoId },
+    select: { empreendimentoId: true },
+  });
+  if (!pedido) return { erro: "Pedido não encontrado." };
+  const bloqueio = await verificarEmpreendimentoAtivo(pedido.empreendimentoId);
+  if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
+
   await prisma.pedidoCompra.update({
     where: { id: pedidoId },
     data: {
@@ -105,6 +117,14 @@ export async function marcarPedidoEmTransito(pedidoId: string): Promise<{ ok: tr
   } catch (e) {
     return { erro: e instanceof Error ? e.message : "Não autorizado." };
   }
+  const pedido = await prisma.pedidoCompra.findUnique({
+    where: { id: pedidoId },
+    select: { empreendimentoId: true },
+  });
+  if (!pedido) return { erro: "Pedido não encontrado." };
+  const bloqueio = await verificarEmpreendimentoAtivo(pedido.empreendimentoId);
+  if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
+
   await prisma.pedidoCompra.update({ where: { id: pedidoId }, data: { status: "EM_TRANSITO" } });
   revalidar();
   return { ok: true };
@@ -145,6 +165,9 @@ export async function receberItemPedidoCompra(
     include: { pedido: true },
   });
   if (!item) return { erro: "Item de pedido não encontrado." };
+
+  const bloqueio = await verificarEmpreendimentoAtivo(item.pedido.empreendimentoId);
+  if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
 
   await prisma.$transaction([
     prisma.movimentacaoEstoque.create({
