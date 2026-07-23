@@ -61,12 +61,22 @@ export const PERMISSOES = {
   ORCAMENTO_APROVAR: "orcamento:aprovar",
   // Atribuir responsável e prazo, e editar a jornada/etapas do orçamento.
   ORCAMENTO_GERENCIAR_JORNADA: "orcamento:gerenciar_jornada",
+  // Aplicar preço de Tabela de Preços/Cotação num item do Orçamento —
+  // ação financeira sensível (Tarefa 1.2.3), antes reutilizava
+  // EMPREENDIMENTO_EDITAR (permissão ampla demais pra algo que afeta
+  // diretamente o valor do orçamento).
+  ORCAMENTO_APLICAR_PRECO: "orcamento:aplicar_preco",
 
   // Módulo: Fornecedores
   FORNECEDOR_VER: "fornecedor:ver",
   FORNECEDOR_CRIAR: "fornecedor:criar",
   FORNECEDOR_EDITAR: "fornecedor:editar",
   FORNECEDOR_ATIVAR_INATIVAR: "fornecedor:ativar_inativar",
+  // Importar/excluir/gerenciar status de Tabela de Preços de um
+  // fornecedor — ação financeira sensível (Tarefa 1.2.3), antes
+  // reutilizava FORNECEDOR_EDITAR (mesma permissão de editar telefone do
+  // fornecedor, granularidade insuficiente pra algo que define preço).
+  FORNECEDOR_GERENCIAR_PRECOS: "fornecedor:gerenciar_precos",
 
   // Módulo: Financeiro (Empresas do Grupo, Categorias de Despesa, Contas a Pagar)
   // Acesso restrito por natureza — dado financeiro sensível da empresa.
@@ -140,10 +150,12 @@ export const DESCRICOES_PERMISSOES: Record<PermissaoChave, string> = {
   [PERMISSOES.EMPREENDIMENTO_APROVAR_PROPOSTA]: "Dar aval para gerar a proposta comercial (restrito a Diretor e Coordenador)",
   [PERMISSOES.ORCAMENTO_APROVAR]: "Aprovar ou devolver um orçamento enviado para aprovação",
   [PERMISSOES.ORCAMENTO_GERENCIAR_JORNADA]: "Atribuir responsável, prazo e gerenciar etapas do orçamento",
+  [PERMISSOES.ORCAMENTO_APLICAR_PRECO]: "Aplicar preço de fornecedor (Tabela de Preços/Cotação) num item do orçamento",
   [PERMISSOES.FORNECEDOR_VER]: "Visualizar fornecedores cadastrados",
   [PERMISSOES.FORNECEDOR_CRIAR]: "Cadastrar novos fornecedores",
   [PERMISSOES.FORNECEDOR_EDITAR]: "Editar dados de fornecedores existentes",
   [PERMISSOES.FORNECEDOR_ATIVAR_INATIVAR]: "Ativar e inativar fornecedores",
+  [PERMISSOES.FORNECEDOR_GERENCIAR_PRECOS]: "Importar e gerenciar Tabela de Preços de fornecedores",
   [PERMISSOES.FINANCEIRO_VER]: "Visualizar dados financeiros (contas a pagar, dashboard)",
   [PERMISSOES.FINANCEIRO_GERENCIAR_CADASTROS]: "Gerenciar Empresas do Grupo e Categorias de Despesa",
   [PERMISSOES.FINANCEIRO_LANCAR_CONTA]: "Criar e editar contas a pagar",
