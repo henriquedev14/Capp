@@ -6,6 +6,7 @@ import Link from "next/link";
 import { KeyRound, Loader2, Check, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { PasswordInput } from "@/components/ui/password-input";
 import { redefinirSenhaComToken } from "@/features/auth/actions/reset-senha-actions";
 
 interface Props {
@@ -88,37 +89,18 @@ export function RedefinirSenhaForm({ token, valido, nome }: Props) {
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-foreground">Nova senha</label>
-            <input
-              type="password"
+            <PasswordInput
               value={novaSenha}
               onChange={(e) => setNovaSenha(e.target.value)}
               required
               minLength={8}
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             <span className="text-xs text-muted-foreground">Mínimo 8 caracteres.</span>
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-foreground">Confirmar nova senha</label>
-            <input
-              type="password"
+            <PasswordInput
               value={confirmacao}
               onChange={(e) => setConfirmacao(e.target.value)}
               required
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
-          </div>
-          {erro && (
-            <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-              {erro}
-            </div>
-          )}
-          <Button type="submit" disabled={salvando}>
-            {salvando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />}
-            Redefinir senha
-          </Button>
-        </form>
-      </div>
-    </div>
-  );
-}
