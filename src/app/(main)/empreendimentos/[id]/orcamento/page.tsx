@@ -210,6 +210,7 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
 
   const tier = empreendimento.tier ?? 2;
   const tierOption = getTierOption(tier);
+  const temPontosTeto = orcamento?.itensServico.some((i) => i.pontos != null) ?? false;
 
   // Kits contratados
   const kitsAtivos = [
@@ -493,6 +494,11 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                             <th className="py-3 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground hidden sm:table-cell">
                               Preço base
                             </th>
+                            {temPontosTeto && (
+                              <th className="py-3 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground hidden sm:table-cell">
+                                Pontos
+                              </th>
+                            )}
                             <th className="py-3 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground hidden sm:table-cell">
                               Unit. c/ tier
                             </th>
@@ -516,6 +522,11 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                               <td className="py-2.5 pr-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
                                 {formatBRL(item.precoBase)}
                               </td>
+                              {temPontosTeto && (
+                                <td className="py-2.5 pr-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
+                                  {item.pontos ?? "—"}
+                                </td>
+                              )}
                               <td className="py-2.5 pr-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
                                 {formatBRL(item.precoUnitario)}
                               </td>
@@ -528,7 +539,7 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                         <tfoot>
                           <tr className="border-t-2 border-border">
                             <td
-                              colSpan={5}
+                              colSpan={temPontosTeto ? 6 : 5}
                               className="py-2.5 text-right text-sm font-medium text-muted-foreground hidden sm:table-cell"
                             >
                               Subtotal Serviço HGI
