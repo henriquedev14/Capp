@@ -67,6 +67,8 @@ export interface ItemServicoOrcamento {
   multiplicador: number;
   precoUnitario: number;
   total: number;
+  /** Só preenchido no critério PONTOS_TETO — ver calcular-itens-servico.ts */
+  pontos?: number | null;
   situacao: SituacaoItemServico;
   justificativa?: string | null;
   tierMultiplicadorId?: string | null;
