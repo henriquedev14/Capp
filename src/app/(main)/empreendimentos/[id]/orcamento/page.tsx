@@ -425,6 +425,22 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                 <CardContent className="pt-4">
                   {/* Totais resumidos */}
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                    {temPontosTeto && (
+                      <>
+                        <div className="flex flex-col rounded-lg bg-secondary/50 px-4 py-3">
+                          <span className="text-xs text-muted-foreground">Média de pontos de teto</span>
+                          <span className="mt-1 text-lg font-semibold tabular-nums">
+                            {orcamento.itensServico[0]?.pontos?.toFixed(2) ?? "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-col rounded-lg bg-secondary/50 px-4 py-3">
+                          <span className="text-xs text-muted-foreground">Preço por apartamento</span>
+                          <span className="mt-1 text-lg font-semibold tabular-nums">
+                            {formatBRL(orcamento.itensServico[0]?.precoUnitario ?? null)}
+                          </span>
+                        </div>
+                      </>
+                    )}
                     <div className="flex flex-col rounded-lg bg-secondary/50 px-4 py-3">
                       <span className="text-xs text-muted-foreground">Serviço HGI</span>
                       <span className="mt-1 text-lg font-semibold tabular-nums">
@@ -494,11 +510,6 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                             <th className="py-3 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground hidden sm:table-cell">
                               Preço base
                             </th>
-                            {temPontosTeto && (
-                              <th className="py-3 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground hidden sm:table-cell">
-                                Pontos
-                              </th>
-                            )}
                             <th className="py-3 pr-4 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground hidden sm:table-cell">
                               Unit. c/ tier
                             </th>
@@ -522,11 +533,6 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                               <td className="py-2.5 pr-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
                                 {formatBRL(item.precoBase)}
                               </td>
-                              {temPontosTeto && (
-                                <td className="py-2.5 pr-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
-                                  {item.pontos ?? "—"}
-                                </td>
-                              )}
                               <td className="py-2.5 pr-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
                                 {formatBRL(item.precoUnitario)}
                               </td>
@@ -539,7 +545,7 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                         <tfoot>
                           <tr className="border-t-2 border-border">
                             <td
-                              colSpan={temPontosTeto ? 6 : 5}
+                              colSpan={5}
                               className="py-2.5 text-right text-sm font-medium text-muted-foreground hidden sm:table-cell"
                             >
                               Subtotal Serviço HGI
