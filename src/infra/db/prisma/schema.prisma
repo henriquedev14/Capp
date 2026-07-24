@@ -920,6 +920,12 @@ model ItemServicoOrcamento {
   precoUnitario Decimal @map("preco_unitario") @db.Decimal(10, 2) // precoBase × multiplicador
   total        Decimal  @db.Decimal(12, 2) // precoUnitario × quantidade
 
+  // Só preenchido quando o critério de precificação é PONTOS_TETO — média
+  // de pontos de teto por apartamento do empreendimento inteiro (Tarefa
+  // 2.1.3), guardado pra transparência na tela (mostrar o "porquê" do
+  // preço, não só o resultado final).
+  pontos       Int?
+
   // Situação da linha — por que pode estar zero ou ajustada
   situacao String @default("NORMAL")
   // NORMAL | FORA_DO_ESCOPO | CORTESIA | AJUSTE_MANUAL | ERRO_DE_CALCULO
