@@ -66,3 +66,50 @@ export async function verificarGateNegociacao(
   }
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------------
+// Gates de geração/uso da Proposta Comercial (extraídos de proposta-actions.ts
+// na Tarefa 2.1.2 — antes viviam misturados direto no corpo da action)
+// ---------------------------------------------------------------------------
+
+export interface ResultadoGeracaoProposta {
+  permitido: boolean;
+  motivo?: string;
+}
+
+/**
+ * Só permite gerar a proposta com o orçamento aprovado — e, se já existe
+ * uma proposta gerada pra essa revisão, exige perfil sênior (Diretor/Admin)
+ * pra sobrescrever (trava contra geração acidental duplicada por um perfil
+ * comum). Função pura — quem chama já buscou o orçamento e checou o perfil
+ * do usuário.
+ */
+export function verificarPodeGerarProposta(
+  orcamento: { status: string; propostaGeradaEm: Date | null },
+  usuarioEhGestorSenior: boolean
+): ResultadoGeracaoProposta {
+  if (orcamento.status !== "ORCAMENTO_APROVADO") {
+    return { permitido: false, motivo: "Só é possível gerar a proposta com o orçamento aprovado pelo gestor." };
+  }
+  if (orcamento.propostaGeradaEm && !usuarioEhGestorSenior) {
+    return {
+      permitido: false,
+      motivo: "A proposta desta revisão já foi gerada e está travada. Somente Diretor ou Admin podem gerar novamente.",
+    };
+  }
+  return { permitido: true };
+}
+
+/**
+ * Exige que a proposta já tenha sido gerada antes de registrar a decisão
+ * do cliente (aceite/recusa) — não faz sentido registrar decisão sobre
+ * um documento que ainda não existe.
+ */
+export function verificarPropostaJaGerada(orcamento: {
+  propostaGeradaEm: Date | null;
+}): ResultadoGeracaoProposta {
+  if (!orcamento.propostaGeradaEm) {
+    return { permitido: false, motivo: "Gere a proposta comercial antes de registrar a decisão do cliente." };
+  }
+  return { permitido: true };
+}

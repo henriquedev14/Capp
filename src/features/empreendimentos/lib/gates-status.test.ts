@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { prisma } from "@/infra/db/prisma/client";
-import { verificarGateOrcamentacao, verificarGateNegociacao } from "./gates-status";
+import { verificarGateOrcamentacao, verificarGateNegociacao, verificarPodeGerarProposta, verificarPropostaJaGerada } from "./gates-status";
 
 /**
  * Testes de caracterização (Tarefa 1.3.1 do Plano Mestre) — travam o
@@ -194,5 +194,52 @@ describe("verificarGateNegociacao", () => {
     // Deve bloquear — a revisão vigente (2) não tem proposta, não importa
     // que uma revisão antiga tivesse.
     expect(resultado).toHaveProperty("erro");
+  });
+});
+
+describe("verificarPodeGerarProposta (extraída na Tarefa 2.1.2)", () => {
+  it("bloqueia quando o orçamento não está com status ORCAMENTO_APROVADO", () => {
+    const resultado = verificarPodeGerarProposta(
+      { status: "EM_ANDAMENTO", propostaGeradaEm: null },
+      false
+    );
+    expect(resultado.permitido).toBe(false);
+  });
+
+  it("libera quando aprovado e a proposta ainda não foi gerada, mesmo sem ser gestor sênior", () => {
+    const resultado = verificarPodeGerarProposta(
+      { status: "ORCAMENTO_APROVADO", propostaGeradaEm: null },
+      false
+    );
+    expect(resultado).toEqual({ permitido: true });
+  });
+
+  it("bloqueia sobrescrever proposta já gerada se o usuário NÃO é gestor sênior", () => {
+    const resultado = verificarPodeGerarProposta(
+      { status: "ORCAMENTO_APROVADO", propostaGeradaEm: new Date() },
+      false
+    );
+    expect(resultado.permitido).toBe(false);
+    expect(resultado.motivo).toContain("Diretor ou Admin");
+  });
+
+  it("libera sobrescrever proposta já gerada se o usuário É gestor sênior", () => {
+    const resultado = verificarPodeGerarProposta(
+      { status: "ORCAMENTO_APROVADO", propostaGeradaEm: new Date() },
+      true
+    );
+    expect(resultado).toEqual({ permitido: true });
+  });
+});
+
+describe("verificarPropostaJaGerada (extraída na Tarefa 2.1.2)", () => {
+  it("bloqueia quando a proposta ainda não foi gerada", () => {
+    const resultado = verificarPropostaJaGerada({ propostaGeradaEm: null });
+    expect(resultado.permitido).toBe(false);
+  });
+
+  it("libera quando a proposta já foi gerada", () => {
+    const resultado = verificarPropostaJaGerada({ propostaGeradaEm: new Date() });
+    expect(resultado).toEqual({ permitido: true });
   });
 });
