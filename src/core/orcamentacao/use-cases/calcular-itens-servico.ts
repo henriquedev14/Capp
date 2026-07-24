@@ -12,6 +12,10 @@ export interface ItemServicoCalculado {
   multiplicador: number;
   precoUnitario: number; // precoBase × multiplicador
   total: number; // precoUnitario × quantidade
+  /** Só preenchido no critério PONTOS_TETO — pontos usados nessa linha
+   * (já é a média do empreendimento inteiro, igual pra toda tipologia,
+   * ver calcular-pontos-teto-medio.ts). Guardado só pra transparência. */
+  pontos?: number;
   /** Faltou faixa na tabela de preços para esta tipologia/área */
   semPreco?: boolean;
   /** Levantamento técnico ainda não validado — valor é estimado pela
@@ -85,9 +89,11 @@ export function calcularItensServico({
       let precoBase: number;
       let precoUnitario: number;
       let semPreco = false;
+      let pontosUsados: number | undefined;
 
       if (criterio === "PONTOS_TETO") {
         const pontos = pontosTetoPorTipologia?.get(tipologia.id) ?? 0;
+        pontosUsados = pontos;
         const f = formulaPontos ?? { valorMinimo: 550, pontosInclusos: 6, valorPorPontoExtra: 70 };
         precoBase = f.valorMinimo + Math.max(0, pontos - f.pontosInclusos) * f.valorPorPontoExtra;
         precoUnitario = parseFloat((precoBase * multiplicadorTier).toFixed(2));
@@ -119,6 +125,7 @@ export function calcularItensServico({
         total,
         semPreco,
         simulado,
+        pontos: pontosUsados,
       });
     }
   }
