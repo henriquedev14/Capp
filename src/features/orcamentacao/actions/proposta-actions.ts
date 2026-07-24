@@ -10,6 +10,7 @@ import { TimelinePrismaRepository } from "@/infra/db/prisma/repositories/timelin
 import { renderizarPropostaPdf } from "@/features/orcamentacao/lib/renderizar-proposta";
 import { criarContaReceberAutomatica } from "@/features/financeiro/lib/criar-conta-receber-automatica";
 import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empreendimento-ativo";
+import { verificarPodeGerarProposta, verificarPropostaJaGerada } from "@/features/empreendimentos/lib/gates-status";
 
 const timelineRepo = new TimelinePrismaRepository();
 
@@ -51,19 +52,9 @@ export async function gerarPropostaComercial(orcamentoId: string): Promise<Resul
   const guardaArquivado = await verificarEmpreendimentoAtivo(orcamento.empreendimentoId);
   if (!guardaArquivado.permitido) return { erro: guardaArquivado.motivo! };
 
-  if (orcamento.status !== "ORCAMENTO_APROVADO") {
-    return { erro: "Só é possível gerar a proposta com o orçamento aprovado pelo gestor." };
-  }
-
-  if (orcamento.propostaGeradaEm) {
-    const podeSobrescrever = await ehGestorSenior();
-    if (!podeSobrescrever) {
-      return {
-        erro:
-          "A proposta desta revisão já foi gerada e está travada. Somente Diretor ou Admin podem gerar novamente.",
-      };
-    }
-  }
+  const podeSobrescrever = orcamento.propostaGeradaEm ? await ehGestorSenior() : true;
+  const validacaoGeracao = verificarPodeGerarProposta(orcamento, podeSobrescrever);
+  if (!validacaoGeracao.permitido) return { erro: validacaoGeracao.motivo! };
 
   const resultado = await renderizarPropostaPdf(orcamentoId, sessao.user.id);
   if ("erro" in resultado) return { erro: resultado.erro };
@@ -157,9 +148,8 @@ export async function registrarDecisaoCliente(
     select: { propostaGeradaEm: true, empreendimentoId: true, revisao: true },
   });
   if (!orcamento) return { erro: "Orçamento não encontrado." };
-  if (!orcamento.propostaGeradaEm) {
-    return { erro: "Gere a proposta comercial antes de registrar a decisão do cliente." };
-  }
+  const validacaoProposta = verificarPropostaJaGerada(orcamento);
+  if (!validacaoProposta.permitido) return { erro: validacaoProposta.motivo! };
 
   const guardaArquivado = await verificarEmpreendimentoAtivo(orcamento.empreendimentoId);
   if (!guardaArquivado.permitido) return { erro: guardaArquivado.motivo! };
