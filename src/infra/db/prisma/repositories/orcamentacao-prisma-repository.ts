@@ -544,6 +544,7 @@ function toDomain(r: {
     multiplicador: unknown;
     precoUnitario: unknown;
     total: unknown;
+    pontos?: number | null;
     situacao?: string;
     justificativa?: string | null;
     tierMultiplicadorId?: string | null;
