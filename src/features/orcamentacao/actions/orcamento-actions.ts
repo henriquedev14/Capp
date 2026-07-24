@@ -12,6 +12,7 @@ import { LevantamentoHidraulicoPrismaRepository } from "@/infra/db/prisma/reposi
 import { LevantamentoMateriaisPrismaRepository } from "@/infra/db/prisma/repositories/levantamento-materiais-prisma-repository";
 import { prisma } from "@/infra/db/prisma/client";
 import { calcularItensServico, type KitContratado } from "@/core/orcamentacao/use-cases/calcular-itens-servico";
+import { calcularPontosMedioPorApartamento } from "@/core/orcamentacao/use-cases/calcular-pontos-teto-medio";
 import { exigirPermissao, temPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 import type { StatusOrcamento } from "@/core/orcamentacao/entities/orcamento";
@@ -147,6 +148,24 @@ export async function criarOrcamento(
     pontosInclusos: configuracao?.kitPontosInclusos ?? 6,
     valorPorPontoExtra: Number(configuracao?.kitValorPorPontoExtra ?? 70),
   };
+
+  // No critério PONTOS_TETO, o preço é ÚNICO para o empreendimento inteiro
+  // — não varia por tipologia (decisão de negócio confirmada com o
+  // Henrique em 24/07/2026, Tarefa 2.1.3). Substitui o mapa por
+  // tipologia pela mesma média em todas as entradas, mantendo o resto do
+  // cálculo (calcularItensServico) sem precisar saber dessa regra.
+  if (criterio === "PONTOS_TETO") {
+    const mediaPontos = calcularPontosMedioPorApartamento(
+      tipologias.map((t) => ({
+        tipologiaId: t.id,
+        pontos: pontosTetoPorTipologia.get(t.id) ?? 0,
+        quantidadeUnidades: quantidadesPorTipologia.get(t.id) ?? 0,
+      }))
+    );
+    for (const tipologia of tipologias) {
+      pontosTetoPorTipologia.set(tipologia.id, mediaPontos);
+    }
+  }
 
   // Calcula itens de serviço
   const itensServico = calcularItensServico({
