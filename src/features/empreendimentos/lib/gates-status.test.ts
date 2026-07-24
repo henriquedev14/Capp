@@ -35,6 +35,7 @@ async function criarEmpreendimentoTeste(clienteId: string, opts: { kitEletrico: 
     data: {
       codigo: `${PREFIXO_TESTE}EMP-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       nome: "Empreendimento de Teste — Caracterização",
+      construtora: "Construtora de Teste",
       clienteId,
       cidade: "Uberlândia",
       estado: "MG",
