@@ -2,13 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, AlertTriangle, X, MapPin, User, Truck as TruckIcon } from "lucide-react";
+import { ArrowRight, AlertTriangle, X, MapPin, User, Truck as TruckIcon, Trash2 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { StatusRemessaBadge } from "@/features/expedicao/components/status-remessa-badge";
-import { buscarRemessaDetalheAction } from "@/features/expedicao/actions/expedicao-actions";
+import { buscarRemessaDetalheAction, excluirRemessaAction } from "@/features/expedicao/actions/expedicao-actions";
 
 interface LinhaFila {
   id: string;
@@ -40,6 +40,9 @@ export function CentralExpedicaoClient({ linhas: linhasIniciais }: { linhas: Lin
   const [selecionadaId, setSelecionadaId] = React.useState<string | null>(null);
   const [detalhe, setDetalhe] = React.useState<Awaited<ReturnType<typeof buscarRemessaDetalheAction>> | null>(null);
   const [carregandoDetalhe, setCarregandoDetalhe] = React.useState(false);
+  const [confirmandoExclusao, setConfirmandoExclusao] = React.useState(false);
+  const [excluindo, setExcluindo] = React.useState(false);
+  const [erroExclusao, setErroExclusao] = React.useState<string | null>(null);
 
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
@@ -194,8 +197,20 @@ export function CentralExpedicaoClient({ linhas: linhasIniciais }: { linhas: Lin
                     {detalhe?.numero ?? "Carregando..."}
                   </span>
                   {detalhe && (
-                    <div className="mt-1">
+                    <div className="mt-1 flex items-center gap-2">
                       <StatusRemessaBadge status={detalhe.status} />
+                      {detalhe.status === "RASCUNHO" && !confirmandoExclusao && (
+                        <button
+                          onClick={() => {
+                            setErroExclusao(null);
+                            setConfirmandoExclusao(true);
+                          }}
+                          className="text-muted-foreground hover:text-destructive"
+                          title="Excluir remessa (só rascunho vazio)"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -209,6 +224,44 @@ export function CentralExpedicaoClient({ linhas: linhasIniciais }: { linhas: Lin
                   <X className="h-4 w-4" />
                 </button>
               </div>
+
+              {confirmandoExclusao && detalhe && (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                  <p className="text-foreground">
+                    Excluir essa remessa de verdade? Isso não pode ser desfeito.
+                  </p>
+                  {erroExclusao && <p className="mt-1 text-destructive">{erroExclusao}</p>}
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setConfirmandoExclusao(false)}
+                      disabled={excluindo}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={excluindo}
+                      onClick={async () => {
+                        setExcluindo(true);
+                        const r = await excluirRemessaAction(detalhe.id);
+                        setExcluindo(false);
+                        if ("erro" in r) {
+                          setErroExclusao(r.erro);
+                          return;
+                        }
+                        setConfirmandoExclusao(false);
+                        setSelecionadaId(null);
+                        setDetalhe(null);
+                      }}
+                    >
+                      {excluindo ? "Excluindo..." : "Sim, excluir"}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {carregandoDetalhe ? (
                 <p className="text-sm text-muted-foreground">Carregando detalhes...</p>
