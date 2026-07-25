@@ -380,3 +380,28 @@ export function validarMotoristaAtivo(ativo: boolean): ResultadoValidacao {
   if (!ativo) return { valido: false, motivo: "Motorista está inativo." };
   return { valido: true };
 }
+
+/**
+ * Só permite excluir remessa que ainda está em RASCUNHO e 100% vazia —
+ * sem item, volume ou carregamento vinculado. Uma vez que a remessa tem
+ * qualquer movimentação real, exclusão física não é mais segura (usar
+ * cancelamento em vez disso). Feature pedida pelo Henrique em 24/07/2026
+ * pra limpar remessas de teste durante o desenvolvimento.
+ */
+export function validarRemessaExcluivel(remessa: {
+  status: string;
+  totalItens: number;
+  totalVolumes: number;
+  totalCarregamentos: number;
+}): ResultadoValidacao {
+  if (remessa.status !== "RASCUNHO") {
+    return { valido: false, motivo: "Só é possível excluir remessas em Rascunho." };
+  }
+  if (remessa.totalItens > 0 || remessa.totalVolumes > 0 || remessa.totalCarregamentos > 0) {
+    return {
+      valido: false,
+      motivo: "Essa remessa já tem item, volume ou carregamento vinculado — não pode mais ser excluída, só cancelada.",
+    };
+  }
+  return { valido: true };
+}
