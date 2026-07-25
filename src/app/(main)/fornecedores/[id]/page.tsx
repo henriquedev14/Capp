@@ -163,18 +163,9 @@ export default async function FornecedorDetalhePage({
               Editar
             </Button>
           </Link>
-          <Link href={`/fornecedores/${fornecedor.id}/importar-cotacao`}>
-            <Button variant="outline" size="sm">
-              <FileUp className="h-4 w-4" />
-              Importar cotação (PDF)
-            </Button>
-          </Link>
-          <Link href={`/fornecedores/${fornecedor.id}/importar-tabela-precos`}>
-            <Button variant="outline" size="sm">
-              <FileSpreadsheet className="h-4 w-4" />
-              Importar tabela de preços (PDF)
-            </Button>
-          </Link>
+          {/* "Importar cotação (PDF)" e "Importar tabela de preços (PDF)" desativados
+              a pedido do Henrique em 24/07/2026 — rotas continuam existindo, só
+              os botões de entrada foram removidos da tela. */}
           <Link href={`/fornecedores/${fornecedor.id}/tabelas-de-preco`}>
             <Button variant="outline" size="sm">
               <FileSpreadsheet className="h-4 w-4" />
