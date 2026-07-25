@@ -13,6 +13,8 @@ import * as repo from "@/infra/db/prisma/repositories/expedicao-prisma-repositor
 import type { ItemRemessaInput } from "@/infra/db/prisma/repositories/expedicao-prisma-repository";
 import { verificarEmpreendimentoNaoArquivado } from "@/core/empreendimentos/use-cases/guarda-empreendimento-arquivado";
 import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empreendimento-ativo";
+import { validarRemessaExcluivel } from "@/core/expedicao/use-cases/validacoes-expedicao";
+import { ehGestorSenior } from "@/infra/auth/eh-gestor-senior";
 
 type Resultado<T = { ok: true }> = T | { erro: string };
 
@@ -563,4 +565,39 @@ export async function criarVeiculoAction(input: {
   } catch (e) {
     return tratarErro(e);
   }
+}
+
+/**
+ * Exclui uma remessa em RASCUNHO, 100% vazia (sem item/volume/carregamento) —
+ * feature pedida pelo Henrique em 24/07/2026 pra limpar remessas de teste
+ * durante o desenvolvimento. Restrita a Diretor/Admin de propósito (não é
+ * uma permissão configurável por papel — é uma regra de "só quem manda no
+ * sistema todo pode apagar algo", igual à sobrescrita de proposta).
+ */
+export async function excluirRemessaAction(remessaId: string): Promise<Resultado> {
+  await exigirPermissao(PERMISSOES.EXPEDICAO_CANCELAR);
+  if (!(await ehGestorSenior())) {
+    return { erro: "Só Diretor ou Admin podem excluir uma remessa." };
+  }
+
+  const remessa = await prisma.remessa.findUnique({
+    where: { id: remessaId },
+    select: {
+      status: true,
+      _count: { select: { itens: true, volumes: true, carregamentos: true } },
+    },
+  });
+  if (!remessa) return { erro: "Remessa não encontrada." };
+
+  const validacao = validarRemessaExcluivel({
+    status: remessa.status,
+    totalItens: remessa._count.itens,
+    totalVolumes: remessa._count.volumes,
+    totalCarregamentos: remessa._count.carregamentos,
+  });
+  if (!validacao.valido) return { erro: validacao.motivo! };
+
+  await prisma.remessa.delete({ where: { id: remessaId } });
+  revalidatePath("/expedicao");
+  return { ok: true };
 }
