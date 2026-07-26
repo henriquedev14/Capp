@@ -39,6 +39,18 @@ export class EmpreendimentoPrismaRepository implements EmpreendimentoRepository 
     return records.map(toDomain);
   }
 
+  /**
+   * Datas de conclusão de cada fase (Comercial/Engenharia/Orçamentação) —
+   * extraído da página em 2.2.1 (item A4). Não faz parte da entidade
+   * Empreendimento principal de propósito (uso bem pontual, só nessa tela).
+   */
+  async buscarStatusConclusao(id: string) {
+    return prisma.empreendimento.findUnique({
+      where: { id },
+      select: { comercialConcluidoEm: true, engenhariaConcluidaEm: true, orcamentacaoConcluidaEm: true },
+    });
+  }
+
   async findManyResumo(filtros?: EmpreendimentoFiltros): Promise<EmpreendimentoResumo[]> {
     const records = await prisma.empreendimento.findMany({
       where: {
