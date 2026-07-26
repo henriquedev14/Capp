@@ -8,6 +8,47 @@ import { ClientePrismaRepository } from "@/infra/db/prisma/repositories/cliente-
 import { EstruturaFisicaPrismaRepository } from "@/infra/db/prisma/repositories/estrutura-fisica-prisma-repository";
 import { TimelinePrismaRepository } from "@/infra/db/prisma/repositories/timeline-prisma-repository";
 import { prisma } from "@/infra/db/prisma/client";
+
+interface StatusLevantamento {
+  status: "VALIDADO" | "EM_ANDAMENTO" | "NENHUM";
+}
+
+/**
+ * Status resumido de cada levantamento (elétrico/hidráulico/materiais) —
+ * "Validado" só quando TODAS as tipologias do empreendimento têm
+ * levantamento validado (não basta uma só). Extraído da página em
+ * 2.2.1 (item A4).
+ */
+export async function buscarStatusLevantamentos(empreendimentoId: string) {
+  const [totalTipologias, statusEletricos, statusHidraulicos, statusMateriais] = await Promise.all([
+    prisma.tipologia.count({ where: { empreendimentoId } }),
+    prisma.levantamentoEletrico.findMany({
+      where: { empreendimentoId },
+      select: { status: true, tipologiaId: true },
+    }),
+    prisma.levantamentoHidraulico.findMany({
+      where: { empreendimentoId },
+      select: { status: true, tipologiaId: true },
+    }),
+    prisma.levantamentoMateriais.findMany({
+      where: { empreendimentoId },
+      select: { status: true, tipologiaId: true },
+    }),
+  ]);
+
+  const statusResumo = (arr: { status: string; tipologiaId: string }[]): StatusLevantamento["status"] => {
+    if (arr.length === 0) return "NENHUM";
+    const tipologiasValidadas = new Set(arr.filter((x) => x.status === "VALIDADO").map((x) => x.tipologiaId));
+    if (totalTipologias > 0 && tipologiasValidadas.size >= totalTipologias) return "VALIDADO";
+    return "EM_ANDAMENTO";
+  };
+
+  return {
+    eletrico: statusResumo(statusEletricos),
+    hidraulico: statusResumo(statusHidraulicos),
+    materiais: statusResumo(statusMateriais),
+  };
+}
 import { CriarEmpreendimentoUseCase } from "@/core/empreendimentos/use-cases/criar-empreendimento";
 import { AtualizarEmpreendimentoUseCase } from "@/core/empreendimentos/use-cases/atualizar-empreendimento";
 import { exigirPermissao, temPermissao } from "@/infra/auth/exigir-permissao";
