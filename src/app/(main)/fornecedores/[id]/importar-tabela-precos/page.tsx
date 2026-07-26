@@ -4,19 +4,18 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import { prisma } from "@/infra/db/prisma/client";
 import { PageHeader } from "@/components/layout/page-header";
+import { FornecedorPrismaRepository } from "@/infra/db/prisma/repositories/fornecedor-prisma-repository";
 import { ImportarTabelaPrecosFornecedorView } from "@/features/fornecedores/components/importar-tabela-precos-fornecedor-view";
+
+const fornecedorRepo = new FornecedorPrismaRepository();
 
 interface Props {
   params: { id: string };
 }
 
 export default async function ImportarTabelaPrecosFornecedorPage({ params }: Props) {
-  const fornecedor = await prisma.fornecedor.findUnique({
-    where: { id: params.id },
-    select: { id: true, razaoSocial: true, nomeFantasia: true },
-  });
+  const fornecedor = await fornecedorRepo.findById(params.id);
   if (!fornecedor) notFound();
 
   return (
