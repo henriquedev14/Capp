@@ -7,8 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { temPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
-import { prisma } from "@/infra/db/prisma/client";
-import { listarBancadas, listarOperadores, buscarMetaProducaoDiaria } from "@/features/producao/actions/producao-actions";
+import { listarBancadas, listarOperadores, buscarMetaProducaoDiaria, listarEmpreendimentosParaProducao } from "@/features/producao/actions/producao-actions";
 import { TabletProducaoView } from "@/features/producao/components/tablet-producao-view";
 
 export default async function TabletProducaoPage() {
@@ -19,11 +18,7 @@ export default async function TabletProducaoPage() {
     listarBancadas(),
     listarOperadores(),
     buscarMetaProducaoDiaria(),
-    prisma.empreendimento.findMany({
-      where: { status: { in: ["SUPRIMENTOS", "PRODUCAO"] }, excluidoEm: null },
-      select: { id: true, nome: true },
-      orderBy: { nome: "asc" },
-    }),
+    listarEmpreendimentosParaProducao(),
   ]);
 
   return (
