@@ -11,7 +11,6 @@ import {
 import { CriterioPrecificacaoToggle } from "@/features/orcamentacao/components/criterio-precificacao-toggle";
 import { FormulaKitPontosCard } from "@/features/orcamentacao/components/formula-kit-pontos-card";
 import { OrcamentacaoPrismaRepository } from "@/infra/db/prisma/repositories/orcamentacao-prisma-repository";
-import { prisma } from "@/infra/db/prisma/client";
 import { temPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 
@@ -22,7 +21,7 @@ export default async function PrecosPage() {
   const [precos, tiers, configuracao] = await Promise.all([
     repo.buscarTabelaPreco(),
     repo.buscarTiers(),
-    prisma.configuracaoSistema.findUnique({ where: { id: "default" } }),
+    repo.buscarConfiguracao(),
   ]);
   const criterioAtivo = configuracao?.criterioPrecificacao ?? "AREA";
   const precosArea = precos.filter((p) => p.criterio === "AREA");
