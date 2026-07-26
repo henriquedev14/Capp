@@ -28,7 +28,7 @@ import { UsuarioPrismaRepository } from "@/infra/db/prisma/repositories/usuario-
 import { JornadaVisual } from "@/features/orcamentacao/components/jornada-visual";
 import { ResponsavelPrazoEditor } from "@/features/orcamentacao/components/responsavel-prazo-editor";
 import { podeGerenciarJornada } from "@/features/orcamentacao/actions/jornada-actions";
-import { prisma } from "@/infra/db/prisma/client";
+import { buscarInfoPropostaOrcamento, listarCotacoesDoOrcamento, listarFornecedoresAtivosResumo } from "@/features/orcamentacao/actions/orcamento-actions";
 import { getTierOption } from "@/features/tiers/constants";
 import { temPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
@@ -81,36 +81,10 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
 
   // Campos de trava da proposta — consultados à parte porque o repo/entity
   // de Orcamento ainda não os mapeia (adicionados depois, junto com o
-  // módulo de decisão do cliente). Blindado: se `db push` não rodou ainda,
-  // cai pro estado "nunca gerada" sem quebrar a tela.
-  let propostaInfo: {
-    propostaGeradaEm: string | null;
-    documentoId: string | null;
-    decisaoCliente: "PENDENTE" | "ACEITA" | "RECUSADA" | null;
-  } = { propostaGeradaEm: null, documentoId: null, decisaoCliente: null };
-  if (orcamento) {
-    try {
-      const raw = await prisma.orcamento.findUnique({
-        where: { id: orcamento.id },
-        select: {
-          propostaGeradaEm: true,
-          propostaDocumentoId: true,
-          decisaoCliente: true,
-        },
-      });
-      if (raw) {
-        propostaInfo = {
-          propostaGeradaEm: raw.propostaGeradaEm
-            ? raw.propostaGeradaEm.toLocaleString("pt-BR")
-            : null,
-          documentoId: raw.propostaDocumentoId,
-          decisaoCliente: (raw.decisaoCliente as "PENDENTE" | "ACEITA" | "RECUSADA" | null) ?? "PENDENTE",
-        };
-      }
-    } catch (e) {
-      console.error("[orcamento/page] erro ao carregar campos de proposta:", e);
-    }
-  }
+  // módulo de decisão do cliente).
+  const propostaInfo = orcamento
+    ? await buscarInfoPropostaOrcamento(orcamento.id)
+    : { propostaGeradaEm: null, documentoId: null, decisaoCliente: null };
   const podeSobrescreverProposta = await ehGestorSenior();
 
   // Jornada, responsáveis disponíveis e permissão de gerenciar — usados no
@@ -135,56 +109,13 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
     ? todosUsuarios.find((u) => u.id === orcamento.responsavelId)
     : null;
 
-  // Cotações associadas a esta revisão específica do orçamento.
-  // Consultado direto no Prisma (sem repo separado) porque é um consumo
-  // pontual dessa página. Se depois surgirem mais consumidores, refatoro.
-  // Blindado com try/catch: se `db push` não foi rodado depois de adicionar
-  // os models de Cotação, o banco ainda não tem a tabela — em vez de derrubar
-  // a tela inteira, mostra 0 cotações.
-  let cotacoes: {
-    id: string;
-    numero: string;
-    status: string;
-    fornecedorNome: string;
-    totalGeral: number;
-    totalItens: number;
-    atualizadoEm: Date;
-  }[] = [];
-  let erroCotacoes: string | null = null;
-  if (orcamento) {
-    try {
-      const raw = await prisma.cotacao.findMany({
-        where: { orcamentoId: orcamento.id },
-        include: {
-          fornecedor: { select: { razaoSocial: true, nomeFantasia: true } },
-          _count: { select: { itens: true } },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-      cotacoes = raw.map((c) => ({
-        id: c.id,
-        numero: c.numero,
-        status: c.status,
-        fornecedorNome: c.fornecedor.nomeFantasia ?? c.fornecedor.razaoSocial,
-        totalGeral: Number(c.totalGeral ?? 0),
-        totalItens: c._count.itens,
-        atualizadoEm: c.updatedAt,
-      }));
-    } catch (e) {
-      // Provável: tabela ainda não existe no banco.
-      erroCotacoes =
-        "Módulo de Cotações indisponível — rode `docker compose run --rm migrate npx prisma db push` para criar as tabelas.";
-      console.error("[orcamento/page] erro ao carregar cotações:", e);
-    }
-  }
+  // Cotações associadas a esta revisão específica do orçamento —
+  // extraído pra listarCotacoesDoOrcamento em 2.2.1 (item A4).
+  const { cotacoes, erro: erroCotacoes } = orcamento
+    ? await listarCotacoesDoOrcamento(orcamento.id)
+    : { cotacoes: [], erro: null };
 
-  const fornecedoresAtivos = (
-    await prisma.fornecedor.findMany({
-      where: { ativo: true },
-      select: { id: true, razaoSocial: true, nomeFantasia: true },
-      orderBy: { razaoSocial: "asc" },
-    })
-  ).map((f) => ({ id: f.id, nome: f.nomeFantasia ?? f.razaoSocial }));
+  const fornecedoresAtivos = await listarFornecedoresAtivosResumo();
 
   // Trava da proposta: além do orçamento estar aprovado, toda tipologia
   // que tem item de serviço do kit Elétrico precisa ter Levantamento de
