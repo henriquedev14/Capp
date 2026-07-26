@@ -4,35 +4,11 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { prisma } from "@/infra/db/prisma/client";
+import { listarDadosContasAReceber } from "@/features/financeiro/actions/conta-receber-actions";
 import { ContasReceberManager } from "@/features/financeiro/components/contas-receber-manager";
 
 export default async function ContasAReceberPage() {
-  const [empresas, contasReceberRaw] = await Promise.all([
-    prisma.empresaGrupo.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
-    prisma.contaReceber.findMany({
-      include: {
-        empreendimento: { select: { id: true, nome: true } },
-        empresa: true,
-        pavimento: { select: { nome: true } },
-      },
-      orderBy: [{ empreendimentoId: "asc" }, { tipo: "asc" }, { createdAt: "asc" }],
-    }),
-  ]);
-
-  const contasReceber = contasReceberRaw.map((c) => ({
-    id: c.id,
-    empreendimentoId: c.empreendimento.id,
-    empreendimentoNome: c.empreendimento.nome,
-    tipo: c.tipo,
-    pavimentoNome: c.pavimento?.nome ?? null,
-    valor: Number(c.valor),
-    dataEnvio: c.dataEnvio ? c.dataEnvio.toISOString() : null,
-    dataPrevista: c.dataPrevista ? c.dataPrevista.toISOString() : null,
-    recebido: c.recebido,
-    empresaId: c.empresaId,
-    empresaNome: c.empresa?.nome ?? null,
-  }));
+  const { empresas, contasReceber } = await listarDadosContasAReceber();
 
   return (
     <div className="flex flex-col gap-6">
