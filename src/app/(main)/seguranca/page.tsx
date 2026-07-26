@@ -5,7 +5,7 @@ import { ShieldAlert, LogIn, LogOut, Lock, Ban, KeyRound, ShieldCheck, ShieldOff
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { prisma } from "@/infra/db/prisma/client";
+import { buscarLogSeguranca } from "@/features/seguranca/actions/seguranca-actions";
 import { temPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 
@@ -55,19 +55,7 @@ export default async function SegurancaPage() {
   const podeVer = await temPermissao(PERMISSOES.SEGURANCA_VER_LOG);
   if (!podeVer) redirect("/painel");
 
-  const [logs, totalBloqueios24h, totalFalhas24h] = await Promise.all([
-    prisma.logSeguranca.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 200,
-      include: { usuario: { select: { nome: true } } },
-    }),
-    prisma.logSeguranca.count({
-      where: { tipo: "LOGIN_BLOQUEADO", createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
-    }),
-    prisma.logSeguranca.count({
-      where: { tipo: "LOGIN_FALHA", createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
-    }),
-  ]);
+  const { logs, totalBloqueios24h, totalFalhas24h } = await buscarLogSeguranca();
 
   return (
     <div className="flex flex-col gap-6">
