@@ -4,28 +4,11 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { prisma } from "@/infra/db/prisma/client";
+import { listarContasPagas } from "@/features/financeiro/actions/conta-pagar-actions";
 import { ContasPagasHistorico } from "@/features/financeiro/components/contas-pagas-historico";
 
 export default async function ContasPagasPage() {
-  const contasRaw = await prisma.contaPagar.findMany({
-    where: { pago: true },
-    include: { empresa: true, categoria: true },
-    orderBy: { dataVencimento: "desc" },
-  });
-
-  const contas = contasRaw.map((c) => ({
-    id: c.id,
-    descricao: c.descricao,
-    tipo: c.tipo,
-    valor: Number(c.valor),
-    dataVencimento: c.dataVencimento.toISOString(),
-    pagoEm: c.pagoEm ? c.pagoEm.toISOString() : null,
-    parcelaAtual: c.parcelaAtual,
-    parcelaTotal: c.parcelaTotal,
-    empresaNome: c.empresa.nome,
-    categoriaNome: c.categoria.nome,
-  }));
+  const contas = await listarContasPagas();
 
   return (
     <div className="flex flex-col gap-6">
