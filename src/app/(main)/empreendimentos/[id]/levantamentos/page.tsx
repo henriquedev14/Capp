@@ -7,7 +7,7 @@ import { ArrowLeft, Wrench, Droplets, Package, Calculator } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmpreendimentoPrismaRepository } from "@/infra/db/prisma/repositories/empreendimento-prisma-repository";
-import { prisma } from "@/infra/db/prisma/client";
+import { buscarStatusLevantamentos } from "@/features/empreendimentos/actions/empreendimento-actions";
 
 // Hub unificado — substitui os 3 cards separados de "Levantamento X" na
 // página do empreendimento. Mantém as URLs internas antigas
@@ -24,36 +24,7 @@ export default async function LevantamentosHubPage({ params }: Props) {
   const empreendimento = await empRepo.findById(params.id);
   if (!empreendimento) notFound();
 
-  // Status resumido de cada tipo. Query direta no Prisma pra evitar depender
-  // de métodos diferentes em cada repo (elétrico usa 'buscarPorTipologia',
-  // hidráulico usa 'buscarTodosPorEmpreendimento', etc). Aqui só precisamos
-  // saber se tem VALIDADO/RASCUNHO/nenhum.
-  const [totalTipologias, statusEletricos, statusHidraulicos, statusMateriais] = await Promise.all([
-    prisma.tipologia.count({ where: { empreendimentoId: params.id } }),
-    prisma.levantamentoEletrico.findMany({
-      where: { empreendimentoId: params.id },
-      select: { status: true, tipologiaId: true },
-    }),
-    prisma.levantamentoHidraulico.findMany({
-      where: { empreendimentoId: params.id },
-      select: { status: true, tipologiaId: true },
-    }),
-    prisma.levantamentoMateriais.findMany({
-      where: { empreendimentoId: params.id },
-      select: { status: true, tipologiaId: true },
-    }),
-  ]);
-
-  // "Validado" só quando TODAS as tipologias do empreendimento têm
-  // levantamento validado — antes, bastava UMA tipologia validada pro
-  // card inteiro virar "Validado", mesmo faltando várias outras (a
-  // pessoa lia isso como "terminei", quando só tinha feito uma parte).
-  const statusResumo = (arr: { status: string; tipologiaId: string }[]) => {
-    if (arr.length === 0) return "NENHUM" as const;
-    const tipologiasValidadas = new Set(arr.filter((x) => x.status === "VALIDADO").map((x) => x.tipologiaId));
-    if (totalTipologias > 0 && tipologiasValidadas.size >= totalTipologias) return "VALIDADO" as const;
-    return "EM_ANDAMENTO" as const;
-  };
+  const statusLevantamentos = await buscarStatusLevantamentos(params.id);
 
   const cards = [
     empreendimento.kitEletrico && {
@@ -61,21 +32,21 @@ export default async function LevantamentosHubPage({ params }: Props) {
       titulo: "Levantamento Elétrico",
       descricao: "Pontos de tomada, luz, comando",
       href: `/empreendimentos/${empreendimento.id}/levantamento`,
-      status: statusResumo(statusEletricos),
+      status: statusLevantamentos.eletrico,
     },
     empreendimento.kitHidraulico && {
       icone: Droplets,
       titulo: "Levantamento Hidráulico",
       descricao: "Tubos PEX, água fria e quente",
       href: `/empreendimentos/${empreendimento.id}/levantamento-hidraulico`,
-      status: statusResumo(statusHidraulicos),
+      status: statusLevantamentos.hidraulico,
     },
     empreendimento.kitEletrico && {
       icone: Package,
       titulo: "Levantamento de Materiais",
       descricao: "Catálogo elétrico — Wago, Tigre, Davin, TAF",
       href: `/empreendimentos/${empreendimento.id}/levantamento-materiais`,
-      status: statusResumo(statusMateriais),
+      status: statusLevantamentos.materiais,
     },
   ].filter(Boolean) as Array<{
     icone: React.ComponentType<{ className?: string }>;
