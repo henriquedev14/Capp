@@ -1,126 +1,174 @@
 export const dynamic = "force-dynamic";
 
-import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Wrench, Droplets, Package, Calculator } from "lucide-react";
+import {
+  Building2,
+  Tag,
+  Repeat,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  LineChart,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { EmpreendimentoPrismaRepository } from "@/infra/db/prisma/repositories/empreendimento-prisma-repository";
-import { buscarStatusLevantamentos } from "@/features/empreendimentos/actions/empreendimento-actions";
+import { buscarResumoFinanceiro } from "@/features/financeiro/actions/cadastros-actions";
 
-// Hub unificado — substitui os 3 cards separados de "Levantamento X" na
-// página do empreendimento. Mantém as URLs internas antigas
-// (/levantamento, /levantamento-hidraulico, /levantamento-materiais) por
-// compatibilidade: aqui é só um menu que aponta pra elas.
-
-const empRepo = new EmpreendimentoPrismaRepository();
-
-interface Props {
-  params: { id: string };
+function formatBRL(v: number): string {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default async function LevantamentosHubPage({ params }: Props) {
-  const empreendimento = await empRepo.findById(params.id);
-  if (!empreendimento) notFound();
+export default async function FinanceiroPage() {
+  const {
+    empresasCount,
+    categoriasCount,
+    contasFixasCount,
+    contasReceberPendentesCount,
+    contasReceberPendentesValor,
+    contasPagarPendentesCount,
+    contasPagarPendentesValor,
+    recebidoMes,
+    pagoMes,
+  } = await buscarResumoFinanceiro();
 
-  const statusLevantamentos = await buscarStatusLevantamentos(params.id);
-
-  const cards = [
-    empreendimento.kitEletrico && {
-      icone: Wrench,
-      titulo: "Levantamento Elétrico",
-      descricao: "Pontos de tomada, luz, comando",
-      href: `/empreendimentos/${empreendimento.id}/levantamento`,
-      status: statusLevantamentos.eletrico,
-    },
-    empreendimento.kitHidraulico && {
-      icone: Droplets,
-      titulo: "Levantamento Hidráulico",
-      descricao: "Tubos PEX, água fria e quente",
-      href: `/empreendimentos/${empreendimento.id}/levantamento-hidraulico`,
-      status: statusLevantamentos.hidraulico,
-    },
-    empreendimento.kitEletrico && {
-      icone: Package,
-      titulo: "Levantamento de Materiais",
-      descricao: "Catálogo elétrico — Wago, Tigre, Davin, TAF",
-      href: `/empreendimentos/${empreendimento.id}/levantamento-materiais`,
-      status: statusLevantamentos.materiais,
-    },
-  ].filter(Boolean) as Array<{
-    icone: React.ComponentType<{ className?: string }>;
-    titulo: string;
-    descricao: string;
-    href: string;
-    status: "VALIDADO" | "EM_ANDAMENTO" | "NENHUM";
-  }>;
+  const lucroReal = recebidoMes - pagoMes;
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        <Link
-          href={`/empreendimentos/${params.id}`}
-          className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar para {empreendimento.nome}
-        </Link>
-        <Link
-          href={`/empreendimentos/${params.id}/orcamento`}
-          className="flex items-center gap-1.5 text-sm font-medium text-primary transition-colors hover:text-primary/80"
-        >
-          <Calculator className="h-4 w-4" />
-          Ir para Orçamento
-        </Link>
-      </div>
-
       <PageHeader
-        breadcrumb={["Empreendimentos", empreendimento.nome, "Levantamentos"]}
-        title="Levantamentos"
-        description="Dimensionamento técnico do empreendimento — cada aba alimenta um bloco diferente do orçamento."
+        breadcrumb={["Financeiro"]}
+        title="Financeiro"
+        description="Saúde financeira do grupo — contas a pagar, contas a receber e cadastros."
       />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {cards.map((c) => (
-          <Link key={c.titulo} href={c.href}>
-            <Card className="h-full hover:border-primary/40 transition-colors">
-              <CardContent className="flex h-full flex-col gap-3 pt-5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-                    <c.icone className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <StatusBadge status={c.status} />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-foreground">{c.titulo}</div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">{c.descricao}</div>
-                </div>
-                <span className="text-[10px] font-medium uppercase tracking-wide text-primary">
-                  Acessar →
+      {/* Lucro Real do mês — alerta automático se negativo */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Card className="border-success/40 bg-success/5">
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-success" />
+              <span className="text-xs font-medium uppercase tracking-wide text-success">Recebido no mês</span>
+            </div>
+            <div className="mt-1 text-2xl font-bold tabular-nums text-success">{formatBRL(recebidoMes)}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-destructive" />
+              <span className="text-xs font-medium uppercase tracking-wide text-destructive">Pago no mês</span>
+            </div>
+            <div className="mt-1 text-2xl font-bold tabular-nums text-destructive">{formatBRL(pagoMes)}</div>
+          </CardContent>
+        </Card>
+        <Card className={lucroReal < 0 ? "border-destructive/60 bg-destructive/10" : "border-primary/40 bg-primary/5"}>
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-2">
+              {lucroReal < 0 && <AlertTriangle className="h-4 w-4 text-destructive" />}
+              <span className={"text-xs font-medium uppercase tracking-wide " + (lucroReal < 0 ? "text-destructive" : "text-primary")}>
+                Lucro Real do mês {lucroReal < 0 && "— ATENÇÃO"}
+              </span>
+            </div>
+            <div className={"mt-1 text-2xl font-bold tabular-nums " + (lucroReal < 0 ? "text-destructive" : "text-primary")}>
+              {formatBRL(lucroReal)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Submódulos */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Link href="/financeiro/fluxo-de-caixa">
+          <Card className="hover:border-primary/40 transition-colors h-full border-primary/30">
+            <CardContent className="flex items-center gap-3 pt-5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <LineChart className="h-[18px] w-[18px] text-primary" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground">Fluxo de Caixa Projetado</span>
+                <span className="text-xs text-muted-foreground">Próximas 8 semanas</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/financeiro/contas-a-receber">
+          <Card className="hover:border-primary/40 transition-colors h-full">
+            <CardContent className="flex items-center gap-3 pt-5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success/10">
+                <ArrowDownCircle className="h-[18px] w-[18px] text-success" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground">Contas a Receber</span>
+                <span className="text-xs text-muted-foreground">
+                  {contasReceberPendentesCount} pendente(s) · {formatBRL(contasReceberPendentesValor)}
                 </span>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/financeiro/contas-a-pagar">
+          <Card className="hover:border-primary/40 transition-colors h-full">
+            <CardContent className="flex items-center gap-3 pt-5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
+                <ArrowUpCircle className="h-[18px] w-[18px] text-destructive" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground">Contas a Pagar</span>
+                <span className="text-xs text-muted-foreground">
+                  {contasPagarPendentesCount} pendente(s) · {formatBRL(contasPagarPendentesValor)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/financeiro/contas-fixas">
+          <Card className="hover:border-primary/40 transition-colors h-full">
+            <CardContent className="flex items-center gap-3 pt-5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                <Repeat className="h-[18px] w-[18px] text-muted-foreground" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground">Contas Fixas</span>
+                <span className="text-xs text-muted-foreground">{contasFixasCount} regra(s) ativa(s)</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/financeiro/empresas">
+          <Card className="hover:border-primary/40 transition-colors h-full">
+            <CardContent className="flex items-center gap-3 pt-5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                <Building2 className="h-[18px] w-[18px] text-muted-foreground" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground">Empresas do Grupo</span>
+                <span className="text-xs text-muted-foreground">{empresasCount} ativa(s)</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/financeiro/categorias">
+          <Card className="hover:border-primary/40 transition-colors h-full">
+            <CardContent className="flex items-center gap-3 pt-5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                <Tag className="h-[18px] w-[18px] text-muted-foreground" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground">Categorias de Despesa</span>
+                <span className="text-xs text-muted-foreground">{categoriasCount} ativa(s)</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: "VALIDADO" | "EM_ANDAMENTO" | "NENHUM" }) {
-  const cfg = {
-    VALIDADO: { label: "Concluído", classe: "bg-success/15 text-success" },
-    EM_ANDAMENTO: { label: "Em andamento", classe: "bg-warning/15 text-warning" },
-    NENHUM: { label: "Não iniciado", classe: "bg-muted text-muted-foreground" },
-  }[status];
-  return (
-    <span
-      className={
-        "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold " + cfg.classe
-      }
-    >
-      {cfg.label}
-    </span>
   );
 }
