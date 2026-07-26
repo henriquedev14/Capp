@@ -4,11 +4,11 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { prisma } from "@/infra/db/prisma/client";
+import { listarCategoriasDespesa } from "@/features/financeiro/actions/cadastros-actions";
 import { CategoriasDespesaComClassificacao } from "@/features/financeiro/components/categorias-despesa-com-classificacao";
 
 export default async function CategoriasDespesaPage() {
-  const categorias = await prisma.categoriaDespesa.findMany({ orderBy: { nome: "asc" } });
+  const categorias = await listarCategoriasDespesa();
 
   return (
     <div className="flex flex-col gap-6">
