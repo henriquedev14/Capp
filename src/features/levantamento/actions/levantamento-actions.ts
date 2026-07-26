@@ -1,11 +1,29 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { prisma } from "@/infra/db/prisma/client";
 import { LevantamentoPrismaRepository } from "@/infra/db/prisma/repositories/levantamento-prisma-repository";
 import { TimelinePrismaRepository } from "@/infra/db/prisma/repositories/timeline-prisma-repository";
 import { exigirPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 import type { CircuitoPeca } from "@/core/empreendimentos/entities/levantamento-eletrico";
+
+/**
+ * Resumo do catálogo PEX (total ativo + agrupado por categoria) —
+ * extraído da página em 2.2.1 (item A4).
+ */
+export async function buscarResumoCatalogoPex() {
+  const [total, categorias] = await Promise.all([
+    prisma.materialPex.count({ where: { ativo: true } }),
+    prisma.materialPex.groupBy({
+      by: ["categoria"],
+      where: { ativo: true },
+      _count: { _all: true },
+      orderBy: { categoria: "asc" },
+    }),
+  ]);
+  return { total, categorias: categorias.map((c) => ({ nome: c.categoria, total: c._count._all })) };
+}
 import { ehDiretorOuCoordenador } from "@/infra/auth/eh-diretor-ou-coordenador";
 import { prisma } from "@/infra/db/prisma/client";
 import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empreendimento-ativo";
