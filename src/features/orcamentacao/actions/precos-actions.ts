@@ -1,11 +1,29 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { prisma } from "@/infra/db/prisma/client";
 import { OrcamentacaoPrismaRepository } from "@/infra/db/prisma/repositories/orcamentacao-prisma-repository";
 import { exigirPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 
 const repo = new OrcamentacaoPrismaRepository();
+
+/**
+ * Resumo do catálogo elétrico (total ativo + agrupado por fabricante) —
+ * extraído da página em 2.2.1 (item A4).
+ */
+export async function buscarResumoCatalogoEletrico() {
+  const [total, porFabricante] = await Promise.all([
+    prisma.materialEletrico.count({ where: { ativo: true } }),
+    prisma.materialEletrico.groupBy({
+      by: ["fabricante"],
+      where: { ativo: true },
+      _count: { _all: true },
+      orderBy: { fabricante: "asc" },
+    }),
+  ]);
+  return { total, fabricantes: porFabricante.map((f) => ({ nome: f.fabricante, total: f._count._all })) };
+}
 
 export async function atualizarPrecoBase(
   id: string,
