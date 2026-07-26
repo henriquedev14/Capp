@@ -307,3 +307,92 @@ export async function deletarOrcamento(
   await repo.deletar(id);
   revalidatePath(`/empreendimentos/${empreendimentoId}/orcamento`);
 }
+
+/**
+ * Campos de trava da proposta (data de geração, documento, decisão do
+ * cliente) — extraído da página em 2.2.1 (item A4). Mantém o try/catch
+ * defensivo original (proteção contra o `db push` ainda não ter rodado
+ * nesta VM, já que esses campos foram adicionados depois).
+ */
+export async function buscarInfoPropostaOrcamento(orcamentoId: string): Promise<{
+  propostaGeradaEm: string | null;
+  documentoId: string | null;
+  decisaoCliente: "PENDENTE" | "ACEITA" | "RECUSADA" | null;
+}> {
+  try {
+    const raw = await prisma.orcamento.findUnique({
+      where: { id: orcamentoId },
+      select: { propostaGeradaEm: true, propostaDocumentoId: true, decisaoCliente: true },
+    });
+    if (!raw) return { propostaGeradaEm: null, documentoId: null, decisaoCliente: null };
+    return {
+      propostaGeradaEm: raw.propostaGeradaEm ? raw.propostaGeradaEm.toLocaleString("pt-BR") : null,
+      documentoId: raw.propostaDocumentoId,
+      decisaoCliente: (raw.decisaoCliente as "PENDENTE" | "ACEITA" | "RECUSADA" | null) ?? "PENDENTE",
+    };
+  } catch (e) {
+    console.error("[buscarInfoPropostaOrcamento] erro ao carregar campos de proposta:", e);
+    return { propostaGeradaEm: null, documentoId: null, decisaoCliente: null };
+  }
+}
+
+interface CotacaoResumo {
+  id: string;
+  numero: string;
+  status: string;
+  fornecedorNome: string;
+  totalGeral: number;
+  totalItens: number;
+  atualizadoEm: Date;
+}
+
+/**
+ * Lista as cotações de um orçamento — extraído da página em 2.2.1 (item
+ * A4). Mantém o try/catch defensivo original (proteção contra a tabela
+ * ainda não existir em ambientes que não rodaram a migration).
+ */
+export async function listarCotacoesDoOrcamento(
+  orcamentoId: string
+): Promise<{ cotacoes: CotacaoResumo[]; erro: string | null }> {
+  try {
+    const raw = await prisma.cotacao.findMany({
+      where: { orcamentoId },
+      include: {
+        fornecedor: { select: { razaoSocial: true, nomeFantasia: true } },
+        _count: { select: { itens: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return {
+      cotacoes: raw.map((c) => ({
+        id: c.id,
+        numero: c.numero,
+        status: c.status,
+        fornecedorNome: c.fornecedor.nomeFantasia ?? c.fornecedor.razaoSocial,
+        totalGeral: Number(c.totalGeral ?? 0),
+        totalItens: c._count.itens,
+        atualizadoEm: c.updatedAt,
+      })),
+      erro: null,
+    };
+  } catch (e) {
+    console.error("[listarCotacoesDoOrcamento] erro ao carregar cotações:", e);
+    return {
+      cotacoes: [],
+      erro: "Módulo de Cotações indisponível — rode `docker compose run --rm migrate npx prisma db push` para criar as tabelas.",
+    };
+  }
+}
+
+/**
+ * Fornecedores ativos (id + nome de exibição) — extraído da página em
+ * 2.2.1 (item A4).
+ */
+export async function listarFornecedoresAtivosResumo() {
+  const fornecedores = await prisma.fornecedor.findMany({
+    where: { ativo: true },
+    select: { id: true, razaoSocial: true, nomeFantasia: true },
+    orderBy: { razaoSocial: "asc" },
+  });
+  return fornecedores.map((f) => ({ id: f.id, nome: f.nomeFantasia ?? f.razaoSocial }));
+}
