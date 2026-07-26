@@ -4,16 +4,16 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { prisma } from "@/infra/db/prisma/client";
 import { CadastroSimplesLista } from "@/features/financeiro/components/cadastro-simples-lista";
 import {
+  listarEmpresasGrupo,
   criarEmpresaGrupo,
   toggleAtivoEmpresaGrupo,
   excluirEmpresaGrupo,
 } from "@/features/financeiro/actions/cadastros-actions";
 
 export default async function EmpresasGrupoPage() {
-  const empresas = await prisma.empresaGrupo.findMany({ orderBy: { nome: "asc" } });
+  const empresas = await listarEmpresasGrupo();
 
   return (
     <div className="flex flex-col gap-6">
