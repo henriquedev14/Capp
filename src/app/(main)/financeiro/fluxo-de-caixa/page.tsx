@@ -4,32 +4,17 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { prisma } from "@/infra/db/prisma/client";
-import { temPermissao } from "@/infra/auth/exigir-permissao";
-import { PERMISSOES } from "@/core/auth/permissions";
 import { projetarFluxoCaixa } from "@/features/financeiro/lib/fluxo-caixa";
+import { buscarDadosFluxoCaixa } from "@/features/financeiro/actions/fluxo-caixa-actions";
 import { FluxoCaixaView } from "@/features/financeiro/components/fluxo-caixa-view";
 
 export default async function FluxoCaixaPage() {
-  const [configuracao, contasReceber, contasPagar, podeEditar] = await Promise.all([
-    prisma.configuracaoSistema.findUnique({ where: { id: "default" } }),
-    prisma.contaReceber.findMany({
-      where: { recebido: false, dataPrevista: { not: null } },
-      select: { valor: true, dataPrevista: true },
-    }),
-    prisma.contaPagar.findMany({
-      where: { pago: false },
-      select: { valor: true, dataVencimento: true },
-    }),
-    temPermissao(PERMISSOES.FINANCEIRO_GERENCIAR_CADASTROS),
-  ]);
+  const { saldoCaixaAtual, contasReceber, contasPagar, podeEditar } = await buscarDadosFluxoCaixa();
 
   const semanas = projetarFluxoCaixa({
-    entradas: contasReceber
-      .filter((c): c is typeof c & { dataPrevista: Date } => c.dataPrevista !== null)
-      .map((c) => ({ data: c.dataPrevista, valor: Number(c.valor) })),
-    saidas: contasPagar.map((c) => ({ data: c.dataVencimento, valor: Number(c.valor) })),
-    saldoInicial: Number(configuracao?.saldoCaixaAtual ?? 0),
+    entradas: contasReceber,
+    saidas: contasPagar,
+    saldoInicial: saldoCaixaAtual,
     numSemanas: 8,
   });
 
@@ -50,7 +35,7 @@ export default async function FluxoCaixaPage() {
       />
 
       <FluxoCaixaView
-        saldoAtual={Number(configuracao?.saldoCaixaAtual ?? 0)}
+        saldoAtual={saldoCaixaAtual}
         semanas={semanas}
         podeEditar={podeEditar}
       />
