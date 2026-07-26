@@ -6,6 +6,36 @@ import { prisma } from "@/infra/db/prisma/client";
 import { exigirPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 
+/**
+ * Lista empresas, categorias e contas fixas (com dados "achatados") —
+ * extraído da página em 2.2.1 (item A4).
+ */
+export async function listarDadosContasFixas() {
+  const [empresas, categorias, contasFixasRaw] = await Promise.all([
+    prisma.empresaGrupo.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
+    prisma.categoriaDespesa.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
+    prisma.contaFixaModelo.findMany({
+      include: { empresa: true, categoria: true },
+      orderBy: { descricao: "asc" },
+    }),
+  ]);
+
+  const contasFixas = contasFixasRaw.map((c) => ({
+    id: c.id,
+    descricao: c.descricao,
+    valor: Number(c.valor),
+    diaUtilVencimento: c.diaUtilVencimento,
+    ativo: c.ativo,
+    empresaId: c.empresaId,
+    empresaNome: c.empresa.nome,
+    categoriaId: c.categoriaId,
+    categoriaNome: c.categoria.nome,
+    observacoes: c.observacoes,
+  }));
+
+  return { empresas, categorias, contasFixas };
+}
+
 interface Resultado {
   erro?: string;
   ok?: boolean;

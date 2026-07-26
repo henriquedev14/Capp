@@ -23,6 +23,53 @@ export async function listarEmpresasGrupo() {
   return prisma.empresaGrupo.findMany({ orderBy: { nome: "asc" } });
 }
 
+/**
+ * Resumo pra tela principal do Financeiro: contadores de cadastros
+ * ativos + agregados do mês (recebido, pago) + pendências totais —
+ * extraído da página em 2.2.1 (item A4).
+ */
+export async function buscarResumoFinanceiro() {
+  const inicioMes = new Date();
+  inicioMes.setDate(1);
+  inicioMes.setHours(0, 0, 0, 0);
+
+  const [
+    empresasCount,
+    categoriasCount,
+    contasFixasCount,
+    contasReceberPendentes,
+    contasPagarPendentes,
+    recebidoMesAgg,
+    pagoMesAgg,
+  ] = await Promise.all([
+    prisma.empresaGrupo.count({ where: { ativo: true } }),
+    prisma.categoriaDespesa.count({ where: { ativo: true } }),
+    prisma.contaFixaModelo.count({ where: { ativo: true } }),
+    prisma.contaReceber.aggregate({ where: { recebido: false }, _sum: { valor: true }, _count: true }),
+    prisma.contaPagar.aggregate({ where: { pago: false }, _sum: { valor: true }, _count: true }),
+    prisma.contaReceber.aggregate({
+      where: { recebido: true, recebidoEm: { gte: inicioMes } },
+      _sum: { valor: true },
+    }),
+    prisma.contaPagar.aggregate({
+      where: { pago: true, pagoEm: { gte: inicioMes } },
+      _sum: { valor: true },
+    }),
+  ]);
+
+  return {
+    empresasCount,
+    categoriasCount,
+    contasFixasCount,
+    contasReceberPendentesCount: contasReceberPendentes._count,
+    contasReceberPendentesValor: Number(contasReceberPendentes._sum.valor ?? 0),
+    contasPagarPendentesCount: contasPagarPendentes._count,
+    contasPagarPendentesValor: Number(contasPagarPendentes._sum.valor ?? 0),
+    recebidoMes: Number(recebidoMesAgg._sum.valor ?? 0),
+    pagoMes: Number(pagoMesAgg._sum.valor ?? 0),
+  };
+}
+
 export async function criarEmpresaGrupo(nome: string): Promise<Resultado> {
   try {
     await exigirPermissao(PERMISSOES.FINANCEIRO_GERENCIAR_CADASTROS);

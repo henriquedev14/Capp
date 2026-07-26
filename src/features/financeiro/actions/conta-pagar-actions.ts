@@ -12,6 +12,45 @@ interface Resultado {
 }
 
 /**
+ * Lista empresas, categorias, contas pendentes e total já pago no mês —
+ * extraído da página em 2.2.1 (item A4).
+ */
+export async function listarDadosContasAPagar() {
+  const hoje = new Date();
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59);
+
+  const [empresas, categorias, contasRaw, agregadoPagasMes] = await Promise.all([
+    prisma.empresaGrupo.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
+    prisma.categoriaDespesa.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
+    prisma.contaPagar.findMany({
+      where: { pago: false },
+      include: { empresa: true, categoria: true },
+      orderBy: { dataVencimento: "asc" },
+    }),
+    prisma.contaPagar.aggregate({
+      where: { pago: true, pagoEm: { gte: inicioMes, lte: fimMes } },
+      _sum: { valor: true },
+    }),
+  ]);
+
+  const contas = contasRaw.map((c) => ({
+    id: c.id,
+    descricao: c.descricao,
+    tipo: c.tipo,
+    valor: Number(c.valor),
+    dataVencimento: c.dataVencimento.toISOString(),
+    pago: c.pago,
+    parcelaAtual: c.parcelaAtual,
+    parcelaTotal: c.parcelaTotal,
+    empresaNome: c.empresa.nome,
+    categoriaNome: c.categoria.nome,
+  }));
+
+  return { empresas, categorias, contas, totalPagoEsteMes: Number(agregadoPagasMes._sum.valor ?? 0) };
+}
+
+/**
  * Lista o histórico de contas já pagas — extraído da página em 2.2.1
  * (item A4). Mantém o mesmo formato "achatado" (datas em string ISO,
  * nomes em vez de objetos relacionados) que a página já esperava.
