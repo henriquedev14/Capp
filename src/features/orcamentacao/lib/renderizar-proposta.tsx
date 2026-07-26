@@ -4,18 +4,17 @@ import { OrcamentacaoPrismaRepository } from "@/infra/db/prisma/repositories/orc
 import { EmpreendimentoPrismaRepository } from "@/infra/db/prisma/repositories/empreendimento-prisma-repository";
 import { ClientePrismaRepository } from "@/infra/db/prisma/repositories/cliente-prisma-repository";
 import { EstruturaFisicaPrismaRepository } from "@/infra/db/prisma/repositories/estrutura-fisica-prisma-repository";
-import { TIPOS_ESTRUTURA } from "@/features/empreendimentos/constants";
 import { montarAnexoMateriaisPorFornecedor, type AnexoMateriaisProposta } from "@/features/orcamentacao/lib/proposta-anexo-materiais";
 import { montarEscopoTemplate } from "@/features/orcamentacao/lib/proposta-escopo-adapter";
 import { renderTemplateHtml } from "@/features/orcamentacao/lib/motor-template-html";
 import { carregarTemplateBase, renderizarHtmlParaPdf } from "@/features/orcamentacao/lib/template-proposta-runtime";
+import { validarCamposObrigatoriosProposta } from "@/core/orcamentacao/use-cases/validar-proposta";
+import { montarDadosProposta } from "@/core/orcamentacao/use-cases/montar-dados-proposta";
 
 const orcamentoRepo = new OrcamentacaoPrismaRepository();
 const empreendimentoRepo = new EmpreendimentoPrismaRepository();
 const clienteRepo = new ClientePrismaRepository();
 const estruturaRepo = new EstruturaFisicaPrismaRepository();
-
-const NAO_INFORMADO = "Não informado";
 
 export interface PropostaInstitucionalData {
   numeroProposta: string;
@@ -40,21 +39,6 @@ export interface PropostaInstitucionalData {
   itensExcluidos?: string[];
   validadeProposta?: string;
   fretePor?: string;
-}
-
-function validarCamposObrigatorios(input: {
-  clienteEncontrado: boolean;
-  totalMaoDeObra: number;
-  totalMateriais: number;
-}): string | null {
-  if (!input.clienteEncontrado) return "Cliente não encontrado para este empreendimento.";
-  if (input.totalMaoDeObra <= 0) {
-    return "Este orçamento não tem valor de mão de obra calculado — verifique o Orçamento (Bloco 1).";
-  }
-  if (input.totalMateriais <= 0) {
-    return "Este orçamento não tem valor de materiais calculado — verifique o Orçamento (Bloco 2).";
-  }
-  return null;
 }
 
 export async function renderizarPropostaPdf(
@@ -91,7 +75,7 @@ export async function renderizarPropostaPdf(
   const totalMaoDeObra = orcamento.itensServico.reduce((acc, i) => acc + i.total, 0);
   const anexoMateriais = montarAnexoMateriaisPorFornecedor(orcamento.itensMaterial, nomeFornecedorPorId);
 
-  const erroValidacao = validarCamposObrigatorios({
+  const erroValidacao = validarCamposObrigatoriosProposta({
     clienteEncontrado: !!cliente,
     totalMaoDeObra,
     totalMateriais: anexoMateriais.totalGeral,
@@ -101,53 +85,26 @@ export async function renderizarPropostaPdf(
     return { erro: erroValidacao };
   }
 
-  const unidadesHabitacionais = tipologias.reduce((acc, t) => acc + (t.quantidadeUnidades ?? 0), 0) || null;
-
-  const sistemaConstrutivo = empreendimento.tipoEstrutura
-    ? TIPOS_ESTRUTURA.find((t) => t.value === empreendimento.tipoEstrutura)?.label ?? empreendimento.tipoEstrutura
-    : NAO_INFORMADO;
-
-  const enderecoCliente = cliente
-    ? [cliente.logradouro, cliente.cidade && cliente.estado ? `${cliente.cidade}-${cliente.estado}` : null]
-        .filter(Boolean)
-        .join(", ") || NAO_INFORMADO
-    : NAO_INFORMADO;
-
-  const data: PropostaInstitucionalData = {
-    numeroProposta: `${empreendimento.codigo}-REV${orcamento.revisao}`,
-    dataEmissao: new Date()
-      .toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
-      .toUpperCase(),
+  const data: PropostaInstitucionalData = montarDadosProposta({
+    empreendimentoCodigo: empreendimento.codigo,
+    empreendimentoNome: empreendimento.nome,
+    empreendimentoCidade: empreendimento.cidade,
+    empreendimentoEstado: empreendimento.estado,
+    empreendimentoTipoEstrutura: empreendimento.tipoEstrutura,
+    revisao: orcamento.revisao,
     cliente: {
-      nome: cliente!.nomeFantasia ?? cliente!.razaoSocial,
-      cnpj: cliente!.cnpj || NAO_INFORMADO,
-      endereco: enderecoCliente,
+      nomeFantasia: cliente!.nomeFantasia,
+      razaoSocial: cliente!.razaoSocial,
+      cnpj: cliente!.cnpj,
+      logradouro: cliente!.logradouro,
+      cidade: cliente!.cidade,
+      estado: cliente!.estado,
     },
-    empreendimento: {
-      nome: empreendimento.nome,
-      cidade: empreendimento.cidade,
-      estado: empreendimento.estado,
-      unidadesHabitacionais,
-      sistemaConstrutivo,
-    },
-    associado: {
-      nome: usuario?.nome ?? "Não informado",
-      cargo: usuario?.cargo ?? NAO_INFORMADO,
-      email: usuario?.email ?? NAO_INFORMADO,
-      telefone: usuario?.telefone ?? NAO_INFORMADO,
-    },
-    investimento: {
-      maoDeObraTotal: totalMaoDeObra,
-      maoDeObraUnitario: unidadesHabitacionais ? totalMaoDeObra / unidadesHabitacionais : null,
-      materiaisTotal: anexoMateriais.totalGeral,
-      materiaisUnitario: unidadesHabitacionais ? anexoMateriais.totalGeral / unidadesHabitacionais : null,
-    },
+    totalUnidadesHabitacionais: tipologias.reduce((acc, t) => acc + (t.quantidadeUnidades ?? 0), 0),
+    usuario: usuario ?? null,
+    totalMaoDeObra,
     anexoMateriais,
-    // Política comercial já vigente (mesma do template anterior) — não é
-    // dado do orçamento, é config fixa da empresa até virar campo editável.
-    validadeProposta: "8 (oito) meses, contados da data de finalização",
-    fretePor: "FOB — pagamento do frete pela construtora, sem desconto da ConstruApp",
-  };
+  });
 
   const escopoTemplate = montarEscopoTemplate(data);
   const templateBase = carregarTemplateBase();
