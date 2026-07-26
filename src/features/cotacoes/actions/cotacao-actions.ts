@@ -10,6 +10,7 @@ import { PERMISSOES } from "@/core/auth/permissions";
 import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empreendimento-ativo";
 import { consolidarLevantamentoMateriais } from "@/features/cotacoes/lib/consolidar-levantamento";
 import { proximoNumeroCotacao } from "@/features/cotacoes/lib/numero-cotacao";
+import type { CotacaoDetalhe } from "@/features/cotacoes/components/cotacao-detail-view";
 
 // --------------------------------------------------------------------------
 // Preview de fornecedores para o modal "Gerar Cotação"
@@ -743,4 +744,83 @@ export async function identificarMelhorCotacao(
     }
   }
   return melhor;
+}
+
+/**
+ * Busca uma cotação com todos os dados prontos pra tela de detalhe —
+ * extraído da página em 2.2.1 (item A4). Retorna null se a cotação não
+ * existir OU se pertencer a um empreendimento diferente do informado
+ * (rota inválida — evita vazar cotação de outro empreendimento por ID
+ * direto na URL).
+ */
+export async function buscarCotacaoDetalhe(
+  cotacaoId: string,
+  empreendimentoId: string
+): Promise<CotacaoDetalhe | null> {
+  const cotacao = await prisma.cotacao.findUnique({
+    where: { id: cotacaoId },
+    include: {
+      fornecedor: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } },
+      orcamento: {
+        select: {
+          empreendimento: {
+            select: {
+              id: true,
+              nome: true,
+              cidade: true,
+              estado: true,
+              cliente: { select: { razaoSocial: true, nomeFantasia: true } },
+            },
+          },
+        },
+      },
+      itens: { orderBy: [{ ordem: "asc" }, { descricao: "asc" }] },
+    },
+  });
+
+  if (!cotacao) return null;
+  if (cotacao.orcamento.empreendimento.id !== empreendimentoId) return null;
+
+  const obra = [cotacao.orcamento.empreendimento.cidade, cotacao.orcamento.empreendimento.estado]
+    .filter(Boolean)
+    .join(" - ");
+
+  return {
+    id: cotacao.id,
+    numero: cotacao.numero,
+    status: cotacao.status,
+    fornecedor: {
+      nomeExibido: cotacao.fornecedor.nomeFantasia ?? cotacao.fornecedor.razaoSocial,
+      razaoSocial: cotacao.fornecedor.razaoSocial,
+      cnpj: cotacao.fornecedor.cnpj,
+    },
+    empreendimento: {
+      id: cotacao.orcamento.empreendimento.id,
+      nome: cotacao.orcamento.empreendimento.nome,
+      clienteNome:
+        cotacao.orcamento.empreendimento.cliente.nomeFantasia ??
+        cotacao.orcamento.empreendimento.cliente.razaoSocial,
+      obra: obra || "—",
+    },
+    totalEletrica: Number(cotacao.totalEletrica ?? 0),
+    totalQdc: Number(cotacao.totalQdc ?? 0),
+    totalGeral: Number(cotacao.totalGeral ?? 0),
+    observacoes: cotacao.observacoes,
+    itensNaoCotaveis: cotacao.itensNaoCotaveis
+      ? (JSON.parse(cotacao.itensNaoCotaveis) as CotacaoDetalhe["itensNaoCotaveis"])
+      : [],
+    itens: cotacao.itens.map((i) => ({
+      id: i.id,
+      descricao: i.descricao,
+      fabricante: i.fabricante,
+      unidade: i.unidade,
+      kit: i.kit,
+      quantidade: Number(i.quantidade),
+      precoUnitario: Number(i.precoUnitario),
+      total: Number(i.total),
+      ordem: i.ordem,
+    })),
+    criadaEm: cotacao.createdAt,
+    atualizadaEm: cotacao.updatedAt,
+  };
 }
