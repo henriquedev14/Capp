@@ -13,6 +13,30 @@ function revalidar() {
 }
 
 /**
+ * Empreendimentos elegíveis pra registrar entrada de suprimentos —
+ * extraído das páginas em 2.2.1 (item A4).
+ */
+export async function listarEmpreendimentosParaSuprimentos() {
+  return prisma.empreendimento.findMany({
+    where: { status: { in: ["CONTRATADO", "SUPRIMENTOS", "PRODUCAO"] }, excluidoEm: null },
+    select: { id: true, nome: true, codigo: true },
+    orderBy: { nome: "asc" },
+  });
+}
+
+/**
+ * Materiais elétricos ativos do catálogo — extraído das páginas em 2.2.1
+ * (item A4).
+ */
+export async function listarMateriaisEletricosAtivos() {
+  return prisma.materialEletrico.findMany({
+    where: { ativo: true },
+    select: { id: true, nome: true, unidade: true, categoria: true },
+    orderBy: { nome: "asc" },
+  });
+}
+
+/**
  * Depois de QUALQUER entrada de material, checa se alguma tipologia da
  * obra ficou com material completo agora (e ainda não tinha o marco) —
  * grava o momento exato, pra poder medir depois "quanto tempo entre
