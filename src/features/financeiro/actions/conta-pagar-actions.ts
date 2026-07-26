@@ -11,6 +11,32 @@ interface Resultado {
   ok?: boolean;
 }
 
+/**
+ * Lista o histórico de contas já pagas — extraído da página em 2.2.1
+ * (item A4). Mantém o mesmo formato "achatado" (datas em string ISO,
+ * nomes em vez de objetos relacionados) que a página já esperava.
+ */
+export async function listarContasPagas() {
+  const contasRaw = await prisma.contaPagar.findMany({
+    where: { pago: true },
+    include: { empresa: true, categoria: true },
+    orderBy: { dataVencimento: "desc" },
+  });
+
+  return contasRaw.map((c) => ({
+    id: c.id,
+    descricao: c.descricao,
+    tipo: c.tipo,
+    valor: Number(c.valor),
+    dataVencimento: c.dataVencimento.toISOString(),
+    pagoEm: c.pagoEm ? c.pagoEm.toISOString() : null,
+    parcelaAtual: c.parcelaAtual,
+    parcelaTotal: c.parcelaTotal,
+    empresaNome: c.empresa.nome,
+    categoriaNome: c.categoria.nome,
+  }));
+}
+
 export interface DadosContaAvulsa {
   empresaId: string;
   categoriaId: string;
