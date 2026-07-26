@@ -59,6 +59,15 @@ export class OrcamentacaoPrismaRepository {
     }));
   }
 
+  /**
+   * Configuração global do sistema (critério de precificação ativo,
+   * fórmula do critério Pontos de Teto) — extraído da página em 2.2.1
+   * (item A4).
+   */
+  async buscarConfiguracao() {
+    return prisma.configuracaoSistema.findUnique({ where: { id: "default" } });
+  }
+
   /** Multiplicador do tier — retorna 1.0 se não encontrado. */
   async buscarMultiplicadorTier(tier: number): Promise<number> {
     const row = await prisma.tierMultiplicador.findUnique({ where: { tier } });
