@@ -25,6 +25,18 @@ function revalidar() {
 // Bancadas — cadastro fixo (5), só o U.H. Referência é ajustável
 // ---------------------------------------------------------------------------
 
+/**
+ * Lista empreendimentos elegíveis pra registrar produção (status
+ * Suprimentos ou Produção) — extraído da página em 2.2.1 (item A4).
+ */
+export async function listarEmpreendimentosParaProducao() {
+  return prisma.empreendimento.findMany({
+    where: { status: { in: ["SUPRIMENTOS", "PRODUCAO"] }, excluidoEm: null },
+    select: { id: true, nome: true },
+    orderBy: { nome: "asc" },
+  });
+}
+
 export async function listarBancadas(): Promise<Bancada[]> {
   const registros = await prisma.bancada.findMany({ orderBy: { ordem: "asc" } });
   return registros.map((b) => ({
