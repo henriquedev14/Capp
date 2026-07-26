@@ -12,15 +12,22 @@ export interface DadosParaMontarProposta {
   empreendimentoTipoEstrutura: string | null | undefined;
   revisao: number;
   cliente: {
-    nomeFantasia: string | null;
+    nomeFantasia: string | null | undefined;
     razaoSocial: string;
-    cnpj: string | null;
-    logradouro: string | null;
-    cidade: string | null;
-    estado: string | null;
+    cnpj: string | null | undefined;
+    logradouro: string | null | undefined;
+    cidade: string | null | undefined;
+    estado: string | null | undefined;
   };
   totalUnidadesHabitacionais: number;
-  usuario: { nome: string | null; cargo: string | null; email: string | null; telefone: string | null } | null;
+  usuario:
+    | {
+        nome: string | null | undefined;
+        cargo: string | null | undefined;
+        email: string | null | undefined;
+        telefone: string | null | undefined;
+      }
+    | null;
   totalMaoDeObra: number;
   anexoMateriais: AnexoMateriaisProposta;
 }
