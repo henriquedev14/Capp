@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { temPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
-import { prisma } from "@/infra/db/prisma/client";
+import { listarEmpreendimentosParaSuprimentos, listarMateriaisEletricosAtivos } from "@/features/suprimentos/actions/suprimentos-actions";
 import { ImportarNotaFiscalView } from "@/features/suprimentos/components/importar-nota-fiscal-view";
 
 export default async function ImportarNotaPage() {
@@ -13,16 +13,8 @@ export default async function ImportarNotaPage() {
   if (!podeRegistrar) redirect("/painel");
 
   const [empreendimentos, materiais] = await Promise.all([
-    prisma.empreendimento.findMany({
-      where: { status: { in: ["CONTRATADO", "SUPRIMENTOS", "PRODUCAO"] }, excluidoEm: null },
-      select: { id: true, nome: true, codigo: true },
-      orderBy: { nome: "asc" },
-    }),
-    prisma.materialEletrico.findMany({
-      where: { ativo: true },
-      select: { id: true, nome: true, unidade: true },
-      orderBy: { nome: "asc" },
-    }),
+    listarEmpreendimentosParaSuprimentos(),
+    listarMateriaisEletricosAtivos(),
   ]);
 
   return (
