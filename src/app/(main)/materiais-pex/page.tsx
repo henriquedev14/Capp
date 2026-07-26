@@ -3,18 +3,10 @@ export const dynamic = "force-dynamic";
 import { Package } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { CatalogoPexView } from "@/features/levantamento/components/catalogo-pex-view";
-import { prisma } from "@/infra/db/prisma/client";
+import { buscarResumoCatalogoPex } from "@/features/levantamento/actions/levantamento-actions";
 
 export default async function MateriaisPexPage() {
-  const [total, categorias] = await Promise.all([
-    prisma.materialPex.count({ where: { ativo: true } }),
-    prisma.materialPex.groupBy({
-      by: ["categoria"],
-      where: { ativo: true },
-      _count: { _all: true },
-      orderBy: { categoria: "asc" },
-    }),
-  ]);
+  const { total, categorias } = await buscarResumoCatalogoPex();
 
   return (
     <div className="flex flex-col gap-8">
@@ -30,7 +22,7 @@ export default async function MateriaisPexPage() {
         </div>
       </div>
 
-      <CatalogoPexView categorias={categorias.map((c) => ({ nome: c.categoria, total: c._count._all }))} />
+      <CatalogoPexView categorias={categorias} />
     </div>
   );
 }
