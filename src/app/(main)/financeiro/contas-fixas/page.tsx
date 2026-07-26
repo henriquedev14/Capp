@@ -4,31 +4,11 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { prisma } from "@/infra/db/prisma/client";
+import { listarDadosContasFixas } from "@/features/financeiro/actions/conta-fixa-actions";
 import { ContasFixasManager } from "@/features/financeiro/components/contas-fixas-manager";
 
 export default async function ContasFixasPage() {
-  const [empresas, categorias, contasFixasRaw] = await Promise.all([
-    prisma.empresaGrupo.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
-    prisma.categoriaDespesa.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
-    prisma.contaFixaModelo.findMany({
-      include: { empresa: true, categoria: true },
-      orderBy: { descricao: "asc" },
-    }),
-  ]);
-
-  const contasFixas = contasFixasRaw.map((c) => ({
-    id: c.id,
-    descricao: c.descricao,
-    valor: Number(c.valor),
-    diaUtilVencimento: c.diaUtilVencimento,
-    ativo: c.ativo,
-    empresaId: c.empresaId,
-    empresaNome: c.empresa.nome,
-    categoriaId: c.categoriaId,
-    categoriaNome: c.categoria.nome,
-    observacoes: c.observacoes,
-  }));
+  const { empresas, categorias, contasFixas } = await listarDadosContasFixas();
 
   return (
     <div className="flex flex-col gap-6">
