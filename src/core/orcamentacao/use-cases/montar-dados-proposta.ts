@@ -9,7 +9,7 @@ export interface DadosParaMontarProposta {
   empreendimentoNome: string;
   empreendimentoCidade: string;
   empreendimentoEstado: string;
-  empreendimentoTipoEstrutura: string | null;
+  empreendimentoTipoEstrutura: string | null | undefined;
   revisao: number;
   cliente: {
     nomeFantasia: string | null;
