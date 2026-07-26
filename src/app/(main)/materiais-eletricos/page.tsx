@@ -3,22 +3,10 @@ export const dynamic = "force-dynamic";
 import { Package } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { CatalogoEletricoView } from "@/features/orcamentacao/components/catalogo-eletrico-view";
-import { prisma } from "@/infra/db/prisma/client";
+import { buscarResumoCatalogoEletrico } from "@/features/orcamentacao/actions/precos-actions";
 
 export default async function MateriaisEletricosPage() {
-  // Só ativos — inativos ficam invisíveis no catálogo (mesmo critério do PEX).
-  // Fabricantes agrupados aqui em vez de por categoria fina, porque no
-  // elétrico o corte relevante do negócio é por fornecedor (Nanoplasticos,
-  // Wago, Tigre...) — cada um define o padrão do kit.
-  const [total, porFabricante] = await Promise.all([
-    prisma.materialEletrico.count({ where: { ativo: true } }),
-    prisma.materialEletrico.groupBy({
-      by: ["fabricante"],
-      where: { ativo: true },
-      _count: { _all: true },
-      orderBy: { fabricante: "asc" },
-    }),
-  ]);
+  const { total, fabricantes: porFabricante } = await buscarResumoCatalogoEletrico();
 
   return (
     <div className="flex flex-col gap-8">
@@ -35,7 +23,7 @@ export default async function MateriaisEletricosPage() {
       </div>
 
       <CatalogoEletricoView
-        fabricantes={porFabricante.map((f) => ({ nome: f.fabricante, total: f._count._all }))}
+        fabricantes={porFabricante}
       />
     </div>
   );
