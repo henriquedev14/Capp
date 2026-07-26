@@ -15,6 +15,14 @@ interface Resultado {
 // Empresas do Grupo (ex: ConstruApp Fábrica, ConstruApp Projetos)
 // ---------------------------------------------------------------------------
 
+/**
+ * Lista as Empresas do Grupo — extraído da página em 2.2.1 (item A4 da
+ * auditoria: página não deve acessar Prisma direto).
+ */
+export async function listarEmpresasGrupo() {
+  return prisma.empresaGrupo.findMany({ orderBy: { nome: "asc" } });
+}
+
 export async function criarEmpresaGrupo(nome: string): Promise<Resultado> {
   try {
     await exigirPermissao(PERMISSOES.FINANCEIRO_GERENCIAR_CADASTROS);
@@ -67,6 +75,13 @@ export async function excluirEmpresaGrupo(id: string): Promise<Resultado> {
 // ---------------------------------------------------------------------------
 // Categorias de Despesa (ex: Folha de Pagamento, Aluguel, Frete)
 // ---------------------------------------------------------------------------
+
+/**
+ * Lista as Categorias de Despesa — extraído da página em 2.2.1 (item A4).
+ */
+export async function listarCategoriasDespesa() {
+  return prisma.categoriaDespesa.findMany({ orderBy: { nome: "asc" } });
+}
 
 export async function criarCategoriaDespesa(nome: string): Promise<Resultado> {
   try {
