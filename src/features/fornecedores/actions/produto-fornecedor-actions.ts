@@ -8,6 +8,77 @@ import { PERMISSOES } from "@/core/auth/permissions";
 
 // Ações do catálogo de produtos por fornecedor.
 // A permissão FORNECEDOR_EDITAR já cobre a edição do fornecedor —
+
+interface ProdutoFornecedorFormatado {
+  id: string;
+  precoUnitario: number;
+  ativo: boolean;
+  material: {
+    id: string;
+    fabricante: string;
+    categoria: string;
+    nome: string;
+    especificacao: string | null;
+    unidade: string;
+    precoUnitario: number;
+    kit: string;
+  };
+}
+
+/**
+ * Lista os produtos (materiais) cadastrados pra um fornecedor, com preço
+ * de referência do catálogo pra comparação — extraído da página em 2.2.1
+ * (item A4). Mantém o try/catch defensivo original (proteção contra a
+ * tabela ainda não existir em ambientes que não rodaram a migration).
+ */
+export async function listarProdutosFornecedor(
+  fornecedorId: string
+): Promise<{ produtos: ProdutoFornecedorFormatado[]; erro: string | null }> {
+  try {
+    const produtos = await prisma.produtoFornecedor.findMany({
+      where: { fornecedorId },
+      include: {
+        materialEletrico: {
+          select: {
+            id: true,
+            fabricante: true,
+            categoria: true,
+            nome: true,
+            especificacao: true,
+            unidade: true,
+            precoUnitario: true,
+            kit: true,
+          },
+        },
+      },
+      orderBy: [{ materialEletrico: { fabricante: "asc" } }, { materialEletrico: { nome: "asc" } }],
+    });
+    return {
+      produtos: produtos.map((p) => ({
+        id: p.id,
+        precoUnitario: Number(p.precoUnitario),
+        ativo: p.ativo,
+        material: {
+          id: p.materialEletrico.id,
+          fabricante: p.materialEletrico.fabricante,
+          categoria: p.materialEletrico.categoria,
+          nome: p.materialEletrico.nome,
+          especificacao: p.materialEletrico.especificacao,
+          unidade: p.materialEletrico.unidade,
+          precoUnitario: Number(p.materialEletrico.precoUnitario),
+          kit: p.materialEletrico.kit,
+        },
+      })),
+      erro: null,
+    };
+  } catch (e) {
+    console.error("[listarProdutosFornecedor] erro ao carregar produtos:", e);
+    return {
+      produtos: [],
+      erro: "Módulo de Produtos indisponível — rode `docker compose run --rm migrate npx prisma db push` para criar as tabelas.",
+    };
+  }
+}
 // reaproveitamos ela aqui em vez de criar uma nova permissão só pra
 // preços (menos ruído na UI de papéis).
 
