@@ -25,7 +25,6 @@ export async function buscarResumoCatalogoPex() {
   return { total, categorias: categorias.map((c) => ({ nome: c.categoria, total: c._count._all })) };
 }
 import { ehDiretorOuCoordenador } from "@/infra/auth/eh-diretor-ou-coordenador";
-import { prisma } from "@/infra/db/prisma/client";
 import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empreendimento-ativo";
 
 const timelineRepo = new TimelinePrismaRepository();
