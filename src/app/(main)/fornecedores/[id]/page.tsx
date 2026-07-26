@@ -24,7 +24,7 @@ import { GerenciarContatosFornecedor } from "@/features/fornecedores/components/
 import { AtivarInativarFornecedorButton } from "@/features/fornecedores/components/ativar-inativar-fornecedor-button";
 import { ProdutosFornecedorManager } from "@/features/fornecedores/components/produtos-fornecedor-manager";
 import { FornecedorPrismaRepository } from "@/infra/db/prisma/repositories/fornecedor-prisma-repository";
-import { prisma } from "@/infra/db/prisma/client";
+import { listarProdutosFornecedor } from "@/features/fornecedores/actions/produto-fornecedor-actions";
 import { cn } from "@/lib/utils";
 
 const repo = new FornecedorPrismaRepository();
@@ -49,68 +49,7 @@ export default async function FornecedorDetalhePage({
   const fornecedor = await repo.findById(params.id);
   if (!fornecedor) notFound();
 
-  // Produtos do catálogo elétrico que este fornecedor comercializa,
-  // com o join do material carregado direto pra facilitar o render.
-  // Blindado: se `db push` ainda não rodou depois de adicionar o model,
-  // mostra 0 produtos + aviso em vez de derrubar a tela.
-  let produtosFormatados: {
-    id: string;
-    precoUnitario: number;
-    ativo: boolean;
-    material: {
-      id: string;
-      fabricante: string;
-      categoria: string;
-      nome: string;
-      especificacao: string | null;
-      unidade: string;
-      precoUnitario: number;
-      kit: string;
-    };
-  }[] = [];
-  let erroProdutos: string | null = null;
-  try {
-    const produtos = await prisma.produtoFornecedor.findMany({
-      where: { fornecedorId: params.id },
-      include: {
-        materialEletrico: {
-          select: {
-            id: true,
-            fabricante: true,
-            categoria: true,
-            nome: true,
-            especificacao: true,
-            unidade: true,
-            precoUnitario: true,
-            kit: true,
-          },
-        },
-      },
-      orderBy: [
-        { materialEletrico: { fabricante: "asc" } },
-        { materialEletrico: { nome: "asc" } },
-      ],
-    });
-    produtosFormatados = produtos.map((p) => ({
-      id: p.id,
-      precoUnitario: Number(p.precoUnitario),
-      ativo: p.ativo,
-      material: {
-        id: p.materialEletrico.id,
-        fabricante: p.materialEletrico.fabricante,
-        categoria: p.materialEletrico.categoria,
-        nome: p.materialEletrico.nome,
-        especificacao: p.materialEletrico.especificacao,
-        unidade: p.materialEletrico.unidade,
-        precoUnitario: Number(p.materialEletrico.precoUnitario),
-        kit: p.materialEletrico.kit,
-      },
-    }));
-  } catch (e) {
-    erroProdutos =
-      "Módulo de Produtos indisponível — rode `docker compose run --rm migrate npx prisma db push` para criar as tabelas.";
-    console.error("[fornecedor/page] erro ao carregar produtos:", e);
-  }
+  const { produtos: produtosFormatados, erro: erroProdutos } = await listarProdutosFornecedor(params.id);
 
   const contatoPrincipal = fornecedor.contatos.find((c) => c.principal) ?? fornecedor.contatos[0];
 
