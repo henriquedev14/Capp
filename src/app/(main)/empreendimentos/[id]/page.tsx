@@ -43,7 +43,6 @@ import { LevantamentoMateriaisPrismaRepository } from "@/infra/db/prisma/reposit
 import { ehGestorSenior } from "@/infra/auth/eh-gestor-senior";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/infra/auth/auth-options.full";
-import { prisma } from "@/infra/db/prisma/client";
 import { ResponsabilidadeEtapaCard } from "@/features/empreendimentos/components/responsabilidade-etapa-card";
 import { CronogramaRemessasCard } from "@/features/empreendimentos/components/cronograma-remessas-card";
 import { listarPavimentosParaCronograma } from "@/features/empreendimentos/actions/cronograma-remessas-actions";
@@ -79,10 +78,7 @@ export default async function EmpreendimentoDetalhePage({
   if (!empreendimento) notFound();
   const podeAlterarStatusLivremente = await ehGestorSenior();
   const sessao = await getServerSession(authOptions);
-  const conclusoes = await prisma.empreendimento.findUnique({
-    where: { id: params.id },
-    select: { comercialConcluidoEm: true, engenhariaConcluidaEm: true, orcamentacaoConcluidaEm: true },
-  });
+  const conclusoes = await empreendimentoRepo.buscarStatusConclusao(params.id);
   const linhasCronograma = await listarPavimentosParaCronograma(params.id);
   const statusProducaoEmpreendimento = await calcularStatusProducaoEmpreendimento(params.id);
 
