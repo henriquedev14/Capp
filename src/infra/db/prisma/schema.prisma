@@ -2036,6 +2036,13 @@ model OperadorProducao {
   nome  String
   ativo Boolean @default(true)
 
+  // Mini cadastro — pedido pelo Henrique em 27/07/2026. Tudo opcional
+  // de propósito: o essencial continua sendo só o nome.
+  funcao      String?
+  telefone    String?
+  observacoes String?
+  turno       TurnoProducao?
+
   registros RegistroProducao[]
 
   createdAt DateTime @default(now()) @map("created_at")
