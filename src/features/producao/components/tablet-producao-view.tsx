@@ -202,7 +202,7 @@ export function TabletProducaoView({ bancadas, operadores: operadoresIniciais, e
     if (!novoOperadorNome.trim()) return;
     setCriandoOperador(true);
     try {
-      const r = await criarOperador(novoOperadorNome.trim());
+      const r = await criarOperador({ nome: novoOperadorNome.trim() });
       if ("erro" in r) {
         setErro(r.erro);
         return;
