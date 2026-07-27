@@ -2,15 +2,21 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { PapeisTable } from "@/features/papeis/components/papeis-table";
 import { PapelPrismaRepository } from "@/infra/db/prisma/repositories/papel-prisma-repository";
+import { temPermissao } from "@/infra/auth/exigir-permissao";
+import { PERMISSOES } from "@/core/auth/permissions";
 
 const repo = new PapelPrismaRepository();
 
 export default async function PapeisPage() {
+  const podeVer = await temPermissao(PERMISSOES.ADMIN_GERENCIAR_PAPEIS);
+  if (!podeVer) redirect("/painel");
+
   const papeis = await repo.findAll();
 
   return (
