@@ -2,15 +2,21 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { UsuariosTable } from "@/features/usuarios/components/usuarios-table";
 import { UsuarioPrismaRepository } from "@/infra/db/prisma/repositories/usuario-prisma-repository";
+import { temPermissao } from "@/infra/auth/exigir-permissao";
+import { PERMISSOES } from "@/core/auth/permissions";
 
 const repo = new UsuarioPrismaRepository();
 
 export default async function PessoasPage() {
+  const podeVer = await temPermissao(PERMISSOES.ADMIN_GERENCIAR_USUARIOS);
+  if (!podeVer) redirect("/painel");
+
   const usuarios = await repo.findMany();
 
   return (
