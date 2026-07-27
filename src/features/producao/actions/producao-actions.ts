@@ -128,6 +128,22 @@ export async function editarNomeOperador(id: string, nome: string): Promise<{ ok
   return { ok: true };
 }
 
+/**
+ * Inativa um operador (soft-delete) — some das listas de seleção, mas
+ * preserva o histórico de produção já registrado em nome dele. Pedido
+ * pelo Henrique em 27/07/2026: nunca exclui de verdade, só inativa.
+ */
+export async function inativarOperador(id: string): Promise<{ ok: true } | { erro: string }> {
+  try {
+    await exigirPermissao(PERMISSOES.PRODUCAO_REGISTRAR);
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : "Não autorizado." };
+  }
+  await prisma.operadorProducao.update({ where: { id }, data: { ativo: false } });
+  revalidar();
+  return { ok: true };
+}
+
 export async function criarOperador(nome: string): Promise<{ id: string } | { erro: string }> {
   try {
     await exigirPermissao(PERMISSOES.PRODUCAO_REGISTRAR);
