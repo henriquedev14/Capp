@@ -144,24 +144,56 @@ export async function inativarOperador(id: string): Promise<{ ok: true } | { err
   return { ok: true };
 }
 
-export async function criarOperador(nome: string): Promise<{ id: string } | { erro: string }> {
+export interface DadosOperador {
+  nome: string;
+  funcao?: string | null;
+  telefone?: string | null;
+  observacoes?: string | null;
+  turno?: "MANHA" | "TARDE" | "NOITE" | null;
+}
+
+export async function criarOperador(dados: DadosOperador): Promise<{ id: string } | { erro: string }> {
   try {
     await exigirPermissao(PERMISSOES.PRODUCAO_REGISTRAR);
   } catch (e) {
     return { erro: e instanceof Error ? e.message : "Não autorizado." };
   }
-  if (!nome.trim()) return { erro: "Informe o nome do operador." };
+  if (!dados.nome.trim()) return { erro: "Informe o nome do operador." };
 
-  const criado = await prisma.operadorProducao.create({ data: { nome: nome.trim() } });
+  const criado = await prisma.operadorProducao.create({
+    data: {
+      nome: dados.nome.trim(),
+      funcao: dados.funcao?.trim() || null,
+      telefone: dados.telefone?.trim() || null,
+      observacoes: dados.observacoes?.trim() || null,
+      turno: dados.turno ?? null,
+    },
+  });
   revalidar();
   return { id: criado.id };
 }
 
-// Regra de negócio explícita: operadores NÃO podem ser excluídos/
-// desativados pelo sistema — só criar e editar o nome. Se um dia
-// alguém sair da empresa, o histórico de produção dele continua válido
-// (não faz sentido "sumir" com o operador e perder o rastro de quem
-// produziu o quê).
+export async function editarOperador(id: string, dados: DadosOperador): Promise<{ ok: true } | { erro: string }> {
+  try {
+    await exigirPermissao(PERMISSOES.PRODUCAO_REGISTRAR);
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : "Não autorizado." };
+  }
+  if (!dados.nome.trim()) return { erro: "Informe o nome do operador." };
+
+  await prisma.operadorProducao.update({
+    where: { id },
+    data: {
+      nome: dados.nome.trim(),
+      funcao: dados.funcao?.trim() || null,
+      telefone: dados.telefone?.trim() || null,
+      observacoes: dados.observacoes?.trim() || null,
+      turno: dados.turno ?? null,
+    },
+  });
+  revalidar();
+  return { ok: true };
+}
 
 // ---------------------------------------------------------------------------
 // Registro de produção — o coração do tablet de bancada
@@ -192,6 +224,23 @@ export async function listarPecasDaTipologiaParaProducao(tipologiaId: string) {
       local: peca.local,
       metrosCabo: Math.round(cabo * 100) / 100,
       metrosEletroduto: Math.round(eletroduto * 100) / 100,
+      // Detalhe técnico completo — pedido pelo Henrique em 27/07/2026
+      // pra aparecer na tela do tablet ao selecionar a peça.
+      kit: peca.kit,
+      diametro: peca.diametro,
+      circuitos: peca.circuitos.map((c) => ({
+        numero: c.circuito,
+        bitola: c.bitola,
+        cores: [
+          c.temVermelho && "VM",
+          c.temPreto && "PT",
+          c.temAzul && "AZ",
+          c.temVerde && "VD",
+          c.temAmarelo && "AM",
+          c.temBranco && "BC",
+          c.temCinza && "CZ",
+        ].filter((c): c is string => !!c),
+      })),
     };
   });
 }
