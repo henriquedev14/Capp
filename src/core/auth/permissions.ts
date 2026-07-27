@@ -66,6 +66,10 @@ export const PERMISSOES = {
   // EMPREENDIMENTO_EDITAR (permissão ampla demais pra algo que afeta
   // diretamente o valor do orçamento).
   ORCAMENTO_APLICAR_PRECO: "orcamento:aplicar_preco",
+  // Ver a fila de orçamentos (tela principal do módulo) — achado durante
+  // criação do papel Produção (24/07/2026): a página não tinha NENHUMA
+  // checagem de permissão antes disso.
+  ORCAMENTO_VER: "orcamento:ver",
 
   // Módulo: Fornecedores
   FORNECEDOR_VER: "fornecedor:ver",
@@ -111,6 +115,9 @@ export const PERMISSOES = {
   SUPRIMENTOS_LIBERAR_PRODUCAO: "suprimentos:liberar_producao",
 
   EXPEDICAO_CRIAR_REMESSA: "expedicao:criar_remessa",
+  // Ver a central de expedição (tela principal do módulo) — mesmo achado
+  // da ORCAMENTO_VER, nenhuma permissão controlava acesso à tela em si.
+  EXPEDICAO_VER: "expedicao:ver",
   EXPEDICAO_GERENCIAR_SEPARACAO: "expedicao:gerenciar_separacao",
   EXPEDICAO_GERENCIAR_CONFERENCIA: "expedicao:gerenciar_conferencia",
   EXPEDICAO_GERENCIAR_VOLUMES: "expedicao:gerenciar_volumes",
@@ -151,6 +158,7 @@ export const DESCRICOES_PERMISSOES: Record<PermissaoChave, string> = {
   [PERMISSOES.ORCAMENTO_APROVAR]: "Aprovar ou devolver um orçamento enviado para aprovação",
   [PERMISSOES.ORCAMENTO_GERENCIAR_JORNADA]: "Atribuir responsável, prazo e gerenciar etapas do orçamento",
   [PERMISSOES.ORCAMENTO_APLICAR_PRECO]: "Aplicar preço de fornecedor (Tabela de Preços/Cotação) num item do orçamento",
+  [PERMISSOES.ORCAMENTO_VER]: "Ver a fila de orçamentos (tela principal de Orçamentação)",
   [PERMISSOES.FORNECEDOR_VER]: "Visualizar fornecedores cadastrados",
   [PERMISSOES.FORNECEDOR_CRIAR]: "Cadastrar novos fornecedores",
   [PERMISSOES.FORNECEDOR_EDITAR]: "Editar dados de fornecedores existentes",
@@ -177,6 +185,7 @@ export const DESCRICOES_PERMISSOES: Record<PermissaoChave, string> = {
   [PERMISSOES.SUPRIMENTOS_LIBERAR_PRODUCAO]: "Liberar o início de produção de uma tipologia (baixa automática de material)",
 
   [PERMISSOES.EXPEDICAO_CRIAR_REMESSA]: "Criar novas remessas de expedição",
+  [PERMISSOES.EXPEDICAO_VER]: "Ver a central de expedição (tela principal do módulo)",
   [PERMISSOES.EXPEDICAO_GERENCIAR_SEPARACAO]: "Registrar quantidades separadas e finalizar separação",
   [PERMISSOES.EXPEDICAO_GERENCIAR_CONFERENCIA]: "Registrar quantidades conferidas e finalizar conferência",
   [PERMISSOES.EXPEDICAO_GERENCIAR_VOLUMES]: "Criar volumes e vincular itens a eles",
