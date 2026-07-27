@@ -17,6 +17,10 @@ export interface OperadorProducao {
   id: string;
   nome: string;
   ativo: boolean;
+  funcao?: string | null;
+  telefone?: string | null;
+  observacoes?: string | null;
+  turno?: "MANHA" | "TARDE" | "NOITE" | null;
   createdAt: Date;
   updatedAt: Date;
 }
