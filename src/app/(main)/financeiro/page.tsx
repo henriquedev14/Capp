@@ -16,12 +16,18 @@ import {
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { buscarResumoFinanceiro } from "@/features/financeiro/actions/cadastros-actions";
+import { redirect } from "next/navigation";
+import { temPermissao } from "@/infra/auth/exigir-permissao";
+import { PERMISSOES } from "@/core/auth/permissions";
 
 function formatBRL(v: number): string {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export default async function FinanceiroPage() {
+  const podeVer = await temPermissao(PERMISSOES.FINANCEIRO_VER);
+  if (!podeVer) redirect("/painel");
+
   const {
     empresasCount,
     categoriasCount,
