@@ -23,6 +23,9 @@ import { StatusOrcamentoBadge } from "@/features/orcamentacao/components/status-
 import { EtapaJornadaBadge } from "@/features/orcamentacao/components/etapa-jornada-badge";
 import { cn } from "@/lib/utils";
 import type { StatusOrcamento } from "@/core/orcamentacao/entities/orcamento";
+import { redirect } from "next/navigation";
+import { temPermissao } from "@/infra/auth/exigir-permissao";
+import { PERMISSOES } from "@/core/auth/permissions";
 
 const usuarioRepo = new UsuarioPrismaRepository();
 
@@ -44,6 +47,9 @@ interface Props {
 }
 
 export default async function OrcamentacaoHubPage({ searchParams }: Props) {
+  const podeVer = await temPermissao(PERMISSOES.ORCAMENTO_VER);
+  if (!podeVer) redirect("/painel");
+
   const session = await getServerSession(authOptions);
   const visao = searchParams.visao ?? "todos";
 
