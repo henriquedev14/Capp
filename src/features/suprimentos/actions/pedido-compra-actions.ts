@@ -11,6 +11,49 @@ function revalidar() {
   revalidatePath("/suprimentos");
 }
 
+/**
+ * Lista Cotações Aceitas que ainda não viraram Pedido de Compra —
+ * achado #5 da investigação de fluxo (27/07/2026): a ação de criar
+ * pedido ficava só dentro da tela de Cotação, sem nenhum link a partir
+ * de Suprimentos. Isso resolve, trazendo a lista pronta pra tela de
+ * Pedidos de Compra, com o botão de gerar ali mesmo.
+ */
+export async function listarCotacoesAceitasSemPedido() {
+  const cotacoesAceitas = await prisma.cotacao.findMany({
+    where: {
+      status: "ACEITA",
+      orcamento: { empreendimento: { excluidoEm: null, status: { not: "ARQUIVADO" } } },
+    },
+    include: {
+      fornecedor: { select: { razaoSocial: true, nomeFantasia: true } },
+      orcamento: { select: { empreendimento: { select: { id: true, nome: true } } } },
+      _count: { select: { itens: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  if (cotacoesAceitas.length === 0) return [];
+
+  const pedidosExistentes = await prisma.pedidoCompra.findMany({
+    where: { cotacaoId: { in: cotacoesAceitas.map((c) => c.id) } },
+    select: { cotacaoId: true },
+  });
+  const idsComPedido = new Set(pedidosExistentes.map((p) => p.cotacaoId));
+
+  return cotacoesAceitas
+    .filter((c) => !idsComPedido.has(c.id))
+    .map((c) => ({
+      id: c.id,
+      numero: c.numero,
+      fornecedorNome: c.fornecedor.nomeFantasia ?? c.fornecedor.razaoSocial,
+      empreendimentoId: c.orcamento.empreendimento.id,
+      empreendimentoNome: c.orcamento.empreendimento.nome,
+      totalGeral: Number(c.totalGeral ?? 0),
+      totalItens: c._count.itens,
+      atualizadaEm: c.updatedAt,
+    }));
+}
+
 async function proximoNumeroPedido(): Promise<string> {
   const ano = new Date().getFullYear();
   const ultimo = await prisma.pedidoCompra.findFirst({
