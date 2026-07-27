@@ -11,6 +11,9 @@ import { buscarFilaRemessas } from "@/infra/db/prisma/repositories/expedicao-pri
 import { CentralExpedicaoClient } from "@/features/expedicao/components/central-expedicao-client";
 import { JornadaExpedicaoLegenda } from "@/features/expedicao/components/jornada-expedicao-legenda";
 import { cn } from "@/lib/utils";
+import { redirect } from "next/navigation";
+import { temPermissao } from "@/infra/auth/exigir-permissao";
+import { PERMISSOES } from "@/core/auth/permissions";
 
 function IndicadorCard({
   label,
@@ -47,6 +50,9 @@ function IndicadorCard({
 }
 
 export default async function ExpedicaoPage() {
+  const podeVer = await temPermissao(PERMISSOES.EXPEDICAO_VER);
+  if (!podeVer) redirect("/painel");
+
   const { linhas, indicadores } = await buscarFilaRemessas({ visao: "todas" });
 
   return (
