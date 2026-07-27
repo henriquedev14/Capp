@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { PERMISSOES } from "@/core/auth/permissions";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import {
@@ -36,30 +37,30 @@ const NAV_GROUPS = [
   {
     label: "Principal",
     items: [
-      { label: "Analytics", icon: LayoutDashboard, href: "/painel" },
-      { label: "Clientes", icon: Building2, href: "/clientes" },
-      { label: "Empreendimentos", icon: Boxes, href: "/empreendimentos" },
+      { label: "Analytics", icon: LayoutDashboard, href: "/painel", permissao: null },
+      { label: "Clientes", icon: Building2, href: "/clientes", permissao: PERMISSOES.CLIENTE_VER },
+      { label: "Empreendimentos", icon: Boxes, href: "/empreendimentos", permissao: PERMISSOES.EMPREENDIMENTO_VER },
     ],
   },
   {
     label: "Operação",
     items: [
-      { label: "Orçamentação", icon: Calculator, href: "/orcamentacao" },
-      { label: "Financeiro", icon: Wallet, href: "/financeiro" },
-      { label: "Fornecedores", icon: Truck, href: "/fornecedores" },
-      { label: "Produção", icon: Factory, href: "/producao" },
-      { label: "Suprimentos", icon: Package, href: "/suprimentos" },
-      { label: "Expedição", icon: PackageCheck, href: "/expedicao" },
+      { label: "Orçamentação", icon: Calculator, href: "/orcamentacao", permissao: PERMISSOES.ORCAMENTO_VER },
+      { label: "Financeiro", icon: Wallet, href: "/financeiro", permissao: PERMISSOES.FINANCEIRO_VER },
+      { label: "Fornecedores", icon: Truck, href: "/fornecedores", permissao: PERMISSOES.FORNECEDOR_VER },
+      { label: "Produção", icon: Factory, href: "/producao", permissao: PERMISSOES.PRODUCAO_REGISTRAR },
+      { label: "Suprimentos", icon: Package, href: "/suprimentos", permissao: PERMISSOES.SUPRIMENTOS_REGISTRAR_ENTRADA },
+      { label: "Expedição", icon: PackageCheck, href: "/expedicao", permissao: PERMISSOES.EXPEDICAO_VER },
     ],
   },
   {
     label: "Gestão",
     items: [
-      { label: "Pessoas", icon: Users, href: "/pessoas" },
-      { label: "Papéis", icon: ShieldCheck, href: "/papeis" },
-      { label: "Segurança", icon: ShieldAlert, href: "/seguranca" },
-      { label: "Relatórios", icon: FileBarChart, href: "#" },
-      { label: "Configurações", icon: Settings, href: "#" },
+      { label: "Pessoas", icon: Users, href: "/pessoas", permissao: PERMISSOES.ADMIN_GERENCIAR_USUARIOS },
+      { label: "Papéis", icon: ShieldCheck, href: "/papeis", permissao: PERMISSOES.ADMIN_GERENCIAR_PAPEIS },
+      { label: "Segurança", icon: ShieldAlert, href: "/seguranca", permissao: PERMISSOES.SEGURANCA_VER_LOG },
+      { label: "Relatórios", icon: FileBarChart, href: "#", permissao: null },
+      { label: "Configurações", icon: Settings, href: "#", permissao: null },
     ],
   },
 ] as const;
@@ -140,14 +141,21 @@ export function AppSidebar() {
 
       {/* Navegação com grupos */}
       <nav className={cn("flex flex-1 flex-col gap-5 p-3", isCollapsed && "items-center gap-3")}>
-        {NAV_GROUPS.map((group) => (
+        {NAV_GROUPS.map((group) => {
+          const permissoesDoUsuario = session?.user?.permissoes ?? [];
+          const itemsVisiveis = group.items.filter(
+            (item) => !item.permissao || permissoesDoUsuario.includes(item.permissao)
+          );
+          if (itemsVisiveis.length === 0) return null;
+
+          return (
           <div key={group.label} className={cn("flex flex-col gap-0.5", isCollapsed && "items-center")}>
             {!isCollapsed && (
               <span className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
                 {group.label}
               </span>
             )}
-            {group.items.map((item) => {
+            {itemsVisiveis.map((item) => {
               const active = isActive(item.href);
               return isCollapsed ? (
                 <Tooltip key={item.label} delayDuration={200}>
@@ -204,7 +212,8 @@ export function AppSidebar() {
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Rodapé: usuário + toggle + logout */}
