@@ -557,6 +557,15 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                                     <td className="px-2 py-2 text-muted-foreground w-12">{item.unidade}</td>
                                     <td className="px-2 py-2 text-right font-mono text-muted-foreground w-24">
                                       {formatBRL(item.precoUnitario ?? 0)}
+                                      {item.cotacaoItemId ? (
+                                        <div className="mt-0.5 text-[10px] font-sans font-medium normal-case text-primary">
+                                          Cotação
+                                        </div>
+                                      ) : item.itemTabelaPrecoId ? (
+                                        <div className="mt-0.5 text-[10px] font-sans font-medium normal-case text-muted-foreground/70">
+                                          Tabela de Preços
+                                        </div>
+                                      ) : null}
                                     </td>
                                     <td className="px-3 py-2 text-right font-mono font-medium w-28">
                                       {formatBRL(item.total ?? 0)}
