@@ -60,6 +60,9 @@ interface Peca {
   concluidas: number;
   total: number;
   completa: boolean;
+  kit?: string;
+  diametro?: string;
+  circuitos?: { numero: number | null; bitola: number; cores: string[] }[];
 }
 
 const ICONE_BANCADA: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -375,6 +378,38 @@ export function TabletProducaoView({ bancadas, operadores: operadoresIniciais, e
                     `${formatNum(pecaAtiva.metrosEletroduto)}m de eletroduto por unidade`}
                   {bancadaAtiva.tipoCalculo === "CONTAGEM" && "1 peça por unidade"}
                 </p>
+              )}
+              {pecaAtiva && pecaAtiva.circuitos && pecaAtiva.circuitos.length > 0 && (
+                <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Detalhe técnico da peça {pecaAtiva.numero}
+                    {pecaAtiva.diametro ? ` — eletroduto Ø ${pecaAtiva.diametro}` : ""}
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    {pecaAtiva.circuitos.map((c, idx) => (
+                      <div key={idx} className="flex items-center gap-3 text-sm">
+                        <span className="w-16 shrink-0 text-muted-foreground">
+                          {c.numero ? `Circ. ${c.numero}` : "—"}
+                        </span>
+                        <span className="w-20 shrink-0 font-medium text-foreground">{c.bitola} mm²</span>
+                        <span className="flex flex-wrap gap-1">
+                          {c.cores.length > 0 ? (
+                            c.cores.map((cor) => (
+                              <span
+                                key={cor}
+                                className="rounded-full bg-background px-2 py-0.5 text-xs font-semibold text-foreground"
+                              >
+                                {cor}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">sem fio marcado</span>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}

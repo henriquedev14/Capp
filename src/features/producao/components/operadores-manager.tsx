@@ -1,18 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Plus, Pencil, Check, X } from "lucide-react";
+import { Loader2, Plus, Pencil, Check, X, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { criarOperador, editarNomeOperador } from "@/features/producao/actions/producao-actions";
+import { criarOperador, editarNomeOperador, inativarOperador } from "@/features/producao/actions/producao-actions";
 import type { OperadorProducao } from "@/core/producao/entities/producao";
 
 /**
  * Gerenciar Operadores — tela dedicada, separada do fluxo do tablet.
- * Só nome, sem login/senha (regra de negócio confirmada). Só cria e
- * edita nome — NUNCA exclui, pra preservar o histórico de produção de
- * quem já saiu da empresa.
+ * Só nome, sem login/senha (regra de negócio confirmada). Cria, edita
+ * nome, e inativa (soft-delete — nunca exclui de verdade, pra preservar
+ * o histórico de produção de quem já saiu da empresa; decisão
+ * confirmada com o Henrique em 27/07/2026).
  */
 export function OperadoresManager({ operadoresIniciais }: { operadoresIniciais: OperadorProducao[] }) {
   const [operadores, setOperadores] = React.useState(operadoresIniciais);
@@ -22,6 +23,8 @@ export function OperadoresManager({ operadoresIniciais }: { operadoresIniciais: 
   const [nomeEmEdicao, setNomeEmEdicao] = React.useState("");
   const [salvando, setSalvando] = React.useState(false);
   const [erro, setErro] = React.useState<string | null>(null);
+  const [confirmandoInativarId, setConfirmandoInativarId] = React.useState<string | null>(null);
+  const [inativando, setInativando] = React.useState(false);
 
   async function handleCriar() {
     if (!novoNome.trim()) return;
@@ -65,6 +68,21 @@ export function OperadoresManager({ operadoresIniciais }: { operadoresIniciais: 
       setEditandoId(null);
     } finally {
       setSalvando(false);
+    }
+  }
+
+  async function handleInativar(id: string) {
+    setInativando(true);
+    try {
+      const r = await inativarOperador(id);
+      if ("erro" in r) {
+        setErro(r.erro);
+        return;
+      }
+      setOperadores((prev) => prev.filter((o) => o.id !== id));
+      setConfirmandoInativarId(null);
+    } finally {
+      setInativando(false);
     }
   }
 
@@ -120,15 +138,42 @@ export function OperadoresManager({ operadoresIniciais }: { operadoresIniciais: 
                       </button>
                     </div>
                   </>
+                ) : confirmandoInativarId === op.id ? (
+                  <>
+                    <span className="text-sm text-muted-foreground">Inativar "{op.nome}"?</span>
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        onClick={() => handleInativar(op.id)}
+                        disabled={inativando}
+                        className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
+                      >
+                        {inativando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      </button>
+                      <button
+                        onClick={() => setConfirmandoInativarId(null)}
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </>
                 ) : (
                   <>
                     <span className="text-sm text-foreground">{op.nome}</span>
-                    <button
-                      onClick={() => iniciarEdicao(op)}
-                      className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        onClick={() => iniciarEdicao(op)}
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setConfirmandoInativarId(op.id)}
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
