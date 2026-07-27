@@ -10,7 +10,19 @@ import {
   marcarPedidoEmTransito,
   cancelarPedidoCompra,
   receberItemPedidoCompra,
+  criarPedidoCompra,
 } from "@/features/suprimentos/actions/pedido-compra-actions";
+
+interface CotacaoAceitaSemPedido {
+  id: string;
+  numero: string;
+  fornecedorNome: string;
+  empreendimentoId: string;
+  empreendimentoNome: string;
+  totalGeral: number;
+  totalItens: number;
+  atualizadaEm: Date;
+}
 
 interface ItemPedido {
   id: string;
@@ -48,13 +60,36 @@ function formatData(d: Date | null): string {
   return new Date(d).toLocaleDateString("pt-BR");
 }
 
-export function PedidosCompraManager({ pedidosIniciais }: { pedidosIniciais: Pedido[] }) {
+export function PedidosCompraManager({
+  pedidosIniciais,
+  cotacoesAceitasSemPedido,
+}: {
+  pedidosIniciais: Pedido[];
+  cotacoesAceitasSemPedido: CotacaoAceitaSemPedido[];
+}) {
   const router = useRouter();
   const [expandido, setExpandido] = React.useState<string | null>(null);
   const [processando, setProcessando] = React.useState<string | null>(null);
   const [recebendoItem, setRecebendoItem] = React.useState<string | null>(null);
   const [quantidadeInput, setQuantidadeInput] = React.useState("");
   const [dataConfirmacao, setDataConfirmacao] = React.useState<Record<string, string>>({});
+  const [gerandoPedido, setGerandoPedido] = React.useState<string | null>(null);
+  const [cotacoesRestantes, setCotacoesRestantes] = React.useState(cotacoesAceitasSemPedido);
+
+  async function handleGerarPedido(cotacaoId: string) {
+    setGerandoPedido(cotacaoId);
+    try {
+      const r = await criarPedidoCompra(cotacaoId);
+      if ("erro" in r) {
+        alert(r.erro);
+        return;
+      }
+      setCotacoesRestantes((prev) => prev.filter((c) => c.id !== cotacaoId));
+      router.refresh();
+    } finally {
+      setGerandoPedido(null);
+    }
+  }
 
   async function handleConfirmar(pedidoId: string) {
     const data = dataConfirmacao[pedidoId];
@@ -110,16 +145,53 @@ export function PedidosCompraManager({ pedidosIniciais }: { pedidosIniciais: Ped
     }
   }
 
+  const secaoCotacoesAceitas = cotacoesRestantes.length > 0 && (
+    <div className="flex flex-col divide-y divide-border rounded-lg border border-primary/30 bg-primary/5">
+      <div className="px-4 py-2.5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+          Cotações aceitas aguardando virar Pedido de Compra
+        </p>
+      </div>
+      {cotacoesRestantes.map((c) => (
+        <div key={c.id} className="flex items-center justify-between gap-3 px-4 py-3">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-sm font-medium text-foreground">
+              Cotação {c.numero} — {c.fornecedorNome}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {c.empreendimentoNome} · {c.totalItens} ite{c.totalItens === 1 ? "m" : "ns"} ·{" "}
+              {c.totalGeral.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            </span>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => handleGerarPedido(c.id)}
+            disabled={gerandoPedido === c.id}
+            className="shrink-0"
+          >
+            {gerandoPedido === c.id && <Loader2 className="h-4 w-4 animate-spin" />}
+            Gerar Pedido de Compra
+          </Button>
+        </div>
+      ))}
+    </div>
+  );
+
   if (pedidosIniciais.length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card py-10 text-center text-sm text-muted-foreground">
-        Nenhum pedido de compra ainda. Pra criar um, vai numa Cotação com status "Aceita" e gera o pedido a partir dela.
+      <div className="flex flex-col gap-4">
+        {secaoCotacoesAceitas}
+        <div className="rounded-lg border border-border bg-card py-10 text-center text-sm text-muted-foreground">
+          Nenhum pedido de compra ainda. Aceite uma cotação em Orçamentação pra ela aparecer aqui em cima.
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card">
+    <div className="flex flex-col gap-4">
+      {secaoCotacoesAceitas}
+      <div className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card">
       {pedidosIniciais.map((p) => {
         const cfg = CONFIG_STATUS[p.status] ?? CONFIG_STATUS.AGUARDANDO_CONFIRMACAO!;
         return (
@@ -245,6 +317,7 @@ export function PedidosCompraManager({ pedidosIniciais }: { pedidosIniciais: Ped
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
