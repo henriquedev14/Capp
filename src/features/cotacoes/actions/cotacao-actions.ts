@@ -11,6 +11,41 @@ import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empre
 import { consolidarLevantamentoMateriais } from "@/features/cotacoes/lib/consolidar-levantamento";
 import { proximoNumeroCotacao } from "@/features/cotacoes/lib/numero-cotacao";
 import type { CotacaoDetalhe } from "@/features/cotacoes/components/cotacao-detail-view";
+import { resolverPrecoFornecedor } from "@/core/fornecedores/use-cases/resolver-preco-fornecedor";
+
+/**
+ * Monta o mapa (materialEletricoId → preço) de um fornecedor, aplicando
+ * o resolver de preço (Tarefa 2.3.3): prefere a Tabela de Preços vigente
+ * sobre a referência estática do ProdutoFornecedor, quando as duas
+ * existem pro mesmo material. O CONJUNTO de materiais cotáveis continua
+ * sendo definido só pelo ProdutoFornecedor (não expande pra materiais
+ * que só existem na tabela) — mudar isso afetaria o aprendizado de
+ * código do fornecedor, que depende do ProdutoFornecedor existir.
+ */
+export function construirMapaPrecoResolvido(fornecedor: {
+  produtosOferecidos: { materialEletricoId: string | null; precoUnitario: unknown }[];
+  tabelasPreco: { dataImportacao: Date; itens: { materialEletricoId: string | null; valorUnitario: unknown }[] }[];
+}): Map<string, number> {
+  const tabela = fornecedor.tabelasPreco[0];
+  const itensTabela = new Map(
+    (tabela?.itens ?? [])
+      .filter((i) => i.materialEletricoId)
+      .map((i) => [i.materialEletricoId as string, Number(i.valorUnitario)])
+  );
+
+  const mapa = new Map<string, number>();
+  for (const produto of fornecedor.produtosOferecidos) {
+    if (!produto.materialEletricoId) continue;
+    const resolvido = resolverPrecoFornecedor({
+      itemTabelaPreco: itensTabela.has(produto.materialEletricoId)
+        ? { valorUnitario: itensTabela.get(produto.materialEletricoId)!, nomeTabela: "", data: tabela!.dataImportacao }
+        : null,
+      produtoFornecedor: { precoUnitario: Number(produto.precoUnitario) },
+    });
+    if (resolvido) mapa.set(produto.materialEletricoId, resolvido.precoUnitario);
+  }
+  return mapa;
+}
 
 // --------------------------------------------------------------------------
 // Preview de fornecedores para o modal "Gerar Cotação"
@@ -82,6 +117,15 @@ export async function previewGeracaoCotacoes(orcamentoId: string): Promise<
           precoUnitario: true,
         },
       },
+      tabelasPreco: {
+        where: { status: "ATIVA" },
+        orderBy: { dataImportacao: "desc" },
+        take: 1,
+        select: {
+          dataImportacao: true,
+          itens: { select: { materialEletricoId: true, valorUnitario: true } },
+        },
+      },
     },
     orderBy: { razaoSocial: "asc" },
   });
@@ -109,9 +153,7 @@ export async function previewGeracaoCotacoes(orcamentoId: string): Promise<
 
   const previewFornecedores: PreviewFornecedor[] = fornecedores.map((f) => {
     // Produtos deste fornecedor mapeados por materialEletricoId
-    const mapa = new Map(
-      f.produtosOferecidos.map((p) => [p.materialEletricoId, Number(p.precoUnitario)])
-    );
+    const mapa = construirMapaPrecoResolvido(f);
 
     let cotaveis = 0;
     const semPreco: PreviewFornecedor["itensCotaveisSemPreco"] = [];
@@ -198,15 +240,25 @@ export async function gerarCotacoes(
           precoUnitario: true,
         },
       },
+      // Tabela de preços vigente (a mais recente com status Ativa) — usada
+      // como fonte preferencial de preço, na frente da referência estática
+      // do ProdutoFornecedor (Tarefa 2.3.3, aplica resolverPrecoFornecedor).
+      tabelasPreco: {
+        where: { status: "ATIVA" },
+        orderBy: { dataImportacao: "desc" },
+        take: 1,
+        select: {
+          dataImportacao: true,
+          itens: { select: { materialEletricoId: true, valorUnitario: true } },
+        },
+      },
     },
   });
 
   // Validação: bloqueia se algum fornecedor tem produto cotável com preço zerado.
   const bloqueios: NonNullable<ResultadoGeracao["detalhesBloqueio"]> = [];
   for (const f of fornecedores) {
-    const mapa = new Map(
-      f.produtosOferecidos.map((p) => [p.materialEletricoId, Number(p.precoUnitario)])
-    );
+    const mapa = construirMapaPrecoResolvido(f);
     const semPreco: { descricao: string; fabricante: string }[] = [];
     for (const item of consolidado.itens) {
       if (!mapa.has(item.materialEletricoId)) continue;
@@ -235,9 +287,7 @@ export async function gerarCotacoes(
   const criadas: NonNullable<ResultadoGeracao["criadas"]> = [];
 
   for (const f of fornecedores) {
-    const mapa = new Map(
-      f.produtosOferecidos.map((p) => [p.materialEletricoId, Number(p.precoUnitario)])
-    );
+    const mapa = construirMapaPrecoResolvido(f);
 
     const itensCotaveis = consolidado.itens.filter((i) => mapa.has(i.materialEletricoId));
     const itensNaoCotaveis = consolidado.itens.filter((i) => !mapa.has(i.materialEletricoId));
