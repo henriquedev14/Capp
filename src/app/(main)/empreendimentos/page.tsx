@@ -9,6 +9,9 @@ import { EmpreendimentosTable } from "@/features/empreendimentos/components/empr
 import { FiltrosEmpreendimentos } from "@/features/empreendimentos/components/filtros-empreendimentos";
 import { EmpreendimentoPrismaRepository } from "@/infra/db/prisma/repositories/empreendimento-prisma-repository";
 import type { StatusEmpreendimento } from "@/core/empreendimentos/entities/empreendimento";
+import { redirect } from "next/navigation";
+import { temPermissao } from "@/infra/auth/exigir-permissao";
+import { PERMISSOES } from "@/core/auth/permissions";
 
 const repo = new EmpreendimentoPrismaRepository();
 
@@ -17,6 +20,9 @@ interface Props {
 }
 
 export default async function EmpreendimentosPage({ searchParams }: Props) {
+  const podeVer = await temPermissao(PERMISSOES.EMPREENDIMENTO_VER);
+  if (!podeVer) redirect("/painel");
+
   const status = searchParams.status as StatusEmpreendimento | undefined;
 
   const empreendimentos = await repo.findManyResumo({
