@@ -75,7 +75,13 @@ export async function consolidarLevantamentoMateriais(
         itensSemFk++;
         continue;
       }
-      const qtdItem = Number(item.quantidade) * unidades;
+      // CORREÇÃO 28/07/2026 (bug grave achado em produção): `item.quantidade`
+      // JÁ é o total da tipologia inteira (quantidade por unidade × repetições
+      // já aplicado na hora de montar o Levantamento de Materiais — ver
+      // comentário do campo no schema.prisma). NÃO multiplicar por `unidades`
+      // de novo aqui — fazer isso gerava quantidades ~23x maiores que o real
+      // (ex: 30 mil metros virando 700 mil metros de cabo).
+      const qtdItem = Number(item.quantidade);
       const chave = chaveConsolidacao(item.descricao);
 
       const existente = mapa.get(chave);
