@@ -35,6 +35,11 @@ export const PERMISSOES = {
   EMPREENDIMENTO_CRIAR: "empreendimento:criar",
   EMPREENDIMENTO_EDITAR: "empreendimento:editar",
   EMPREENDIMENTO_VER: "empreendimento:ver",
+  // Quando o papel tem essa permissão, a listagem de Empreendimentos
+  // (e as buscas relacionadas) mostra só os empreendimentos onde essa
+  // pessoa é a responsável comercial — pedido pelo Henrique em
+  // 28/07/2026, pra evitar um vendedor ver a carteira do outro.
+  EMPREENDIMENTO_VER_APENAS_PROPRIOS: "empreendimento:ver_apenas_proprios",
   EMPREENDIMENTO_EXCLUIR: "empreendimento:excluir",
   EMPREENDIMENTO_ANOTAR: "empreendimento:anotar",
   EMPREENDIMENTO_LEVANTAMENTO: "empreendimento:levantamento", // adicionar anotações na timeline
@@ -147,6 +152,8 @@ export const DESCRICOES_PERMISSOES: Record<PermissaoChave, string> = {
   [PERMISSOES.EMPREENDIMENTO_CRIAR]: "Cadastrar novos empreendimentos",
   [PERMISSOES.EMPREENDIMENTO_EDITAR]: "Editar empreendimentos existentes",
   [PERMISSOES.EMPREENDIMENTO_VER]: "Visualizar empreendimentos",
+  [PERMISSOES.EMPREENDIMENTO_VER_APENAS_PROPRIOS]:
+    "Restringe a listagem de empreendimentos só aos que essa pessoa é responsável comercial (uso: papel Comercial)",
   [PERMISSOES.EMPREENDIMENTO_EXCLUIR]: "Excluir empreendimentos",
   [PERMISSOES.EMPREENDIMENTO_ANOTAR]: "Adicionar anotações na timeline do empreendimento",
   [PERMISSOES.EMPREENDIMENTO_LEVANTAMENTO]: "Acessar e editar levantamento elétrico do empreendimento",
