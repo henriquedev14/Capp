@@ -31,7 +31,15 @@ async function main() {
   }
 
   console.log("[seed] Garantindo papel Admin com todas as permissões...");
-  const todasPermissoes = await prisma.permissao.findMany();
+  // Exceção: permissões de RESTRIÇÃO (o nome geralmente diz "apenas
+  // próprios"/"restringe") nunca devem ir pro Admin automaticamente —
+  // são o oposto de uma capacidade ampla. Achado em 28/07/2026: Admin
+  // ganhou EMPREENDIMENTO_VER_APENAS_PROPRIOS por engano nesse loop e
+  // passou a ver 0 empreendimentos (parecia perda de dado, não era).
+  const PERMISSOES_RESTRICAO_NUNCA_PRO_ADMIN: string[] = [PERMISSOES.EMPREENDIMENTO_VER_APENAS_PROPRIOS];
+  const todasPermissoes = (await prisma.permissao.findMany()).filter(
+    (p) => !PERMISSOES_RESTRICAO_NUNCA_PRO_ADMIN.includes(p.chave)
+  );
   const papelAdmin = await prisma.papel.upsert({
     where: { nome: "Admin" },
     update: {},
