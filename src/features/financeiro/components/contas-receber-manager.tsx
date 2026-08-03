@@ -99,7 +99,7 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
         observacoes: avulso.observacoes,
       });
       if ("erro" in r) {
-        setErroAvulso(r.erro);
+        setErroAvulso(r.erro ?? "Erro ao lançar o faturamento.");
         return;
       }
       setFormAvulsoAberto(false);
