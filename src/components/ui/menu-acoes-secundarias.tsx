@@ -34,7 +34,6 @@ export function MenuAcoesSecundarias({ children }: { children: React.ReactNode }
       {aberto && (
         <div
           className="absolute right-0 top-full z-20 mt-1 min-w-48 rounded-lg border border-border bg-card p-1 shadow-lg"
-          onClick={() => setAberto(false)}
         >
           {children}
         </div>
