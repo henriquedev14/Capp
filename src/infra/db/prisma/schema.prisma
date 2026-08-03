@@ -1900,8 +1900,13 @@ enum TipoContaReceber {
 model ContaReceber {
   id String @id @default(cuid())
 
-  empreendimentoId String         @map("empreendimento_id") // não é mais único — 1 empreendimento tem 1 entrada + N remessas
-  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+  // Opcional desde 28/07/2026 — projetos em execução desde antes do
+  // ConstruApp (pré-implantação) não têm Empreendimento cadastrado
+  // ainda, mas precisam de faturamento avulso mesmo assim. Quando nulo,
+  // `nomeAvulso` guarda o nome digitado manualmente.
+  empreendimentoId String?         @map("empreendimento_id") // não é mais único — 1 empreendimento tem 1 entrada + N remessas
+  empreendimento   Empreendimento? @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+  nomeAvulso       String?         @map("nome_avulso")
   orcamentoId      String?        @map("orcamento_id") // qual revisão gerou esse valor
   orcamento        Orcamento?     @relation(fields: [orcamentoId], references: [id], onDelete: SetNull)
 
