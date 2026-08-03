@@ -10,6 +10,8 @@ import { FiltrosEmpreendimentos } from "@/features/empreendimentos/components/fi
 import { EmpreendimentoPrismaRepository } from "@/infra/db/prisma/repositories/empreendimento-prisma-repository";
 import type { StatusEmpreendimento } from "@/core/empreendimentos/entities/empreendimento";
 import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/infra/auth/auth-options.full";
 import { temPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 
@@ -25,9 +27,15 @@ export default async function EmpreendimentosPage({ searchParams }: Props) {
 
   const status = searchParams.status as StatusEmpreendimento | undefined;
 
+  // Papel Comercial só vê a própria carteira — pedido do Henrique em
+  // 28/07/2026, pra evitar um vendedor ver as entregas do outro.
+  const restringirAosProprios = await temPermissao(PERMISSOES.EMPREENDIMENTO_VER_APENAS_PROPRIOS);
+  const session = restringirAosProprios ? await getServerSession(authOptions) : null;
+
   const empreendimentos = await repo.findManyResumo({
     busca: searchParams.busca,
     status,
+    responsavelComercialUserId: restringirAosProprios ? session?.user?.id : undefined,
   });
 
   return (
