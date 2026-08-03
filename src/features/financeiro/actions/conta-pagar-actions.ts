@@ -121,7 +121,11 @@ export interface DadosParcelamento {
   descricao: string;
   valorParcela: number;
   totalParcelas: number;
-  primeiroVencimento: string; // ISO date — demais parcelas somam 1 mês cada
+  primeiroVencimento: string; // ISO date — demais parcelas somam intervaloDias cada
+  // Dias entre uma parcela e a próxima — pedido pelo Henrique em
+  // 28/07/2026 (antes era sempre "+1 mês", fixo). Padrão 30 (mensal),
+  // mas aceita qualquer número (7 = semanal, 15 = quinzenal, etc).
+  intervaloDias?: number;
   observacoes?: string;
 }
 
@@ -146,9 +150,11 @@ export async function criarParcelamento(dados: DadosParcelamento): Promise<Resul
   const dataBase = new Date(dados.primeiroVencimento);
   if (isNaN(dataBase.getTime())) return { erro: "Data do primeiro vencimento inválida." };
 
+  const intervaloDias = dados.intervaloDias && dados.intervaloDias > 0 ? dados.intervaloDias : 30;
+
   for (let i = 0; i < dados.totalParcelas; i++) {
     const vencimento = new Date(dataBase);
-    vencimento.setMonth(vencimento.getMonth() + i);
+    vencimento.setDate(vencimento.getDate() + i * intervaloDias);
 
     await prisma.contaPagar.create({
       data: {
