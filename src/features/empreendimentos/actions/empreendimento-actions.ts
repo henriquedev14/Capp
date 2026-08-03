@@ -72,8 +72,9 @@ function parseDataOpcional(valor?: string): Date | null {
 export async function criarEmpreendimento(
   formData: unknown
 ): Promise<{ id: string } | { erro: string }> {
+  let sessao;
   try {
-    await exigirPermissao(PERMISSOES.EMPREENDIMENTO_CRIAR);
+    sessao = await exigirPermissao(PERMISSOES.EMPREENDIMENTO_CRIAR);
   } catch (e) {
     return { erro: e instanceof Error ? e.message : "Não autorizado." };
   }
@@ -122,7 +123,10 @@ export async function criarEmpreendimento(
       criterioPrecificacao: (v.criterioPrecificacao || null) as Empreendimento["criterioPrecificacao"],
       dataPrevistaInicio: parseDataOpcional(v.dataPrevistaInicio),
       dataPrevistaEntrega: parseDataOpcional(v.dataPrevistaEntrega),
-      responsavelComercialUserId: null,
+      // Quem cria já vira automaticamente o responsável comercial —
+      // antes ficava null e precisava de um passo manual extra
+      // ("assumir responsabilidade") pra registrar isso.
+      responsavelComercialUserId: sessao.user.id,
       responsavelEngenhariaUserId: null,
       responsavelOrcamentacaoUserId: null,
       observacoes: v.observacoes || null,
