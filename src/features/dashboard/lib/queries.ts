@@ -237,7 +237,15 @@ export async function carregarDashboardData(): Promise<DashboardData> {
     }),
     prisma.configuracaoSistema.findUnique({ where: { id: "default" } }),
     prisma.contaReceber.aggregate({
-      where: { recebido: false, dataPrevista: { lt: hoje } },
+      where: {
+        recebido: false,
+        dataPrevista: { lt: hoje },
+        // Empreendimento arquivado (cancelado) não conta mais como
+        // inadimplência real — não vai ser cobrado de verdade. Pedido
+        // pelo Henrique em 28/07/2026, ao arquivar um projeto de teste
+        // e ver a previsão continuar contando os valores dele.
+        OR: [{ empreendimentoId: null }, { empreendimento: { excluidoEm: null } }],
+      },
       _sum: { valor: true },
       _count: true,
     }),
@@ -247,7 +255,11 @@ export async function carregarDashboardData(): Promise<DashboardData> {
       _count: true,
     }),
     prisma.contaReceber.findMany({
-      where: { recebido: false, dataPrevista: { not: null, gte: hoje } },
+      where: {
+        recebido: false,
+        dataPrevista: { not: null, gte: hoje },
+        OR: [{ empreendimentoId: null }, { empreendimento: { excluidoEm: null } }],
+      },
       select: { dataPrevista: true, valor: true },
     }),
     prisma.contaPagar.findMany({
