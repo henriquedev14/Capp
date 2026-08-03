@@ -4,11 +4,17 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { listarDadosContasAReceber } from "@/features/financeiro/actions/conta-receber-actions";
+import {
+  listarDadosContasAReceber,
+  listarEmpreendimentosParaFaturamento,
+} from "@/features/financeiro/actions/conta-receber-actions";
 import { ContasReceberManager } from "@/features/financeiro/components/contas-receber-manager";
 
 export default async function ContasAReceberPage() {
-  const { empresas, contasReceber } = await listarDadosContasAReceber();
+  const [{ empresas, contasReceber }, empreendimentos] = await Promise.all([
+    listarDadosContasAReceber(),
+    listarEmpreendimentosParaFaturamento(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -26,7 +32,7 @@ export default async function ContasAReceberPage() {
         description="20% de entrada (28 dias após assinatura) + parcelas proporcionais por pavimento entregue, geradas automaticamente ao contratar."
       />
 
-      <ContasReceberManager contas={contasReceber} empresas={empresas} />
+      <ContasReceberManager contas={contasReceber} empresas={empresas} empreendimentos={empreendimentos} />
     </div>
   );
 }
