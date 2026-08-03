@@ -25,8 +25,8 @@ export async function listarDadosContasAReceber() {
 
   const contasReceber = contasReceberRaw.map((c) => ({
     id: c.id,
-    empreendimentoId: c.empreendimento.id,
-    empreendimentoNome: c.empreendimento.nome,
+    empreendimentoId: c.empreendimento?.id ?? null,
+    empreendimentoNome: c.empreendimento?.nome ?? c.nomeAvulso ?? "(sem nome)",
     tipo: c.tipo,
     pavimentoNome: c.pavimento?.nome ?? null,
     valor: Number(c.valor),
@@ -117,7 +117,8 @@ export async function listarPavimentosParaFaturamento(empreendimentoId: string) 
 }
 
 interface DadosContaReceberAvulsa {
-  empreendimentoId: string;
+  empreendimentoId?: string | null;
+  nomeAvulso?: string;
   tipo: "ENTRADA" | "REMESSA";
   pavimentoId?: string | null;
   empresaId?: string | null;
@@ -131,6 +132,10 @@ interface DadosContaReceberAvulsa {
  * 28/07/2026: até então só existia a criação automática (20% de
  * entrada + parcelas por pavimento), sem forma de lançar algo fora
  * desse padrão (ex: cobrança extra, ajuste, acordo específico).
+ *
+ * Aceita OU um empreendimentoId real, OU um nomeAvulso digitado — pra
+ * cobrir projetos em execução desde antes do ConstruApp existir
+ * (pré-implantação), que ainda não têm Empreendimento cadastrado.
  */
 export async function criarContaReceberAvulsa(
   dados: DadosContaReceberAvulsa
@@ -141,9 +146,12 @@ export async function criarContaReceberAvulsa(
     return { erro: e instanceof Error ? e.message : "Não autorizado." };
   }
 
-  if (!dados.empreendimentoId) return { erro: "Escolha o empreendimento (obra)." };
+  const nomeAvulso = dados.nomeAvulso?.trim() || null;
+  if (!dados.empreendimentoId && !nomeAvulso) {
+    return { erro: "Escolha um empreendimento cadastrado ou digite o nome do projeto (pré-implantação)." };
+  }
   if (!Number.isFinite(dados.valor) || dados.valor <= 0) return { erro: "Valor inválido." };
-  if (dados.tipo === "REMESSA" && !dados.pavimentoId) {
+  if (dados.tipo === "REMESSA" && dados.empreendimentoId && !dados.pavimentoId) {
     return { erro: "Escolha o pavimento (remessa) correspondente." };
   }
 
@@ -156,9 +164,10 @@ export async function criarContaReceberAvulsa(
 
   await prisma.contaReceber.create({
     data: {
-      empreendimentoId: dados.empreendimentoId,
+      empreendimentoId: dados.empreendimentoId || null,
+      nomeAvulso: dados.empreendimentoId ? null : nomeAvulso,
       tipo: dados.tipo,
-      pavimentoId: dados.tipo === "REMESSA" ? dados.pavimentoId : null,
+      pavimentoId: dados.tipo === "REMESSA" && dados.empreendimentoId ? dados.pavimentoId : null,
       empresaId: dados.empresaId || null,
       valor: dados.valor,
       dataPrevista,
