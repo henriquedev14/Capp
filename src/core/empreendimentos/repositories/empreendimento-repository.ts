@@ -17,6 +17,9 @@ export interface EmpreendimentoFiltros {
   busca?: string;
   status?: StatusEmpreendimento;
   clienteId?: string;
+  // Restringe aos empreendimentos onde esse usuário é o responsável
+  // comercial — usado quando o papel tem EMPREENDIMENTO_VER_APENAS_PROPRIOS.
+  responsavelComercialUserId?: string;
 }
 
 /**
