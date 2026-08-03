@@ -73,6 +73,104 @@ export async function desfazerRecebimentoConta(id: string): Promise<Resultado> {
   return { ok: true };
 }
 
+/**
+ * Lista empreendimentos ativos (não arquivados) pro seletor de
+ * faturamento avulso.
+ */
+export async function listarEmpreendimentosParaFaturamento() {
+  return prisma.empreendimento.findMany({
+    where: { excluidoEm: null, status: { not: "ARQUIVADO" } },
+    select: { id: true, nome: true },
+    orderBy: { nome: "asc" },
+  });
+}
+
+/**
+ * Lista os pavimentos de um empreendimento (via Torre direto ou via
+ * Bloco dentro de Torre) — pra escolher qual "remessa" o faturamento
+ * avulso corresponde. Mesma lógica de busca usada no cronograma
+ * automático (criarContaReceberAutomatica).
+ */
+export async function listarPavimentosParaFaturamento(empreendimentoId: string) {
+  const torres = await prisma.torre.findMany({
+    where: { empreendimentoId },
+    include: {
+      pavimentos: { select: { id: true, nome: true }, orderBy: { ordem: "asc" } },
+      blocos: {
+        include: { pavimentos: { select: { id: true, nome: true }, orderBy: { ordem: "asc" } } },
+        orderBy: { ordem: "asc" },
+      },
+    },
+    orderBy: { ordem: "asc" },
+  });
+
+  const pavimentos: { id: string; nome: string }[] = [];
+  for (const torre of torres) {
+    for (const p of torre.pavimentos) pavimentos.push({ id: p.id, nome: `${torre.nome} — ${p.nome}` });
+    for (const bloco of torre.blocos) {
+      for (const p of bloco.pavimentos) {
+        pavimentos.push({ id: p.id, nome: `${torre.nome} / ${bloco.nome} — ${p.nome}` });
+      }
+    }
+  }
+  return pavimentos;
+}
+
+interface DadosContaReceberAvulsa {
+  empreendimentoId: string;
+  tipo: "ENTRADA" | "REMESSA";
+  pavimentoId?: string | null;
+  empresaId?: string | null;
+  valor: number;
+  dataPrevista?: string;
+  observacoes?: string;
+}
+
+/**
+ * Lança uma Conta a Receber avulsa/manual — pedido pelo Henrique em
+ * 28/07/2026: até então só existia a criação automática (20% de
+ * entrada + parcelas por pavimento), sem forma de lançar algo fora
+ * desse padrão (ex: cobrança extra, ajuste, acordo específico).
+ */
+export async function criarContaReceberAvulsa(
+  dados: DadosContaReceberAvulsa
+): Promise<Resultado> {
+  try {
+    await exigirPermissao(PERMISSOES.FINANCEIRO_LANCAR_CONTA);
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : "Não autorizado." };
+  }
+
+  if (!dados.empreendimentoId) return { erro: "Escolha o empreendimento (obra)." };
+  if (!Number.isFinite(dados.valor) || dados.valor <= 0) return { erro: "Valor inválido." };
+  if (dados.tipo === "REMESSA" && !dados.pavimentoId) {
+    return { erro: "Escolha o pavimento (remessa) correspondente." };
+  }
+
+  let dataPrevista: Date | undefined;
+  if (dados.dataPrevista) {
+    const d = new Date(dados.dataPrevista);
+    if (isNaN(d.getTime())) return { erro: "Data inválida." };
+    dataPrevista = d;
+  }
+
+  await prisma.contaReceber.create({
+    data: {
+      empreendimentoId: dados.empreendimentoId,
+      tipo: dados.tipo,
+      pavimentoId: dados.tipo === "REMESSA" ? dados.pavimentoId : null,
+      empresaId: dados.empresaId || null,
+      valor: dados.valor,
+      dataPrevista,
+      observacoes: dados.observacoes?.trim() || null,
+    },
+  });
+
+  revalidatePath("/financeiro/contas-a-receber");
+  revalidatePath("/financeiro");
+  return { ok: true };
+}
+
 export async function atualizarContaReceber(
   id: string,
   dados: { empresaId?: string | null; dataPrevista?: string; valor?: number; observacoes?: string }
