@@ -57,6 +57,9 @@ export class EmpreendimentoPrismaRepository implements EmpreendimentoRepository 
         excluidoEm: null,
         ...(filtros?.clienteId && { clienteId: filtros.clienteId }),
         ...(filtros?.status && { status: filtros.status }),
+        ...(filtros?.responsavelComercialUserId && {
+          responsavelComercialUserId: filtros.responsavelComercialUserId,
+        }),
         ...(filtros?.busca && {
           OR: [
             { nome: { contains: filtros.busca, mode: "insensitive" } },
