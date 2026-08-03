@@ -404,6 +404,7 @@ function ModalParcelamento({
     dataVencimento: new Date().toISOString().slice(0, 10), // primeira parcela
     observacoes: "",
     totalParcelas: "12",
+    intervaloDias: "30",
   });
 
   async function salvar() {
@@ -416,6 +417,7 @@ function ModalParcelamento({
         descricao: form.descricao,
         valorParcela: Number(form.valor.replace(",", ".")),
         totalParcelas: parseInt(form.totalParcelas, 10),
+        intervaloDias: parseInt(form.intervaloDias, 10),
         primeiroVencimento: form.dataVencimento,
         observacoes: form.observacoes,
       });
@@ -456,8 +458,42 @@ function ModalParcelamento({
             className="rounded-lg border border-input bg-background px-2 py-1.5 text-sm"
           />
         </div>
+        <div className="flex flex-col gap-1 col-span-2">
+          <label className="text-xs font-medium text-muted-foreground">Intervalo entre parcelas (dias)</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              value={form.intervaloDias}
+              onChange={(e) => setForm((f) => ({ ...f, intervaloDias: e.target.value }))}
+              className="w-24 rounded-lg border border-input bg-background px-2 py-1.5 text-sm"
+            />
+            <div className="flex gap-1">
+              {[
+                { label: "Semanal", dias: "7" },
+                { label: "Quinzenal", dias: "15" },
+                { label: "Mensal", dias: "30" },
+              ].map((opt) => (
+                <button
+                  key={opt.dias}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, intervaloDias: opt.dias }))}
+                  className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                    form.intervaloDias === opt.dias
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
-      <p className="text-xs text-muted-foreground">Isso cria todas as parcelas de uma vez, uma por mês.</p>
+      <p className="text-xs text-muted-foreground">
+        Cria todas as parcelas de uma vez, uma a cada {form.intervaloDias || "30"} dia(s).
+      </p>
       {erro && <p className="text-xs text-destructive">{erro}</p>}
       <div className="flex justify-end gap-2 pt-1">
         <Button variant="outline" size="sm" onClick={onFechar} disabled={salvando}>Cancelar</Button>
