@@ -8,7 +8,7 @@ export interface ItemReceberPriorizado {
   id: string;
   clienteNome: string;
   empreendimentoNome: string;
-  empreendimentoId: string;
+  empreendimentoId: string | null;
   valor: number;
   dataPrevista: Date | null;
   diasAtraso: number;
@@ -40,13 +40,17 @@ export async function listarFilaContasAReceber(limite = 8): Promise<ItemReceberP
       const dias = c.dataPrevista ? Math.floor((hoje.getTime() - c.dataPrevista.getTime()) / (1000 * 60 * 60 * 24)) : 0;
       return {
         id: c.id,
-        clienteNome: c.empreendimento.cliente.nomeFantasia || c.empreendimento.cliente.razaoSocial,
-        empreendimentoNome: c.empreendimento.nome,
-        empreendimentoId: c.empreendimento.id,
+        // Faturamento avulso (pré-implantação) não tem Empreendimento nem
+        // Cliente cadastrado — usa o nome digitado como referência.
+        clienteNome: c.empreendimento
+          ? c.empreendimento.cliente.nomeFantasia || c.empreendimento.cliente.razaoSocial
+          : (c.nomeAvulso ?? "Avulso"),
+        empreendimentoNome: c.empreendimento?.nome ?? c.nomeAvulso ?? "(sem nome)",
+        empreendimentoId: c.empreendimento?.id ?? null,
         valor: Number(c.valor),
         dataPrevista: c.dataPrevista,
         diasAtraso: Math.max(dias, 0),
-        empreendimentoArquivado: c.empreendimento.excluidoEm != null,
+        empreendimentoArquivado: c.empreendimento?.excluidoEm != null,
       };
     })
     .sort((a, b) => b.diasAtraso - a.diasAtraso || (b.dataPrevista?.getTime() ?? 0) - (a.dataPrevista?.getTime() ?? 0))
@@ -67,7 +71,9 @@ export async function listarTopClientesDevedores(limite = 5): Promise<TopCliente
 
   const mapa = new Map<string, { valor: number; qtd: number }>();
   for (const c of contas) {
-    const nome = c.empreendimento.cliente.nomeFantasia || c.empreendimento.cliente.razaoSocial;
+    const nome = c.empreendimento
+      ? c.empreendimento.cliente.nomeFantasia || c.empreendimento.cliente.razaoSocial
+      : (c.nomeAvulso ?? "Avulso");
     const atual = mapa.get(nome) ?? { valor: 0, qtd: 0 };
     atual.valor += Number(c.valor);
     atual.qtd += 1;
