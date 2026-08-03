@@ -13,6 +13,8 @@ import {
   atualizarContaReceber,
   registrarEnvioRemessa,
   definirDataProjetada,
+  criarContaReceberAvulsa,
+  listarPavimentosParaFaturamento,
 } from "@/features/financeiro/actions/conta-receber-actions";
 
 export interface ContaReceberItem {
@@ -32,6 +34,7 @@ export interface ContaReceberItem {
 interface Props {
   contas: ContaReceberItem[];
   empresas: { id: string; nome: string }[];
+  empreendimentos: { id: string; nome: string }[];
 }
 
 function formatBRL(v: number): string {
@@ -41,7 +44,7 @@ function formatData(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
 
-export function ContasReceberManager({ contas, empresas }: Props) {
+export function ContasReceberManager({ contas, empresas, empreendimentos }: Props) {
   const router = useRouter();
   const [processandoId, setProcessandoId] = React.useState<string | null>(null);
   const [editandoId, setEditandoId] = React.useState<string | null>(null);
@@ -51,6 +54,69 @@ export function ContasReceberManager({ contas, empresas }: Props) {
   const [modoDataId, setModoDataId] = React.useState<string | null>(null);
   const [tipoAcaoData, setTipoAcaoData] = React.useState<"projetar" | "confirmar">("projetar");
   const [dataInput, setDataInput] = React.useState(new Date().toISOString().slice(0, 10));
+
+  // Faturamento avulso — formulário manual, fora do cronograma automático.
+  const [formAvulsoAberto, setFormAvulsoAberto] = React.useState(false);
+  const [avulso, setAvulso] = React.useState({
+    empreendimentoId: "",
+    tipo: "REMESSA" as "ENTRADA" | "REMESSA",
+    pavimentoId: "",
+    empresaId: "",
+    valor: "",
+    dataPrevista: "",
+    observacoes: "",
+  });
+  const [pavimentosDisponiveis, setPavimentosDisponiveis] = React.useState<{ id: string; nome: string }[]>([]);
+  const [carregandoPavimentos, setCarregandoPavimentos] = React.useState(false);
+  const [salvandoAvulso, setSalvandoAvulso] = React.useState(false);
+  const [erroAvulso, setErroAvulso] = React.useState<string | null>(null);
+
+  async function handleEmpreendimentoAvulsoChange(empreendimentoId: string) {
+    setAvulso((prev) => ({ ...prev, empreendimentoId, pavimentoId: "" }));
+    setPavimentosDisponiveis([]);
+    if (!empreendimentoId) return;
+    setCarregandoPavimentos(true);
+    try {
+      const lista = await listarPavimentosParaFaturamento(empreendimentoId);
+      setPavimentosDisponiveis(lista);
+    } finally {
+      setCarregandoPavimentos(false);
+    }
+  }
+
+  async function handleSalvarAvulso() {
+    setErroAvulso(null);
+    const valorNum = Number(avulso.valor.replace(",", "."));
+    setSalvandoAvulso(true);
+    try {
+      const r = await criarContaReceberAvulsa({
+        empreendimentoId: avulso.empreendimentoId,
+        tipo: avulso.tipo,
+        pavimentoId: avulso.pavimentoId || null,
+        empresaId: avulso.empresaId || null,
+        valor: valorNum,
+        dataPrevista: avulso.dataPrevista || undefined,
+        observacoes: avulso.observacoes,
+      });
+      if ("erro" in r) {
+        setErroAvulso(r.erro);
+        return;
+      }
+      setFormAvulsoAberto(false);
+      setAvulso({
+        empreendimentoId: "",
+        tipo: "REMESSA",
+        pavimentoId: "",
+        empresaId: "",
+        valor: "",
+        dataPrevista: "",
+        observacoes: "",
+      });
+      router.refresh();
+    } finally {
+      setSalvandoAvulso(false);
+    }
+  }
 
   // Três estados possíveis pra uma remessa:
   //  1. Sem cronograma nenhum (dataPrevista null) — Comercial precisa
@@ -202,6 +268,153 @@ export function ContasReceberManager({ contas, empresas }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      {!formAvulsoAberto ? (
+        <Button variant="outline" className="w-fit" onClick={() => setFormAvulsoAberto(true)}>
+          + Lançar Faturamento Avulso
+        </Button>
+      ) : (
+        <Card>
+          <CardContent className="flex flex-col gap-3 pt-6">
+            <p className="text-sm font-semibold text-foreground">Faturamento Avulso</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">Empreendimento (obra) *</label>
+                <select
+                  value={avulso.empreendimentoId}
+                  onChange={(e) => handleEmpreendimentoAvulsoChange(e.target.value)}
+                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">Selecione...</option>
+                  {empreendimentos.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">Tipo *</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAvulso((p) => ({ ...p, tipo: "ENTRADA", pavimentoId: "" }))}
+                    className={`rounded-full border px-3 py-2 text-sm font-medium ${
+                      avulso.tipo === "ENTRADA"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    Entrada
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAvulso((p) => ({ ...p, tipo: "REMESSA" }))}
+                    className={`rounded-full border px-3 py-2 text-sm font-medium ${
+                      avulso.tipo === "REMESSA"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    Remessa (pavimento)
+                  </button>
+                </div>
+              </div>
+              {avulso.tipo === "REMESSA" && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">Pavimento (remessa) *</label>
+                  <select
+                    value={avulso.pavimentoId}
+                    onChange={(e) => setAvulso((p) => ({ ...p, pavimentoId: e.target.value }))}
+                    disabled={!avulso.empreendimentoId || carregandoPavimentos}
+                    className="h-10 rounded-lg border border-input bg-background px-3 text-sm disabled:opacity-50"
+                  >
+                    <option value="">
+                      {carregandoPavimentos
+                        ? "Carregando..."
+                        : !avulso.empreendimentoId
+                          ? "Escolha o empreendimento primeiro"
+                          : pavimentosDisponiveis.length === 0
+                            ? "Nenhum pavimento cadastrado"
+                            : "Selecione..."}
+                    </option>
+                    {pavimentosDisponiveis.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">Empresa do Grupo</label>
+                <select
+                  value={avulso.empresaId}
+                  onChange={(e) => setAvulso((p) => ({ ...p, empresaId: e.target.value }))}
+                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">Sem empresa definida</option>
+                  {empresas.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">Valor (R$) *</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={avulso.valor}
+                  onChange={(e) => setAvulso((p) => ({ ...p, valor: e.target.value }))}
+                  placeholder="0,00"
+                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">Data prevista de recebimento</label>
+                <input
+                  type="date"
+                  value={avulso.dataPrevista}
+                  onChange={(e) => setAvulso((p) => ({ ...p, dataPrevista: e.target.value }))}
+                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1 sm:col-span-2">
+                <label className="text-xs font-medium text-muted-foreground">Observações</label>
+                <textarea
+                  value={avulso.observacoes}
+                  onChange={(e) => setAvulso((p) => ({ ...p, observacoes: e.target.value }))}
+                  rows={2}
+                  className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            {erroAvulso && (
+              <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+                {erroAvulso}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button onClick={handleSalvarAvulso} disabled={salvandoAvulso}>
+                {salvandoAvulso && <Loader2 className="h-4 w-4 animate-spin" />}
+                Lançar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setFormAvulsoAberto(false);
+                  setErroAvulso(null);
+                }}
+                disabled={salvandoAvulso}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Pop-up de conferência — contas que venceram ontem, ainda não
           marcadas como recebidas. Fecha e some (não trava a tela), mas
           aparece de novo a cada carregamento enquanto a conta continuar
