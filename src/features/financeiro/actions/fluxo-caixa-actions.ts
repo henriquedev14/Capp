@@ -17,7 +17,13 @@ export async function buscarDadosFluxoCaixa() {
   const [configuracao, contasReceber, contasPagar, podeEditar] = await Promise.all([
     prisma.configuracaoSistema.findUnique({ where: { id: "default" } }),
     prisma.contaReceber.findMany({
-      where: { recebido: false, dataPrevista: { not: null } },
+      where: {
+        recebido: false,
+        dataPrevista: { not: null },
+        // Mesmo critério do dashboard: projeto arquivado (cancelado)
+        // não deve mais contar na projeção futura.
+        OR: [{ empreendimentoId: null }, { empreendimento: { excluidoEm: null } }],
+      },
       select: { valor: true, dataPrevista: true },
     }),
     prisma.contaPagar.findMany({
