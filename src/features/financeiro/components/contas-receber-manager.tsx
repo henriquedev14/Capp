@@ -19,7 +19,7 @@ import {
 
 export interface ContaReceberItem {
   id: string;
-  empreendimentoId: string;
+  empreendimentoId: string | null;
   empreendimentoNome: string;
   tipo: "ENTRADA" | "REMESSA";
   pavimentoNome: string | null;
@@ -57,8 +57,10 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
 
   // Faturamento avulso — formulário manual, fora do cronograma automático.
   const [formAvulsoAberto, setFormAvulsoAberto] = React.useState(false);
+  const [modoEmpreendimento, setModoEmpreendimento] = React.useState<"existente" | "digitado">("existente");
   const [avulso, setAvulso] = React.useState({
     empreendimentoId: "",
+    nomeAvulso: "",
     tipo: "REMESSA" as "ENTRADA" | "REMESSA",
     pavimentoId: "",
     empresaId: "",
@@ -90,7 +92,8 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
     setSalvandoAvulso(true);
     try {
       const r = await criarContaReceberAvulsa({
-        empreendimentoId: avulso.empreendimentoId,
+        empreendimentoId: modoEmpreendimento === "existente" ? avulso.empreendimentoId : null,
+        nomeAvulso: modoEmpreendimento === "digitado" ? avulso.nomeAvulso : undefined,
         tipo: avulso.tipo,
         pavimentoId: avulso.pavimentoId || null,
         empresaId: avulso.empresaId || null,
@@ -103,8 +106,10 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
         return;
       }
       setFormAvulsoAberto(false);
+      setModoEmpreendimento("existente");
       setAvulso({
         empreendimentoId: "",
+        nomeAvulso: "",
         tipo: "REMESSA",
         pavimentoId: "",
         empresaId: "",
@@ -277,20 +282,54 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
           <CardContent className="flex flex-col gap-3 pt-6">
             <p className="text-sm font-semibold text-foreground">Faturamento Avulso</p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 sm:col-span-2">
                 <label className="text-xs font-medium text-muted-foreground">Empreendimento (obra) *</label>
-                <select
-                  value={avulso.empreendimentoId}
-                  onChange={(e) => handleEmpreendimentoAvulsoChange(e.target.value)}
-                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
-                >
-                  <option value="">Selecione...</option>
-                  {empreendimentos.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nome}
-                    </option>
-                  ))}
-                </select>
+                <div className="mb-1 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModoEmpreendimento("existente")}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                      modoEmpreendimento === "existente"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    Já cadastrado
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModoEmpreendimento("digitado")}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                      modoEmpreendimento === "digitado"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    Digitar nome (pré-implantação)
+                  </button>
+                </div>
+                {modoEmpreendimento === "existente" ? (
+                  <select
+                    value={avulso.empreendimentoId}
+                    onChange={(e) => handleEmpreendimentoAvulsoChange(e.target.value)}
+                    className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="">Selecione...</option>
+                    {empreendimentos.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.nome}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={avulso.nomeAvulso}
+                    onChange={(e) => setAvulso((p) => ({ ...p, nomeAvulso: e.target.value }))}
+                    placeholder="Nome do projeto (ainda não cadastrado no sistema)"
+                    className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+                  />
+                )}
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-muted-foreground">Tipo *</label>
@@ -319,7 +358,7 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
                   </button>
                 </div>
               </div>
-              {avulso.tipo === "REMESSA" && (
+              {avulso.tipo === "REMESSA" && modoEmpreendimento === "existente" && (
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-muted-foreground">Pavimento (remessa) *</label>
                   <select
@@ -488,12 +527,16 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
                 return (
                   <div key={c.id} className="flex items-center justify-between gap-3 px-4 py-3">
                     <div className="flex min-w-0 flex-col">
-                      <Link
-                        href={`/empreendimentos/${c.empreendimentoId}`}
-                        className="text-sm font-medium text-foreground hover:text-primary truncate"
-                      >
-                        {c.empreendimentoNome}
-                      </Link>
+                      {c.empreendimentoId ? (
+                        <Link
+                          href={`/empreendimentos/${c.empreendimentoId}`}
+                          className="text-sm font-medium text-foreground hover:text-primary truncate"
+                        >
+                          {c.empreendimentoNome}
+                        </Link>
+                      ) : (
+                        <span className="text-sm font-medium text-foreground truncate">{c.empreendimentoNome}</span>
+                      )}
                       <span className="text-xs text-muted-foreground">
                         {linhaLabel(c)} · previsto {c.dataPrevista ? formatData(c.dataPrevista) : "—"} ·{" "}
                         <span className="font-medium text-destructive">{dias}d de atraso</span>
@@ -531,9 +574,13 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
               {semCronograma.map((c) => (
                 <div key={c.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="flex min-w-0 flex-col">
-                    <Link href={`/empreendimentos/${c.empreendimentoId}`} className="text-sm font-medium text-foreground hover:text-primary truncate">
-                      {c.empreendimentoNome}
-                    </Link>
+                    {c.empreendimentoId ? (
+                      <Link href={`/empreendimentos/${c.empreendimentoId}`} className="text-sm font-medium text-foreground hover:text-primary truncate">
+                        {c.empreendimentoNome}
+                      </Link>
+                    ) : (
+                      <span className="text-sm font-medium text-foreground truncate">{c.empreendimentoNome}</span>
+                    )}
                     <span className="text-xs text-muted-foreground">{linhaLabel(c)}</span>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
@@ -563,9 +610,13 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
               {[...projetadas, ...confirmadasPendentes, ...recebidas].map((c) => (
                 <div key={c.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="flex min-w-0 flex-col">
-                    <Link href={`/empreendimentos/${c.empreendimentoId}`} className="text-sm font-medium text-foreground hover:text-primary truncate">
-                      {c.empreendimentoNome}
-                    </Link>
+                    {c.empreendimentoId ? (
+                      <Link href={`/empreendimentos/${c.empreendimentoId}`} className="text-sm font-medium text-foreground hover:text-primary truncate">
+                        {c.empreendimentoNome}
+                      </Link>
+                    ) : (
+                      <span className="text-sm font-medium text-foreground truncate">{c.empreendimentoNome}</span>
+                    )}
                     <span className="text-xs text-muted-foreground truncate">{linhaLabel(c)}</span>
                     {editandoId === c.id ? (
                       <div className="mt-1 flex items-center gap-2">
