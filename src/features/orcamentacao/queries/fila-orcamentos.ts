@@ -66,6 +66,11 @@ export interface FiltrosFilaOrcamento {
   apenasComPendencia?: boolean;
   usuarioAtualId?: string;
   visao?: "minha_fila" | "equipe" | "todos" | "atrasados" | "aguardando_aprovacao";
+  // Restringe aos empreendimentos onde esse usuário é o responsável
+  // comercial — usado quando o papel tem EMPREENDIMENTO_VER_APENAS_PROPRIOS
+  // (achado pelo Henrique em 28/07/2026: Comercial via a fila inteira,
+  // mesmo só devendo ver a própria carteira).
+  responsavelComercialUserId?: string;
 }
 
 function proximaAcaoPara(etapa: string | null, etapaStatus: string | null): string {
@@ -103,7 +108,14 @@ export async function buscarFilaOrcamentos(
   const hoje = new Date();
 
   const orcamentos = await prisma.orcamento.findMany({
-    where: { empreendimento: { excluidoEm: null } },
+    where: {
+      empreendimento: {
+        excluidoEm: null,
+        ...(filtros.responsavelComercialUserId && {
+          responsavelComercialUserId: filtros.responsavelComercialUserId,
+        }),
+      },
+    },
     include: {
       empreendimento: {
         select: {
