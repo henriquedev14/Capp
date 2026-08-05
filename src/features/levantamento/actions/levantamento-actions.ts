@@ -356,7 +356,7 @@ export async function validarLevantamento(
   const guardaArquivado = await verificarEmpreendimentoAtivo(empreendimentoId);
   if (!guardaArquivado.permitido) return { erro: guardaArquivado.motivo! };
   try {
-    await repo.validarLevantamento(levantamentoId);
+    await repo.validarLevantamento(levantamentoId, sessao.user.id);
     await timelineRepo.criarEvento({
       empreendimentoId,
       tipo: "DOCUMENTO",
