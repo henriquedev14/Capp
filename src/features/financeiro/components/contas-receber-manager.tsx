@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Undo2, Loader2, Pencil, X, Truck, CalendarClock } from "lucide-react";
+import { Check, Undo2, Loader2, Pencil, X, Truck, CalendarClock, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
   definirDataProjetada,
   criarContaReceberAvulsa,
   listarPavimentosParaFaturamento,
+  excluirContaReceber,
 } from "@/features/financeiro/actions/conta-receber-actions";
 
 export interface ContaReceberItem {
@@ -188,6 +189,18 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
     setProcessandoId(id);
     try {
       const r = await desfazerRecebimentoConta(id);
+      if (r.erro) alert(r.erro);
+      else router.refresh();
+    } finally {
+      setProcessandoId(null);
+    }
+  }
+
+  async function handleExcluir(id: string, nome: string) {
+    if (!confirm(`Excluir esse lançamento (${nome})? Essa ação não pode ser desfeita.`)) return;
+    setProcessandoId(id);
+    try {
+      const r = await excluirContaReceber(id);
       if (r.erro) alert(r.erro);
       else router.refresh();
     } finally {
@@ -559,6 +572,14 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
                       ) : (
                         <BotaoData id={c.id} tipo="confirmar" texto="Confirmar envio" />
                       )}
+                      <button
+                        onClick={() => handleExcluir(c.id, c.empreendimentoNome)}
+                        disabled={processandoId === c.id}
+                        title="Excluir lançamento"
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
                 );
@@ -706,6 +727,16 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
                           Receber
                         </Button>
                       )
+                    )}
+                    {!c.recebido && (
+                      <button
+                        onClick={() => handleExcluir(c.id, c.empreendimentoNome)}
+                        disabled={processandoId === c.id}
+                        title="Excluir lançamento"
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     )}
                   </div>
                 </div>
