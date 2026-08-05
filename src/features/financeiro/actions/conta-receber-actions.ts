@@ -10,6 +10,28 @@ import { PERMISSOES } from "@/core/auth/permissions";
  * Lista empresas ativas + todas as contas a receber (com dados
  * "achatados" pra tela) — extraído da página em 2.2.1 (item A4).
  */
+/**
+ * Exclui uma conta a receber — urgente 28/07/2026 (ainda não existia
+ * forma de apagar um lançamento avulso feito por engano).
+ */
+export async function excluirContaReceber(id: string): Promise<Resultado> {
+  try {
+    await exigirPermissao(PERMISSOES.FINANCEIRO_EXCLUIR_CONTA);
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : "Não autorizado." };
+  }
+
+  const conta = await prisma.contaReceber.findUnique({ where: { id } });
+  if (!conta) return { erro: "Conta não encontrada." };
+  if (conta.recebido) return { erro: "Não é possível excluir uma conta já marcada como recebida." };
+
+  await prisma.contaReceber.delete({ where: { id } });
+
+  revalidatePath("/financeiro/contas-a-receber");
+  revalidatePath("/financeiro");
+  return { ok: true };
+}
+
 export async function listarDadosContasAReceber() {
   const [empresas, contasReceberRaw] = await Promise.all([
     prisma.empresaGrupo.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
