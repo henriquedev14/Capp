@@ -577,9 +577,12 @@ model Usuario {
 
   eventosEmpreendimento    EventoEmpreendimento[]
   documentosEmpreendimento DocumentoEmpreendimento[]
-  levantamentosCriados     LevantamentoEletrico[]
-  levantamentosHidraulicosCriados LevantamentoHidraulico[]
-  levantamentosMateriaisCriados LevantamentoMateriais[]
+  levantamentosCriados     LevantamentoEletrico[] @relation("EletricoCriadoPor")
+  levantamentosHidraulicosCriados LevantamentoHidraulico[] @relation("HidraulicoCriadoPor")
+  levantamentosMateriaisCriados LevantamentoMateriais[] @relation("MateriaisCriadoPor")
+  levantamentosValidados     LevantamentoEletrico[] @relation("EletricoValidadoPor")
+  levantamentosHidraulicosValidados LevantamentoHidraulico[] @relation("HidraulicoValidadoPor")
+  levantamentosMateriaisValidados LevantamentoMateriais[] @relation("MateriaisValidadoPor")
   orcamentosCriados        Orcamento[]
   propostasGeradas         Orcamento[] @relation("PropostasGeradas")
   orcamentosResponsavel    Orcamento[] @relation("OrcamentosResponsavel")
@@ -1103,7 +1106,9 @@ model LevantamentoMateriais {
   itens ItemLevantamentoMaterial[]
 
   criadoPorId String?  @map("criado_por_id")
-  criadoPor   Usuario? @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+  criadoPor   Usuario? @relation("MateriaisCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  validadoPorId String? @map("validado_por_id")
+  validadoPor   Usuario? @relation("MateriaisValidadoPor", fields: [validadoPorId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1202,7 +1207,9 @@ model LevantamentoHidraulico {
   itens ItemLevantamentoHidraulico[]
 
   criadoPorId String?  @map("criado_por_id")
-  criadoPor   Usuario? @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+  criadoPor   Usuario? @relation("HidraulicoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  validadoPorId String? @map("validado_por_id")
+  validadoPor   Usuario? @relation("HidraulicoValidadoPor", fields: [validadoPorId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1308,7 +1315,9 @@ model LevantamentoEletrico {
   pecas PecaLevantamento[]
 
   criadoPorId String? @map("criado_por_id")
-  criadoPor   Usuario? @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+  criadoPor   Usuario? @relation("EletricoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  validadoPorId String? @map("validado_por_id")
+  validadoPor   Usuario? @relation("EletricoValidadoPor", fields: [validadoPorId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
