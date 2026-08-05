@@ -408,6 +408,13 @@ export async function arquivarEmpreendimento(
     await empreendimentoRepo.arquivar(id, usuarioId);
     revalidatePath("/empreendimentos");
     revalidatePath(`/empreendimentos/${id}`);
+    // Arquivar afeta os totais financeiros (a previsão/pendências desse
+    // empreendimento saem da conta) — precisa avisar essas telas também,
+    // senão elas continuam mostrando o valor antigo até expirar o cache
+    // por conta própria. Achado pelo Henrique em 28/07/2026.
+    revalidatePath("/painel");
+    revalidatePath("/financeiro");
+    revalidatePath("/financeiro/contas-a-receber");
     return { ok: true };
   } catch (e) {
     return { erro: e instanceof Error ? e.message : "Erro ao arquivar empreendimento." };
