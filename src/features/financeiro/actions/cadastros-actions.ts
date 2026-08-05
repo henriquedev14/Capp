@@ -45,7 +45,19 @@ export async function buscarResumoFinanceiro() {
     prisma.empresaGrupo.count({ where: { ativo: true } }),
     prisma.categoriaDespesa.count({ where: { ativo: true } }),
     prisma.contaFixaModelo.count({ where: { ativo: true } }),
-    prisma.contaReceber.aggregate({ where: { recebido: false }, _sum: { valor: true }, _count: true }),
+    prisma.contaReceber.aggregate({
+      // Empreendimento arquivado (cancelado) some das pendências —
+      // mesma regra já aplicada em listarDadosContasAReceber. Faturamento
+      // avulso (empreendimentoId null) sempre conta, e o que já foi
+      // recebido (recebidoMesAgg abaixo) não usa esse filtro, pois é
+      // fato contábil consumado, não desaparece com o arquivamento.
+      where: {
+        recebido: false,
+        OR: [{ empreendimentoId: null }, { empreendimento: { excluidoEm: null } }],
+      },
+      _sum: { valor: true },
+      _count: true,
+    }),
     prisma.contaPagar.aggregate({ where: { pago: false }, _sum: { valor: true }, _count: true }),
     prisma.contaReceber.aggregate({
       where: { recebido: true, recebidoEm: { gte: inicioMes } },
