@@ -281,10 +281,10 @@ export class LevantamentoPrismaRepository {
 
   // ── Status ─────────────────────────────────────────────────────────────────
 
-  async validarLevantamento(id: string): Promise<void> {
+  async validarLevantamento(id: string, usuarioId?: string): Promise<void> {
     const levantamento = await prisma.levantamentoEletrico.update({
       where: { id },
-      data: { status: "VALIDADO", validadoEm: new Date() },
+      data: { status: "VALIDADO", validadoEm: new Date(), validadoPorId: usuarioId },
     });
     await prisma.marcoOperacional.create({
       data: {

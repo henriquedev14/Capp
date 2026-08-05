@@ -224,10 +224,10 @@ export class LevantamentoMateriaisPrismaRepository {
     await prisma.itemLevantamentoMaterial.delete({ where: { id } });
   }
 
-  async validar(id: string): Promise<void> {
+  async validar(id: string, usuarioId?: string): Promise<void> {
     const levantamento = await prisma.levantamentoMateriais.update({
       where: { id },
-      data: { status: "VALIDADO", validadoEm: new Date() },
+      data: { status: "VALIDADO", validadoEm: new Date(), validadoPorId: usuarioId },
     });
     await prisma.marcoOperacional.create({
       data: {
