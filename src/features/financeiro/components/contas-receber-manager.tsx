@@ -21,6 +21,7 @@ export interface ContaReceberItem {
   id: string;
   empreendimentoId: string | null;
   empreendimentoNome: string;
+  empreendimentoArquivado: boolean;
   tipo: "ENTRADA" | "REMESSA";
   pavimentoNome: string | null;
   valor: number;
@@ -146,9 +147,15 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
   );
   const recebidas = contas.filter((c) => c.recebido);
 
-  const totalEmAtraso = emAtraso.reduce((s, c) => s + c.valor, 0);
-  const totalPendente = [...projetadas, ...confirmadasPendentes].reduce((s, c) => s + c.valor, 0);
-  const totalSemCronograma = semCronograma.reduce((s, c) => s + c.valor, 0);
+  // Totais em destaque não contam empreendimento arquivado (cancelado) —
+  // as linhas continuam na lista normalmente (financeiro nunca esconde),
+  // só o resumo em números grandes que não deve mais tratar isso como
+  // dinheiro real a receber. Achado pelo Henrique em 28/07/2026.
+  const totalEmAtraso = emAtraso.filter((c) => !c.empreendimentoArquivado).reduce((s, c) => s + c.valor, 0);
+  const totalPendente = [...projetadas, ...confirmadasPendentes]
+    .filter((c) => !c.empreendimentoArquivado)
+    .reduce((s, c) => s + c.valor, 0);
+  const totalSemCronograma = semCronograma.filter((c) => !c.empreendimentoArquivado).reduce((s, c) => s + c.valor, 0);
 
   // Alerta de conferência — contas que venceram EXATAMENTE ontem (não
   // qualquer atraso, que já tem a seção própria acima) e ainda não foram
