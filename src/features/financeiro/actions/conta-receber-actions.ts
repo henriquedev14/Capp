@@ -36,6 +36,18 @@ export async function listarDadosContasAReceber() {
   const [empresas, contasReceberRaw] = await Promise.all([
     prisma.empresaGrupo.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
     prisma.contaReceber.findMany({
+      where: {
+        // Empreendimento arquivado (cancelado) some da lista de trabalho
+        // — mas só o que ainda não foi recebido. O que já foi recebido
+        // de verdade fica no histórico, é fato contábil consumado, não
+        // desaparece. Pedido pelo Henrique em 28/07/2026 (2ª vez — antes
+        // só tinha tirado dos totais, agora tira da lista também).
+        OR: [
+          { recebido: true },
+          { empreendimentoId: null },
+          { empreendimento: { excluidoEm: null } },
+        ],
+      },
       include: {
         empreendimento: { select: { id: true, nome: true, excluidoEm: true } },
         empresa: true,
