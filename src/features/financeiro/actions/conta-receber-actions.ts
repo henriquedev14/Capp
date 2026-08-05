@@ -29,6 +29,7 @@ export async function excluirContaReceber(id: string): Promise<Resultado> {
 
   revalidatePath("/financeiro/contas-a-receber");
   revalidatePath("/financeiro");
+  revalidatePath("/painel");
   return { ok: true };
 }
 
@@ -95,6 +96,7 @@ export async function marcarContaReceberComoRecebida(id: string): Promise<Result
     data: { recebido: true, recebidoEm: new Date() },
   });
   revalidatePath("/financeiro");
+  revalidatePath("/painel");
   return { ok: true };
 }
 
@@ -109,6 +111,7 @@ export async function desfazerRecebimentoConta(id: string): Promise<Resultado> {
     data: { recebido: false, recebidoEm: null },
   });
   revalidatePath("/financeiro");
+  revalidatePath("/painel");
   return { ok: true };
 }
 
@@ -216,6 +219,7 @@ export async function criarContaReceberAvulsa(
 
   revalidatePath("/financeiro/contas-a-receber");
   revalidatePath("/financeiro");
+  revalidatePath("/painel");
   return { ok: true };
 }
 
@@ -244,6 +248,7 @@ export async function atualizarContaReceber(
 
   await prisma.contaReceber.update({ where: { id }, data });
   revalidatePath("/financeiro");
+  revalidatePath("/painel");
   return { ok: true };
 }
 
@@ -293,6 +298,7 @@ export async function definirDataProjetada(
   });
 
   revalidatePath("/financeiro/contas-a-receber");
+  revalidatePath("/painel");
   return { ok: true };
 }
 
@@ -318,5 +324,6 @@ export async function registrarEnvioRemessa(
   });
 
   revalidatePath("/financeiro/contas-a-receber");
+  revalidatePath("/painel");
   return { ok: true };
 }
