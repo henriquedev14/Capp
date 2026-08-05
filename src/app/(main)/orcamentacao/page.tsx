@@ -53,6 +53,11 @@ export default async function OrcamentacaoHubPage({ searchParams }: Props) {
   const session = await getServerSession(authOptions);
   const visao = searchParams.visao ?? "todos";
 
+  // Papel Comercial só vê a própria carteira — mesma regra aplicada em
+  // Empreendimentos, agora também em Orçamentação (achado pelo Henrique
+  // em 28/07/2026: dava pra contornar a restrição vindo por aqui).
+  const restringirAosProprios = await temPermissao(PERMISSOES.EMPREENDIMENTO_VER_APENAS_PROPRIOS);
+
   const [usuarios, { linhas, indicadores }] = await Promise.all([
     usuarioRepo.findMany(),
     buscarFilaOrcamentos({
@@ -61,6 +66,7 @@ export default async function OrcamentacaoHubPage({ searchParams }: Props) {
       etapa: searchParams.etapa,
       usuarioAtualId: session?.user?.id,
       visao: visao as "minha_fila" | "equipe" | "todos" | "atrasados" | "aguardando_aprovacao",
+      responsavelComercialUserId: restringirAosProprios ? session?.user?.id : undefined,
     }),
   ]);
 
