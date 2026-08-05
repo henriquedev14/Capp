@@ -26,6 +26,8 @@ import { LevantamentoMateriaisPrismaRepository } from "@/infra/db/prisma/reposit
 import { EmpreendimentoPrismaRepository } from "@/infra/db/prisma/repositories/empreendimento-prisma-repository";
 import { UsuarioPrismaRepository } from "@/infra/db/prisma/repositories/usuario-prisma-repository";
 import { JornadaVisual } from "@/features/orcamentacao/components/jornada-visual";
+import { verificarGateOrcamentacao } from "@/features/empreendimentos/lib/gates-status";
+import { calcularJornadaReal } from "@/core/orcamentacao/use-cases/calcular-jornada-real";
 import { ResponsavelPrazoEditor } from "@/features/orcamentacao/components/responsavel-prazo-editor";
 import { podeGerenciarJornada } from "@/features/orcamentacao/actions/jornada-actions";
 import { buscarInfoPropostaOrcamento, listarCotacoesDoOrcamento, listarFornecedoresAtivosResumo } from "@/features/orcamentacao/actions/orcamento-actions";
@@ -114,6 +116,27 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
   const { cotacoes, erro: erroCotacoes } = orcamento
     ? await listarCotacoesDoOrcamento(orcamento.id)
     : { cotacoes: [], erro: null };
+
+  // Jornada REAL — calculada a partir do estado de verdade do sistema,
+  // não só do que foi escrito manualmente na tabela (que ficava travada
+  // em "0% concluído" até alguém aprovar, mesmo com o trabalho todo
+  // feito). Achado #1 da investigação de fluxo ponta-a-ponta (28/07/2026).
+  if (orcamento) {
+    const gateLevantamentos = await verificarGateOrcamentacao(
+      params.id,
+      empreendimento.kitEletrico,
+      empreendimento.kitHidraulico
+    );
+    jornada = calcularJornadaReal({
+      jornadaExistente: jornada,
+      levantamentosOk: "ok" in gateLevantamentos,
+      totalServicosHgi: orcamento.itensServico.reduce((s, i) => s + (i.total ?? 0), 0),
+      totalItensMaterial: orcamento.itensMaterial.length,
+      cotacoes,
+      statusOrcamento: orcamento.status,
+      propostaGeradaEm: propostaInfo.propostaGeradaEm,
+    });
+  }
 
   const fornecedoresAtivos = await listarFornecedoresAtivosResumo();
 
