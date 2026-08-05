@@ -15,7 +15,7 @@ export async function listarDadosContasAReceber() {
     prisma.empresaGrupo.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
     prisma.contaReceber.findMany({
       include: {
-        empreendimento: { select: { id: true, nome: true } },
+        empreendimento: { select: { id: true, nome: true, excluidoEm: true } },
         empresa: true,
         pavimento: { select: { nome: true } },
       },
@@ -27,6 +27,11 @@ export async function listarDadosContasAReceber() {
     id: c.id,
     empreendimentoId: c.empreendimento?.id ?? null,
     empreendimentoNome: c.empreendimento?.nome ?? c.nomeAvulso ?? "(sem nome)",
+    // Empreendimento arquivado (cancelado) — a linha continua aparecendo
+    // na lista (financeiro nunca esconde), mas os totais em destaque não
+    // devem mais contar esse valor como algo real a receber. Achado
+    // pelo Henrique em 28/07/2026, depois de arquivar um teste.
+    empreendimentoArquivado: c.empreendimento?.excluidoEm != null,
     tipo: c.tipo,
     pavimentoNome: c.pavimento?.nome ?? null,
     valor: Number(c.valor),
