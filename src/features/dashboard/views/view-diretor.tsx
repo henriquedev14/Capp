@@ -149,9 +149,10 @@ export function ViewDiretor({ data, metasPorArea }: { data: DashboardData; metas
             href: "/financeiro/contas-a-pagar",
           });
         }
-        if (data.paradosSemAtualizacao.length > 0) {
+        if (data.paradosSemAtualizacao.length > 0 || data.empreendimentosParadosSemOrcamento.length > 0) {
+          const total = data.paradosSemAtualizacao.length + data.empreendimentosParadosSemOrcamento.length;
           decisoes.push({
-            titulo: `${data.paradosSemAtualizacao.length} orçamento(s) parado(s) há mais de 7 dias`,
+            titulo: `${total} empreendimento(s) parado(s) há mais de 7 dias`,
             detalhe: "Sem atualização recente — pode estar esquecido, sem dono, ou esperando decisão de alguém.",
             href: "#alertas-parados",
           });
@@ -250,9 +251,9 @@ export function ViewDiretor({ data, metasPorArea }: { data: DashboardData; metas
         />
         <KpiCard
           label="Empreendimentos em risco"
-          value={data.paradosSemAtualizacao.length + data.cotacoesSemResposta.length}
+          value={data.paradosSemAtualizacao.length + data.empreendimentosParadosSemOrcamento.length + data.cotacoesSemResposta.length}
           hint="parados +7d ou cotação sem resposta +5d"
-          tone={data.paradosSemAtualizacao.length + data.cotacoesSemResposta.length > 0 ? "warning" : "default"}
+          tone={data.paradosSemAtualizacao.length + data.empreendimentosParadosSemOrcamento.length + data.cotacoesSemResposta.length > 0 ? "warning" : "default"}
           icon={Clock}
         />
       </div>
@@ -732,16 +733,44 @@ export function ViewDiretor({ data, metasPorArea }: { data: DashboardData; metas
           <CardHeader className="flex-row items-center gap-3 border-b border-border">
             <AlertTriangle className="h-4 w-4 text-warning" />
             <CardTitle className="text-[15px]">
-              Parados há +7 dias ({data.paradosSemAtualizacao.length})
+              Parados há +7 dias ({data.paradosSemAtualizacao.length + data.empreendimentosParadosSemOrcamento.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-5">
-            {data.paradosSemAtualizacao.length === 0 ? (
+            {data.paradosSemAtualizacao.length === 0 && data.empreendimentosParadosSemOrcamento.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Nenhum orçamento parado. Boa!
+                Nenhum empreendimento parado. Boa!
               </p>
             ) : (
               <div className="flex flex-col gap-2">
+                {/* Travados ANTES de existir orçamento (Prospecção/Comercial) —
+                    achado pelo Henrique em 06/08/2026, não pego pelo alerta
+                    original porque esse só olhava Orçamento. */}
+                {data.empreendimentosParadosSemOrcamento.slice(0, 6).map((e) => {
+                  const diasParado = Math.floor(
+                    (Date.now() - new Date(e.atualizadoEm).getTime()) / (1000 * 60 * 60 * 24)
+                  );
+                  return (
+                    <Link
+                      key={e.id}
+                      href={`/empreendimentos/${e.id}`}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 transition-colors hover:bg-warning/10"
+                    >
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {e.nome}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {e.status === "PROSPECCAO" ? "Prospecção" : "Comercial"} · sem orçamento ainda
+                        </span>
+                      </div>
+                      <span className="shrink-0 text-xs font-medium text-warning">
+                        {diasParado}d
+                        <ArrowRight className="ml-1 inline h-3 w-3" />
+                      </span>
+                    </Link>
+                  );
+                })}
                 {data.paradosSemAtualizacao.slice(0, 6).map((o) => {
                   const diasParado = Math.floor(
                     (Date.now() - new Date(o.atualizadoEm).getTime()) / (1000 * 60 * 60 * 24)
