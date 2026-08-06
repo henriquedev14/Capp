@@ -9,9 +9,12 @@ import type { CotacaoDetalhe } from "@/features/cotacoes/components/cotacao-deta
  * N registros Cotacao por trás, um por fornecedor; só a tela que
  * agrupa visualmente.
  */
-export async function buscarTodasCotacoesDetalhadas(empreendimentoId: string): Promise<CotacaoDetalhe[]> {
+export async function buscarTodasCotacoesDetalhadas(
+  orcamentoId: string,
+  empreendimentoId: string
+): Promise<CotacaoDetalhe[]> {
   const cotacoesIds = await prisma.cotacao.findMany({
-    where: { empreendimentoId },
+    where: { orcamentoId },
     select: { id: true },
     orderBy: { createdAt: "asc" },
   });
