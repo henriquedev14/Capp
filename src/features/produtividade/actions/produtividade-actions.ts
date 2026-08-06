@@ -4,6 +4,39 @@ import { prisma } from "@/infra/db/prisma/client";
 import { temPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 import type { PessoaProdutividade } from "@/core/produtividade/use-cases/classificar-quadrante";
+import { carregarDashboardData } from "@/features/dashboard/lib/queries";
+import { calcularProdutividadePorOperador } from "@/features/producao/actions/producao-actions";
+
+/**
+ * Busca os dados de "Saúde Geral" (semáforo por área) e "Tempo Médio de
+ * Ciclo" — reaproveitando o que o Painel principal já calcula
+ * (kpisCronologicos, paradosSemAtualizacao, cotacoesSemResposta), só
+ * que reorganizado pra tela de Produtividade. Não duplica lógica, só
+ * consome o mesmo dado de outro jeito. Pedido pelo Henrique em
+ * 06/08/2026, depois de achar a tela "simples demais" sem isso.
+ */
+export async function buscarSaudeGeralEEngenharia(inicio: Date, fim: Date) {
+  const [dashboard, produtividadeProducao] = await Promise.all([
+    carregarDashboardData(),
+    calcularProdutividadePorOperador(inicio, fim),
+  ]);
+
+  const orcamentosParados = dashboard.paradosSemAtualizacao.length;
+  const cotacoesParadas = dashboard.cotacoesSemResposta.length;
+
+  const metaTotal = produtividadeProducao.reduce((s, p) => s + p.metaPeriodoUH, 0);
+  const realizadoTotal = produtividadeProducao.reduce((s, p) => s + p.quantidadeUH, 0);
+  const percentualProducao = metaTotal > 0 ? Math.round((realizadoTotal / metaTotal) * 100) : 0;
+
+  return {
+    kpisCronologicos: dashboard.kpisCronologicos,
+    orcamentosParados,
+    cotacoesParadas,
+    percentualProducao,
+    realizadoTotal: Math.round(realizadoTotal),
+    metaTotal: Math.round(metaTotal),
+  };
+}
 
 const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 
