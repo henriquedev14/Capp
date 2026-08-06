@@ -31,7 +31,7 @@ export async function buscarProdutividadePorPessoa(
     },
     select: {
       responsavelComercialUserId: true,
-      responsavelComercial: { select: { nome: true } },
+      responsavelComercialUser: { select: { nome: true } },
       updatedAt: true,
     },
   });
@@ -49,7 +49,7 @@ export async function buscarProdutividadePorPessoa(
   const comercialPorUsuario = new Map<string, { nome: string; carga: number; parados: number }>();
   for (const e of empreendimentosAtivos) {
     const id = e.responsavelComercialUserId!;
-    const atual = comercialPorUsuario.get(id) ?? { nome: e.responsavelComercial!.nome, carga: 0, parados: 0 };
+    const atual = comercialPorUsuario.get(id) ?? { nome: e.responsavelComercialUser!.nome, carga: 0, parados: 0 };
     atual.carga++;
     if (e.updatedAt < seteDiasAtras) atual.parados++;
     comercialPorUsuario.set(id, atual);
