@@ -116,7 +116,8 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
   const { cotacoes, erro: erroCotacoes } = orcamento
     ? await listarCotacoesDoOrcamento(orcamento.id)
     : { cotacoes: [], erro: null };
-  const cotacoesDetalhadas = cotacoes.length > 0 ? await buscarTodasCotacoesDetalhadas(params.id) : [];
+  const cotacoesDetalhadas =
+    cotacoes.length > 0 && orcamento ? await buscarTodasCotacoesDetalhadas(orcamento.id, params.id) : [];
 
   const fornecedoresAtivos = await listarFornecedoresAtivosResumo();
 
