@@ -19,6 +19,10 @@ export interface DashboardData {
   };
   // Alertas: orçamentos parados sem atualização há +7 dias
   paradosSemAtualizacao: OrcamentoResumo[];
+  // Alertas: empreendimentos parados há +7 dias ANTES de ter orçamento
+  // (travados em Prospecção/Comercial) — não pegos pelo alerta acima,
+  // que só olha Orçamento. Achado pelo Henrique em 06/08/2026.
+  empreendimentosParadosSemOrcamento: EmpreendimentoResumo[];
   // Alertas: cotações enviadas há +5 dias sem resposta do fornecedor
   cotacoesSemResposta: {
     id: string;
@@ -429,6 +433,13 @@ export async function carregarDashboardData(): Promise<DashboardData> {
       o.atualizadoEm < setedeDiasAtras
   );
 
+  // Empreendimentos travados ANTES de existir orçamento — Prospecção
+  // ou Comercial há mais de 7 dias sem nenhuma atualização. O filtro
+  // acima nunca pega esse caso porque não existe Orçamento pra checar.
+  const empreendimentosParadosSemOrcamento = empreendimentos.filter(
+    (e) => (e.status === "PROSPECCAO" || e.status === "COMERCIAL") && e.atualizadoEm < setedeDiasAtras
+  );
+
   // Alertas: cotações enviadas ao fornecedor há mais de 5 dias sem
   // resposta (nem aceita, nem recusada, nem respondida) — indica que
   // pode estar travando o fechamento do orçamento sem ninguém perceber.
@@ -636,6 +647,7 @@ export async function carregarDashboardData(): Promise<DashboardData> {
       materiais: mapLev(levMateriais),
     },
     paradosSemAtualizacao,
+    empreendimentosParadosSemOrcamento,
     cotacoesSemResposta: cotacoesSemResposta.map((c) => ({
       id: c.id,
       numero: c.numero,
