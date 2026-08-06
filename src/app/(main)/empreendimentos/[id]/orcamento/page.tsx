@@ -20,17 +20,17 @@ import { DeletarOrcamentoButton } from "@/features/orcamentacao/components/delet
 import { GerarPropostaButton } from "@/features/orcamentacao/components/gerar-proposta-button";
 import { ehGestorSenior } from "@/infra/auth/eh-gestor-senior";
 import { GerarCotacaoButton } from "@/features/cotacoes/components/gerar-cotacao-button";
-import { CotacoesList } from "@/features/cotacoes/components/cotacoes-list";
 import { OrcamentacaoPrismaRepository } from "@/infra/db/prisma/repositories/orcamentacao-prisma-repository";
 import { LevantamentoMateriaisPrismaRepository } from "@/infra/db/prisma/repositories/levantamento-materiais-prisma-repository";
 import { EmpreendimentoPrismaRepository } from "@/infra/db/prisma/repositories/empreendimento-prisma-repository";
 import { UsuarioPrismaRepository } from "@/infra/db/prisma/repositories/usuario-prisma-repository";
 import { JornadaVisual } from "@/features/orcamentacao/components/jornada-visual";
-import { verificarGateOrcamentacao } from "@/features/empreendimentos/lib/gates-status";
-import { calcularJornadaReal } from "@/core/orcamentacao/use-cases/calcular-jornada-real";
 import { ResponsavelPrazoEditor } from "@/features/orcamentacao/components/responsavel-prazo-editor";
 import { podeGerenciarJornada } from "@/features/orcamentacao/actions/jornada-actions";
 import { buscarInfoPropostaOrcamento, listarCotacoesDoOrcamento, listarFornecedoresAtivosResumo } from "@/features/orcamentacao/actions/orcamento-actions";
+import { consolidarItensPorMaterial } from "@/core/orcamentacao/use-cases/consolidar-itens-material";
+import { CotacoesUnificadas } from "@/features/cotacoes/components/cotacoes-unificadas";
+import { buscarTodasCotacoesDetalhadas } from "@/features/cotacoes/actions/buscar-todas-detalhadas";
 import { getTierOption } from "@/features/tiers/constants";
 import { temPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
@@ -116,27 +116,7 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
   const { cotacoes, erro: erroCotacoes } = orcamento
     ? await listarCotacoesDoOrcamento(orcamento.id)
     : { cotacoes: [], erro: null };
-
-  // Jornada REAL — calculada a partir do estado de verdade do sistema,
-  // não só do que foi escrito manualmente na tabela (que ficava travada
-  // em "0% concluído" até alguém aprovar, mesmo com o trabalho todo
-  // feito). Achado #1 da investigação de fluxo ponta-a-ponta (28/07/2026).
-  if (orcamento) {
-    const gateLevantamentos = await verificarGateOrcamentacao(
-      params.id,
-      empreendimento.kitEletrico,
-      empreendimento.kitHidraulico
-    );
-    jornada = calcularJornadaReal({
-      jornadaExistente: jornada,
-      levantamentosOk: "ok" in gateLevantamentos,
-      totalServicosHgi: orcamento.itensServico.reduce((s, i) => s + (i.total ?? 0), 0),
-      totalItensMaterial: orcamento.itensMaterial.length,
-      cotacoes,
-      statusOrcamento: orcamento.status,
-      propostaGeradaEm: propostaInfo.propostaGeradaEm,
-    });
-  }
+  const cotacoesDetalhadas = cotacoes.length > 0 ? await buscarTodasCotacoesDetalhadas(params.id) : [];
 
   const fornecedoresAtivos = await listarFornecedoresAtivosResumo();
 
@@ -529,9 +509,10 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                       <Package className="h-[18px] w-[18px] text-muted-foreground" />
                     </div>
                     <div>
-                      <CardTitle className="text-[15px]">Bloco 2 — Materiais</CardTitle>
+                      <CardTitle className="text-[15px]">Preço Final Consolidado</CardTitle>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Preenchido a partir do Levantamento de Materiais validado de cada tipologia
+                        Resultado final por material — vem de Cotação aceita ou Tabela de Preços. É o que compõe o
+                        Total Materiais e a Proposta.
                       </p>
                     </div>
                   </div>
@@ -558,8 +539,12 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                           mapa.get(grupo)!.push(item);
                           return mapa;
                         }, new Map<string, typeof orcamento.itensMaterial>())
-                      ).map(([fabricante, itens]) => {
-                        const subtotal = itens.reduce((acc, i) => acc + (i.total ?? 0), 0);
+                      ).map(([fabricante, itensDaCategoria]) => {
+                        // Consolida o mesmo material vindo de tipologias
+                        // diferentes numa linha só, somando quantidade/total
+                        // — pedido pelo Henrique em 06/08/2026 (achado #8).
+                        const itens = consolidarItensPorMaterial(itensDaCategoria);
+                        const subtotal = itens.reduce((acc, i) => acc + i.total, 0);
                         return (
                           <div key={fabricante} className="rounded-lg border border-border overflow-hidden">
                             <div className="bg-secondary/50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
@@ -571,27 +556,29 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                                   <tr key={item.id}>
                                     <td className="px-3 py-2 text-foreground">
                                       {item.descricao}
-                                      {item.tipologiaNome && (
-                                        <span className="ml-2 text-xs text-muted-foreground">({item.tipologiaNome})</span>
+                                      {item.tipologias.length > 1 && (
+                                        <span className="ml-2 text-xs text-muted-foreground">
+                                          ({item.tipologias.length} tipologias)
+                                        </span>
                                       )}
                                     </td>
                                     <td className="px-2 py-2 text-muted-foreground w-24">{item.marca ?? "—"}</td>
                                     <td className="px-2 py-2 text-right text-muted-foreground w-16">{item.quantidade}</td>
                                     <td className="px-2 py-2 text-muted-foreground w-12">{item.unidade}</td>
                                     <td className="px-2 py-2 text-right font-mono text-muted-foreground w-24">
-                                      {formatBRL(item.precoUnitario ?? 0)}
-                                      {item.cotacaoItemId ? (
+                                      {formatBRL(item.precoUnitario)}
+                                      {item.origemUnica === "COTACAO" ? (
                                         <div className="mt-0.5 text-[10px] font-sans font-medium normal-case text-primary">
                                           Cotação
                                         </div>
-                                      ) : item.itemTabelaPrecoId ? (
+                                      ) : item.origemUnica === "TABELA_PRECO" ? (
                                         <div className="mt-0.5 text-[10px] font-sans font-medium normal-case text-muted-foreground/70">
                                           Tabela de Preços
                                         </div>
                                       ) : null}
                                     </td>
                                     <td className="px-3 py-2 text-right font-mono font-medium w-28">
-                                      {formatBRL(item.total ?? 0)}
+                                      {formatBRL(item.total)}
                                     </td>
                                   </tr>
                                 ))}
@@ -614,13 +601,14 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                 </CardContent>
               </Card>
 
-              {/* Cotações geradas a partir deste orçamento */}
+              {/* Cotações geradas a partir deste orçamento — visão unificada
+                  por abas (Etapa 1 da unificação, 06/08/2026) */}
               {erroCotacoes ? (
                 <div className="rounded-lg border border-warning/40 bg-warning/5 p-4 text-sm text-warning">
                   {erroCotacoes}
                 </div>
               ) : (
-                <CotacoesList empreendimentoId={params.id} cotacoes={cotacoes} />
+                <CotacoesUnificadas cotacoes={cotacoesDetalhadas} />
               )}
             </>
           )}
