@@ -9,6 +9,7 @@ import {
   Building2,
   Boxes,
   Users,
+  Users2,
   FileBarChart,
   Settings,
   Zap,
@@ -38,6 +39,7 @@ const NAV_GROUPS = [
     label: "Principal",
     items: [
       { label: "Analytics", icon: LayoutDashboard, href: "/painel", permissao: null },
+      { label: "Produtividade", icon: Users2, href: "/produtividade", permissao: PERMISSOES.DASHBOARD_VER_PRODUTIVIDADE },
       { label: "Clientes", icon: Building2, href: "/clientes", permissao: PERMISSOES.CLIENTE_VER },
       { label: "Empreendimentos", icon: Boxes, href: "/empreendimentos", permissao: PERMISSOES.EMPREENDIMENTO_VER },
     ],
