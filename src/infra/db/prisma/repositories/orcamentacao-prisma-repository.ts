@@ -171,6 +171,10 @@ export class OrcamentacaoPrismaRepository {
     tier: number;
     observacoes?: string | null;
     criadoPorId?: string | null;
+    /** Quem fica responsável pelo orçamento — pedido pelo Henrique em
+     * 06/08/2026 (Central de Produtividade): antes ninguém preenchia
+     * isso, então nenhum orçamento aparecia atribuído a ninguém. */
+    responsavelId?: string | null;
     itensServico: Array<Omit<ItemServicoOrcamento, "id" | "orcamentoId" | "situacao" | "justificativa" | "tierMultiplicadorId" | "ajusteManual" | "ajusteMotivo" | "memoriaCalculo">>;
     itensMaterial: Array<Omit<ItemMaterialOrcamento, "id" | "orcamentoId" | "situacao" | "justificativa" | "fornecedorSelecionadoId" | "cotacaoItemId" | "itemTabelaPrecoId" | "marca" | "precoBase" | "frete" | "impostos" | "perdas" | "memoriaCalculo">>;
   }): Promise<Orcamento> {
@@ -188,6 +192,9 @@ export class OrcamentacaoPrismaRepository {
         tier: data.tier,
         observacoes: data.observacoes,
         criadoPorId: data.criadoPorId,
+        // Sem responsável explícito, quem criou já assume — evita
+        // orçamento "órfão" sem ninguém cuidando dele.
+        responsavelId: data.responsavelId ?? data.criadoPorId,
         totalServicosHgi,
         totalMateriais,
         itensServico: {
