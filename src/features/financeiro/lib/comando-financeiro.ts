@@ -20,7 +20,16 @@ export interface ItemReceberPriorizado {
 export async function listarFilaContasAReceber(limite = 8): Promise<ItemReceberPriorizado[]> {
   const hoje = new Date();
   const contas = await prisma.contaReceber.findMany({
-    where: { recebido: false, dataPrevista: { not: null } },
+    where: {
+      recebido: false,
+      dataPrevista: { not: null },
+      // Empreendimento arquivado (cancelado) não é mais pendência real
+      // — não faz sentido continuar na fila de "precisa de atenção".
+      // Antes só marcava com um selo (empreendimentoArquivado) que
+      // nunca chegou a ser desenhado na tela — Henrique flagou em
+      // 06/08/2026 que o NOW LAGUNA continuava aparecendo aqui.
+      OR: [{ empreendimentoId: null }, { empreendimento: { excluidoEm: null } }],
+    },
     include: {
       empreendimento: {
         select: {
@@ -65,7 +74,10 @@ export interface TopCliente {
 
 export async function listarTopClientesDevedores(limite = 5): Promise<TopCliente[]> {
   const contas = await prisma.contaReceber.findMany({
-    where: { recebido: false },
+    where: {
+      recebido: false,
+      OR: [{ empreendimentoId: null }, { empreendimento: { excluidoEm: null } }],
+    },
     include: { empreendimento: { select: { cliente: { select: { razaoSocial: true, nomeFantasia: true } } } } },
   });
 
