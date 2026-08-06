@@ -21,7 +21,7 @@ export async function buscarSaudeGeralEEngenharia(inicio: Date, fim: Date) {
     calcularProdutividadePorOperador(inicio, fim),
   ]);
 
-  const orcamentosParados = dashboard.paradosSemAtualizacao.length;
+  const orcamentosParados = dashboard.paradosSemAtualizacao.length + dashboard.empreendimentosParadosSemOrcamento.length;
   const cotacoesParadas = dashboard.cotacoesSemResposta.length;
 
   const metaTotal = produtividadeProducao.reduce((s, p) => s + p.metaPeriodoUH, 0);
