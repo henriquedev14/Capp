@@ -107,6 +107,7 @@ export const PERMISSOES = {
   DASHBOARD_VER_ENGENHARIA: "dashboard:ver_engenharia",
   DASHBOARD_VER_ORCAMENTACAO: "dashboard:ver_orcamentacao",
   DASHBOARD_VER_FINANCEIRO: "dashboard:ver_financeiro",
+  DASHBOARD_VER_PRODUTIVIDADE: "dashboard:ver_produtividade",
 
   // Módulo: Produção (bancadas de industrialização)
   PRODUCAO_REGISTRAR: "producao:registrar", // líder de bancada lança produção no tablet
@@ -183,6 +184,7 @@ export const DESCRICOES_PERMISSOES: Record<PermissaoChave, string> = {
   [PERMISSOES.DASHBOARD_VER_ENGENHARIA]: "Ver a aba Engenharia do Analytics",
   [PERMISSOES.DASHBOARD_VER_ORCAMENTACAO]: "Ver a aba Orçamentação do Analytics",
   [PERMISSOES.DASHBOARD_VER_FINANCEIRO]: "Ver a aba Financeiro do Analytics",
+  [PERMISSOES.DASHBOARD_VER_PRODUTIVIDADE]: "Ver a Central de Produtividade (quadrante por pessoa)",
   [PERMISSOES.PRODUCAO_REGISTRAR]: "Lançar produção no tablet de uma bancada",
   [PERMISSOES.PRODUCAO_CORRIGIR]: "Corrigir um registro de produção lançado errado",
   [PERMISSOES.PRODUCAO_GERENCIAR_CADASTRO]: "Ajustar bancadas, operadores, meta diária e U.H. Referência",
