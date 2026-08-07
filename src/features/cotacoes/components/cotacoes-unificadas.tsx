@@ -23,6 +23,8 @@ const CORES_ABA: Record<string, string> = {
 
 interface Props {
   cotacoes: CotacaoDetalhe[];
+  totalMateriais: number;
+  aplicarTabelaPrecoSlot?: React.ReactNode;
 }
 
 /**
@@ -31,22 +33,30 @@ interface Props {
  * Cotacao separado por trás). Antes cada fornecedor exigia navegar
  * pra uma página própria; agora é uma aba na mesma tela. Recusar uma
  * aba não afeta as outras — cada seção mantém seu próprio status.
+ *
+ * Também absorveu o que era o "Bloco 2 — Materiais" (visão separada
+ * do preço final) — o Henrique pediu pra tirar essa duplicação: a
+ * aplicação de preço acontece direto aqui, por fornecedor, sem uma
+ * segunda tela mostrando "o resultado" à parte.
  */
-export function CotacoesUnificadas({ cotacoes }: Props) {
+export function CotacoesUnificadas({ cotacoes, totalMateriais, aplicarTabelaPrecoSlot }: Props) {
   const [abaAtiva, setAbaAtiva] = React.useState(cotacoes[0]?.id ?? "");
   const cotacaoAtiva = cotacoes.find((c) => c.id === abaAtiva) ?? cotacoes[0];
 
   if (cotacoes.length === 0) {
     return (
       <Card>
-        <CardHeader className="flex-row items-center gap-3 border-b border-border">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent">
-            <FileSpreadsheet className="h-[18px] w-[18px] text-accent-foreground" />
+        <CardHeader className="flex-row items-center justify-between gap-3 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent">
+              <FileSpreadsheet className="h-[18px] w-[18px] text-accent-foreground" />
+            </div>
+            <div className="flex-1">
+              <CardTitle className="text-[15px]">Cotação</CardTitle>
+              <p className="mt-0.5 text-xs text-muted-foreground">Nenhuma cotação gerada ainda para este orçamento.</p>
+            </div>
           </div>
-          <div className="flex-1">
-            <CardTitle className="text-[15px]">Cotação</CardTitle>
-            <p className="mt-0.5 text-xs text-muted-foreground">Nenhuma cotação gerada ainda para este orçamento.</p>
-          </div>
+          {aplicarTabelaPrecoSlot}
         </CardHeader>
         <CardContent className="pt-5">
           <div className="rounded-lg border border-dashed border-border py-8 text-center">
@@ -59,17 +69,30 @@ export function CotacoesUnificadas({ cotacoes }: Props) {
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center gap-3 border-b border-border">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent">
-          <FileSpreadsheet className="h-[18px] w-[18px] text-accent-foreground" />
+      <CardHeader className="flex-row items-center justify-between gap-3 border-b border-border">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent">
+            <FileSpreadsheet className="h-[18px] w-[18px] text-accent-foreground" />
+          </div>
+          <div className="flex-1">
+            <CardTitle className="text-[15px]">
+              Cotação — {cotacoes.length} fornecedor{cotacoes.length > 1 ? "es" : ""} consultado{cotacoes.length > 1 ? "s" : ""}
+            </CardTitle>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Uma rodada, uma seção por fornecedor. Se um recusar, gera-se outra rodada só pra ele.
+            </p>
+          </div>
         </div>
-        <div className="flex-1">
-          <CardTitle className="text-[15px]">
-            Cotação — {cotacoes.length} fornecedor{cotacoes.length > 1 ? "es" : ""} consultado{cotacoes.length > 1 ? "s" : ""}
-          </CardTitle>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Uma rodada, uma seção por fornecedor. Se um recusar, gera-se outra rodada só pra ele.
-          </p>
+        <div className="flex shrink-0 items-center gap-3">
+          {totalMateriais > 0 && (
+            <div className="rounded-lg bg-primary/10 px-4 py-2 text-right">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">Total Materiais</p>
+              <p className="text-base font-bold text-primary">
+                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalMateriais)}
+              </p>
+            </div>
+          )}
+          {aplicarTabelaPrecoSlot}
         </div>
       </CardHeader>
       <CardContent className="pt-4">
