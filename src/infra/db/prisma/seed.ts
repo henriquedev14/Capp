@@ -205,6 +205,7 @@ async function seedOrcamentacao() {
       kitValorMinimo: 550,
       kitPontosInclusos: 6,
       kitValorPorPontoExtra: 70,
+      nomeEmpresaDocumentos: "ConstruApp by Grupo HGI",
     },
   });
 
