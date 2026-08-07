@@ -7,7 +7,6 @@ import {
   Calculator,
   AlertTriangle,
   Info,
-  Package,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -502,106 +501,6 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                 </CardContent>
               </Card>
 
-              {/* Bloco 2 — Materiais */}
-              <Card>
-                <CardHeader className="flex-row items-center justify-between gap-3 border-b border-border pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary">
-                      <Package className="h-[18px] w-[18px] text-muted-foreground" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-[15px]">Preço Final Consolidado</CardTitle>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Resultado final por material — vem de Cotação aceita ou Tabela de Preços. É o que compõe o
-                        Total Materiais e a Proposta.
-                      </p>
-                    </div>
-                  </div>
-                  {orcamento && (
-                    <AplicarTabelaPrecoButton
-                      orcamentoId={orcamento.id}
-                      empreendimentoId={params.id}
-                      fornecedoresDisponiveis={fornecedoresAtivos}
-                    />
-                  )}
-                </CardHeader>
-                <CardContent className="pt-4">
-                  {orcamento.itensMaterial.length === 0 ? (
-                    <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-                      <Info className="h-4 w-4 shrink-0" />
-                      Nenhum material ainda — valide o Levantamento de Materiais de alguma tipologia.
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-4">
-                      {Array.from(
-                        orcamento.itensMaterial.reduce((mapa, item) => {
-                          const grupo = item.categoria ?? "Outros";
-                          if (!mapa.has(grupo)) mapa.set(grupo, []);
-                          mapa.get(grupo)!.push(item);
-                          return mapa;
-                        }, new Map<string, typeof orcamento.itensMaterial>())
-                      ).map(([fabricante, itensDaCategoria]) => {
-                        // Consolida o mesmo material vindo de tipologias
-                        // diferentes numa linha só, somando quantidade/total
-                        // — pedido pelo Henrique em 06/08/2026 (achado #8).
-                        const itens = consolidarItensPorMaterial(itensDaCategoria);
-                        const subtotal = itens.reduce((acc, i) => acc + i.total, 0);
-                        return (
-                          <div key={fabricante} className="rounded-lg border border-border overflow-hidden">
-                            <div className="bg-secondary/50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
-                              {fabricante}
-                            </div>
-                            <table className="w-full text-sm">
-                              <tbody className="divide-y divide-border/50">
-                                {itens.map((item) => (
-                                  <tr key={item.id}>
-                                    <td className="px-3 py-2 text-foreground">
-                                      {item.descricao}
-                                      {item.tipologias.length > 1 && (
-                                        <span className="ml-2 text-xs text-muted-foreground">
-                                          ({item.tipologias.length} tipologias)
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="px-2 py-2 text-muted-foreground w-24">{item.marca ?? "—"}</td>
-                                    <td className="px-2 py-2 text-right text-muted-foreground w-16">{item.quantidade}</td>
-                                    <td className="px-2 py-2 text-muted-foreground w-12">{item.unidade}</td>
-                                    <td className="px-2 py-2 text-right font-mono text-muted-foreground w-24">
-                                      {formatBRL(item.precoUnitario)}
-                                      {item.origemUnica === "COTACAO" ? (
-                                        <div className="mt-0.5 text-[10px] font-sans font-medium normal-case text-primary">
-                                          Cotação
-                                        </div>
-                                      ) : item.origemUnica === "TABELA_PRECO" ? (
-                                        <div className="mt-0.5 text-[10px] font-sans font-medium normal-case text-muted-foreground/70">
-                                          Tabela de Preços
-                                        </div>
-                                      ) : null}
-                                    </td>
-                                    <td className="px-3 py-2 text-right font-mono font-medium w-28">
-                                      {formatBRL(item.total)}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                            <div className="flex justify-end border-t border-border bg-secondary/30 px-3 py-1.5 text-xs font-semibold">
-                              Subtotal {fabricante}: {formatBRL(subtotal)}
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      <div className="flex justify-end rounded-lg bg-primary/10 px-4 py-3">
-                        <span className="text-base font-bold text-primary">
-                          Total Materiais: {formatBRL(orcamento.totalMateriais ?? 0)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
               {/* Cotações geradas a partir deste orçamento — visão unificada
                   por abas (Etapa 1 da unificação, 06/08/2026) */}
               {erroCotacoes ? (
@@ -609,7 +508,19 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                   {erroCotacoes}
                 </div>
               ) : (
-                <CotacoesUnificadas cotacoes={cotacoesDetalhadas} />
+                <CotacoesUnificadas
+                  cotacoes={cotacoesDetalhadas}
+                  totalMateriais={orcamento?.totalMateriais ?? 0}
+                  aplicarTabelaPrecoSlot={
+                    orcamento && (
+                      <AplicarTabelaPrecoButton
+                        orcamentoId={orcamento.id}
+                        empreendimentoId={params.id}
+                        fornecedoresDisponiveis={fornecedoresAtivos}
+                      />
+                    )
+                  }
+                />
               )}
             </>
           )}
