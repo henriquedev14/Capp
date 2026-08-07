@@ -411,6 +411,33 @@ export async function atualizarPrecoCotacaoItem(
 // Mudar status da cotação
 // --------------------------------------------------------------------------
 
+/**
+ * Marca TODAS as cotações (uma por fornecedor) da mesma rodada como
+ * ENVIADA de uma vez — antes precisava clicar fornecedor por
+ * fornecedor, um botão repetido em cada seção. Pedido pelo Henrique
+ * em 07/08/2026: essa ação é da rodada inteira, não de cada seção.
+ */
+export async function marcarRodadaComoEnviada(rodadaId: string): Promise<{ ok: true } | { erro: string }> {
+  try {
+    await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : "Não autorizado." };
+  }
+
+  await prisma.cotacao.updateMany({
+    where: { rodadaId, status: "RASCUNHO" },
+    data: { status: "ENVIADA" },
+  });
+
+  const rodada = await prisma.rodadaCotacao.findUnique({
+    where: { id: rodadaId },
+    include: { orcamento: { select: { empreendimentoId: true } } },
+  });
+  if (rodada) revalidatePath(`/empreendimentos/${rodada.orcamento.empreendimentoId}/orcamento`);
+
+  return { ok: true };
+}
+
 export async function mudarStatusCotacao(
   cotacaoId: string,
   novoStatus: "RASCUNHO" | "ENVIADA" | "RESPONDIDA" | "ACEITA" | "RECUSADA"
@@ -817,6 +844,7 @@ export async function buscarCotacaoDetalhe(
     id: cotacao.id,
     numero: cotacao.numero,
     numeroRodada: cotacao.rodada?.numero ?? cotacao.numero,
+    rodadaId: cotacao.rodadaId,
     status: cotacao.status,
     fornecedor: {
       nomeExibido: cotacao.fornecedor.nomeFantasia ?? cotacao.fornecedor.razaoSocial,
