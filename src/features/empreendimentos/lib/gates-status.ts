@@ -57,11 +57,21 @@ export async function verificarGateNegociacao(
   const ultimoOrcamento = await prisma.orcamento.findFirst({
     where: { empreendimentoId },
     orderBy: { revisao: "desc" },
-    select: { propostaGeradaEm: true },
+    select: { propostaGeradaEm: true, statusAprovacao: true },
   });
   if (!ultimoOrcamento?.propostaGeradaEm) {
     return {
       erro: "Gere a proposta comercial antes de avançar para Negociação — sem ela não há o que apresentar ao cliente.",
+    };
+  }
+  // Achado #2 da revisão de arquitetura (07/08/2026): antes só checava
+  // se a proposta tinha SIDO gerada um dia, sem confirmar que a
+  // aprovação do gestor ainda está vigente. Numa borda rara (orçamento
+  // aprovado → proposta gerada → depois devolvido/alterado), isso
+  // deixava a Negociação liberada sem aprovação de verdade.
+  if (ultimoOrcamento.statusAprovacao !== "APROVADO") {
+    return {
+      erro: "O orçamento precisa estar com a aprovação do gestor vigente antes de avançar para Negociação.",
     };
   }
   return { ok: true };

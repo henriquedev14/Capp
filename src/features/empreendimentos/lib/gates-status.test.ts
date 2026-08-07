@@ -167,23 +167,39 @@ describe("verificarGateNegociacao", () => {
     expect(resultado).toHaveProperty("erro");
   });
 
-  it("libera quando a revisão mais recente já tem propostaGeradaEm preenchido", async () => {
+  it("libera quando a revisão mais recente já tem propostaGeradaEm preenchido E a aprovação está vigente", async () => {
     const cliente = await criarClienteTeste();
     const emp = await criarEmpreendimentoTeste(cliente.id, { kitEletrico: true, kitHidraulico: false });
     await prisma.orcamento.create({
-      data: { empreendimentoId: emp.id, revisao: 1, propostaGeradaEm: new Date() },
+      data: { empreendimentoId: emp.id, revisao: 1, propostaGeradaEm: new Date(), statusAprovacao: "APROVADO" },
     });
 
     const resultado = await verificarGateNegociacao(emp.id);
     expect(resultado).toEqual({ ok: true });
   });
 
+  it("Achado #2 (07/08/2026): bloqueia quando a proposta foi gerada mas a aprovação NÃO está mais vigente (ex: devolvida depois)", async () => {
+    const cliente = await criarClienteTeste();
+    const emp = await criarEmpreendimentoTeste(cliente.id, { kitEletrico: true, kitHidraulico: false });
+    await prisma.orcamento.create({
+      data: {
+        empreendimentoId: emp.id,
+        revisao: 1,
+        propostaGeradaEm: new Date(),
+        statusAprovacao: "DEVOLVIDO",
+      },
+    });
+
+    const resultado = await verificarGateNegociacao(emp.id);
+    expect(resultado).toHaveProperty("erro");
+  });
+
   it("verifica sempre a revisão MAIS RECENTE, não a primeira criada", async () => {
     const cliente = await criarClienteTeste();
     const emp = await criarEmpreendimentoTeste(cliente.id, { kitEletrico: true, kitHidraulico: false });
-    // Revisão 1 já teve proposta gerada (cenário antigo)...
+    // Revisão 1 já teve proposta gerada e aprovada (cenário antigo)...
     await prisma.orcamento.create({
-      data: { empreendimentoId: emp.id, revisao: 1, propostaGeradaEm: new Date() },
+      data: { empreendimentoId: emp.id, revisao: 1, propostaGeradaEm: new Date(), statusAprovacao: "APROVADO" },
     });
     // ...mas a revisão 2 (mais nova) ainda não gerou a proposta dela.
     await prisma.orcamento.create({
