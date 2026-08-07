@@ -55,8 +55,14 @@ export async function GET(
     return NextResponse.json({ erro: "Cotação não encontrada." }, { status: 404 });
   }
 
+  const config = await prisma.configuracaoSistema.findUnique({
+    where: { id: "default" },
+    select: { nomeEmpresaDocumentos: true },
+  });
+
   const data: CotacaoPdfData = {
     numero: cotacao.numero,
+    nomeEmissor: config?.nomeEmpresaDocumentos || "ConstruApp",
     status: cotacao.status,
     clienteNome:
       cotacao.orcamento.empreendimento.cliente.nomeFantasia ??
