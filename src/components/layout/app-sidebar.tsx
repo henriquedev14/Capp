@@ -19,6 +19,7 @@ import {
   PackageCheck,
   Package,
   Calculator,
+  Handshake,
   ShieldCheck,
   ShieldAlert,
   Wallet,
@@ -48,6 +49,7 @@ const NAV_GROUPS = [
     label: "Operação",
     items: [
       { label: "Orçamentação", icon: Calculator, href: "/orcamentacao", permissao: PERMISSOES.ORCAMENTO_VER },
+      { label: "Negociação", icon: Handshake, href: "/negociacao", permissao: PERMISSOES.ORCAMENTO_VER },
       { label: "Financeiro", icon: Wallet, href: "/financeiro", permissao: PERMISSOES.FINANCEIRO_VER },
       { label: "Fornecedores", icon: Truck, href: "/fornecedores", permissao: PERMISSOES.FORNECEDOR_VER },
       { label: "Produção", icon: Factory, href: "/producao", permissao: PERMISSOES.PRODUCAO_REGISTRAR },
