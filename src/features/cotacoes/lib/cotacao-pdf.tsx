@@ -258,6 +258,9 @@ export interface CotacaoPdfData {
   totalGeral: number;
   itens: CotacaoPdfItem[];
   observacoes: string | null;
+  /** Nome exibido no cabeçalho — vem de ConfiguracaoSistema, não é
+   * mais fixo no código. Achado #4 da revisão de arquitetura (07/08/2026). */
+  nomeEmissor: string;
 }
 
 function formatBRL(v: number): string {
@@ -302,8 +305,7 @@ export function CotacaoDocument({ data }: { data: CotacaoPdfData }) {
         <View style={styles.header} fixed>
           <View style={styles.headerLogo}>
             <LogoMalha />
-            <Text style={styles.headerLogoName}>ConstructApp</Text>
-            <Text style={styles.headerLogoTag}>HGI GROUP</Text>
+            <Text style={styles.headerLogoName}>{data.nomeEmissor}</Text>
           </View>
           <View style={styles.headerInfo}>
             <Text style={styles.headerInfoTitle}>ORÇAMENTO</Text>
@@ -442,7 +444,7 @@ export function CotacaoDocument({ data }: { data: CotacaoPdfData }) {
         {/* Rodapé */}
         <View style={styles.footer} fixed>
           <Text style={styles.footerText}>
-            Documento gerado pelo ConstructApp — sistema interno HGI Group
+            Documento gerado pelo {data.nomeEmissor}
           </Text>
           <Text
             style={styles.footerText}
