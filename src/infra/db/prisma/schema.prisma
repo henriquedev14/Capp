@@ -798,6 +798,13 @@ model ConfiguracaoSistema {
   criterioPrecificacao CriterioPrecificacao @default(AREA)
   saldoCaixaAtual      Decimal              @default(0) @db.Decimal(12, 2)
 
+  // Identidade exibida nos documentos gerados (PDF/CSV de Cotação, etc.)
+  // — antes ficava fixo "ConstructApp / HGI GROUP" direto no código do
+  // relatório, sem vir de cadastro nenhum. Achado #4 da revisão de
+  // arquitetura (07/08/2026).
+  nomeEmpresaDocumentos String? @map("nome_empresa_documentos")
+  cnpjEmpresaDocumentos String? @map("cnpj_empresa_documentos")
+
   // Fórmula do critério PONTOS_TETO — substituiu o sistema de 4 faixas
   // (Baixo/Médio/Alto/Altíssimo Padrão) por uma fórmula única, mais
   // simples de entender e editar:
