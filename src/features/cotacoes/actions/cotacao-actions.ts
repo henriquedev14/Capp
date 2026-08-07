@@ -10,6 +10,7 @@ import { PERMISSOES } from "@/core/auth/permissions";
 import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empreendimento-ativo";
 import { consolidarLevantamentoMateriais } from "@/features/cotacoes/lib/consolidar-levantamento";
 import { proximoNumeroCotacao } from "@/features/cotacoes/lib/numero-cotacao";
+import { proximoNumeroRodada } from "@/features/cotacoes/lib/numero-rodada";
 import type { CotacaoDetalhe } from "@/features/cotacoes/components/cotacao-detail-view";
 import { construirMapaPrecoResolvido } from "@/core/fornecedores/use-cases/construir-mapa-preco-resolvido";
 
@@ -252,6 +253,15 @@ export async function gerarCotacoes(
   // pra evitar cotação "meio criada" se algum item der erro no meio.
   const criadas: NonNullable<ResultadoGeracao["criadas"]> = [];
 
+  // Uma Rodada só, compartilhada por todos os fornecedores desta leva
+  // — é o número que o usuário vê de verdade. Cada Cotacao individual
+  // continua existindo por trás (uma por fornecedor, com seu próprio
+  // status), só não expõe mais número próprio na tela.
+  const numeroRodada = await proximoNumeroRodada();
+  const rodada = await prisma.rodadaCotacao.create({
+    data: { numero: numeroRodada, orcamentoId },
+  });
+
   for (const f of fornecedores) {
     const mapa = construirMapaPrecoResolvido(f);
 
@@ -291,6 +301,7 @@ export async function gerarCotacoes(
         orcamentoId,
         fornecedorId: f.id,
         numero,
+        rodadaId: rodada.id,
         status: "RASCUNHO",
         totalEletrica,
         totalQdc,
@@ -777,6 +788,7 @@ export async function buscarCotacaoDetalhe(
     where: { id: cotacaoId },
     include: {
       fornecedor: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } },
+      rodada: { select: { numero: true } },
       orcamento: {
         select: {
           empreendimento: {
@@ -804,6 +816,7 @@ export async function buscarCotacaoDetalhe(
   return {
     id: cotacao.id,
     numero: cotacao.numero,
+    numeroRodada: cotacao.rodada?.numero ?? cotacao.numero,
     status: cotacao.status,
     fornecedor: {
       nomeExibido: cotacao.fornecedor.nomeFantasia ?? cotacao.fornecedor.razaoSocial,
