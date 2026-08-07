@@ -156,6 +156,34 @@ model ClienteContato {
 // EMPREENDIMENTO — entidade central do negócio
 // ----------------------------------------------------------------------------
 
+// Histórico de decisões do cliente na etapa de Negociação — pode ter
+// mais de uma linha por empreendimento (recusou uma vez, aceitou
+// depois de renegociar). Registrado manualmente por alguém da HGI
+// depois de falar com o cliente fora do sistema (ligação, e-mail).
+// Resolve o Achado #3 da investigação de fluxo (07/08/2026).
+model DecisaoNegociacao {
+  id               String @id @default(cuid())
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+
+  decisao String // "ACEITO" | "RECUSADO"
+
+  // Só preenchido quando decisao = ACEITO — qual fornecedor o cliente
+  // escolheu (marca essa Cotacao como ACEITA, as outras da mesma
+  // Rodada viram RECUSADA automaticamente).
+  cotacaoVencedoraId String? @map("cotacao_vencedora_id")
+
+  observacoes String? @db.Text
+
+  registradoPorId String?  @map("registrado_por_id")
+  registradoPor   Usuario? @relation(fields: [registradoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([empreendimentoId])
+  @@map("decisoes_negociacao")
+}
+
 model Empreendimento {
   id     String @id @default(cuid())
   // Código legível para humanos — gerado automaticamente na criação
@@ -278,6 +306,7 @@ model Empreendimento {
 
   // Timeline — eventos, anotações e documentos do empreendimento
   eventos    EventoEmpreendimento[]
+  decisoesNegociacao DecisaoNegociacao[]
   documentos DocumentoEmpreendimento[]
 
   // Módulo 6 — Engenharia
@@ -583,6 +612,7 @@ model Usuario {
   levantamentosValidados     LevantamentoEletrico[] @relation("EletricoValidadoPor")
   levantamentosHidraulicosValidados LevantamentoHidraulico[] @relation("HidraulicoValidadoPor")
   levantamentosMateriaisValidados LevantamentoMateriais[] @relation("MateriaisValidadoPor")
+  decisoesNegociacaoRegistradas   DecisaoNegociacao[]
   orcamentosCriados        Orcamento[]
   propostasGeradas         Orcamento[] @relation("PropostasGeradas")
   orcamentosResponsavel    Orcamento[] @relation("OrcamentosResponsavel")
