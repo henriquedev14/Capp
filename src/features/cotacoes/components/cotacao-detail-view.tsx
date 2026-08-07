@@ -30,6 +30,8 @@ export interface CotacaoDetalhe {
   numeroRodada: string;
   rodadaId: string | null;
   status: string;
+  /** Nome exibido no cabeçalho — vem de ConfiguracaoSistema. */
+  nomeEmissor: string;
   fornecedor: {
     nomeExibido: string;
     razaoSocial: string;
@@ -150,10 +152,7 @@ export function CotacaoDetailView({ cotacao }: { cotacao: CotacaoDetalhe }) {
           {/* Logo do sistema */}
           <div className="flex items-center justify-center border-b md:border-b-0 md:border-r border-border bg-secondary/40 px-6 py-4">
             <div className="flex flex-col items-center">
-              <div className="text-lg font-bold text-primary">ConstructApp</div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                HGI Group
-              </div>
+              <div className="text-lg font-bold text-primary">{cotacao.nomeEmissor}</div>
             </div>
           </div>
           {/* Info central */}
