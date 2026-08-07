@@ -893,6 +893,7 @@ model Orcamento {
   itensServico     ItemServicoOrcamento[]
   itensMaterial    ItemMaterialOrcamento[]
   cotacoes         Cotacao[]
+  rodadasCotacao   RodadaCotacao[]
   contasReceber    ContaReceber[]
   jornada          OrcamentoJornada[]
   historico        OrcamentoHistorico[]
@@ -1644,6 +1645,23 @@ enum StatusCotacao {
 // Cotação = documento gerado pra UM fornecedor a partir do levantamento
 // consolidado. Vive dentro de um Orçamento. Podem existir várias por
 // orçamento — uma por fornecedor consultado.
+// Agrupa N Cotações (uma por fornecedor) geradas na mesma leva, com
+// UM número só compartilhado — o que o usuário vê e usa no dia a dia.
+// Criada em 07/08/2026 (unificação da tela de Cotação).
+model RodadaCotacao {
+  id          String @id @default(cuid())
+  numero      String @unique // "COT-2026-0001" — esse é o número que aparece pro usuário
+  orcamentoId String @map("orcamento_id")
+  orcamento   Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+
+  cotacoes Cotacao[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([orcamentoId])
+  @@map("rodadas_cotacao")
+}
+
 model Cotacao {
   id             String @id @default(cuid())
   orcamentoId    String @map("orcamento_id")
@@ -1652,8 +1670,17 @@ model Cotacao {
   fornecedorId   String @map("fornecedor_id")
   fornecedor     Fornecedor @relation(fields: [fornecedorId], references: [id])
 
-  numero         String @unique  // "COT-2025-001" — sequência global anual
+  numero         String @unique  // "COT-2025-001" — sequência global anual, mantido como referência interna
   status         StatusCotacao @default(RASCUNHO)
+
+  // Rodada compartilhada — o número que aparece de verdade pro usuário
+  // é o da Rodada, não o desse registro individual. Uma Rodada agrupa
+  // N cotações (uma por fornecedor consultado na mesma leva). Se um
+  // fornecedor recusa, gera-se outra Rodada só pra ele. Pedido pelo
+  // Henrique em 07/08/2026, pra parar de confundir "N números pro
+  // mesmo pedido" com "N pedidos diferentes".
+  rodadaId String? @map("rodada_id")
+  rodada   RodadaCotacao? @relation(fields: [rodadaId], references: [id], onDelete: SetNull)
 
   observacoes    String? @db.Text
   validadeAte    DateTime? @map("validade_ate")
