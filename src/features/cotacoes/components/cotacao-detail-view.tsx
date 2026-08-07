@@ -28,6 +28,7 @@ export interface CotacaoDetalhe {
    * mesma leva — é esse que aparece pro usuário, não o `numero`
    * individual (mantido só como referência interna). */
   numeroRodada: string;
+  rodadaId: string | null;
   status: string;
   fornecedor: {
     nomeExibido: string;
