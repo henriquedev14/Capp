@@ -836,6 +836,11 @@ export async function buscarCotacaoDetalhe(
   if (!cotacao) return null;
   if (cotacao.orcamento.empreendimento.id !== empreendimentoId) return null;
 
+  const config = await prisma.configuracaoSistema.findUnique({
+    where: { id: "default" },
+    select: { nomeEmpresaDocumentos: true },
+  });
+
   const obra = [cotacao.orcamento.empreendimento.cidade, cotacao.orcamento.empreendimento.estado]
     .filter(Boolean)
     .join(" - ");
@@ -845,6 +850,7 @@ export async function buscarCotacaoDetalhe(
     numero: cotacao.numero,
     numeroRodada: cotacao.rodada?.numero ?? cotacao.numero,
     rodadaId: cotacao.rodadaId,
+    nomeEmissor: config?.nomeEmpresaDocumentos || "ConstruApp",
     status: cotacao.status,
     fornecedor: {
       nomeExibido: cotacao.fornecedor.nomeFantasia ?? cotacao.fornecedor.razaoSocial,
