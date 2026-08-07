@@ -8,9 +8,6 @@ import {
   PencilLine,
   Trash2,
   Send,
-  ThumbsUp,
-  ThumbsDown,
-  RotateCcw,
   FileDown,
   FileSpreadsheet,
   ShoppingCart,
@@ -323,51 +320,17 @@ function BotoesFluxoStatus({
     n: "RASCUNHO" | "ENVIADA" | "RESPONDIDA" | "ACEITA" | "RECUSADA"
   ) => Promise<void>;
 }) {
-  // Fluxo natural: RASCUNHO → ENVIADA → RESPONDIDA → ACEITA/RECUSADA
-  // Cada botão sinaliza o próximo passo, sem esconder o retorno.
-  const botoes: {
-    label: string;
-    icon: React.ComponentType<{ className?: string }>;
-    proximo: "RASCUNHO" | "ENVIADA" | "RESPONDIDA" | "ACEITA" | "RECUSADA";
-    variant: "default" | "outline";
-  }[] = [];
-
-  if (status === "RASCUNHO") {
-    botoes.push({ label: "Marcar como enviada", icon: Send, proximo: "ENVIADA", variant: "default" });
-  }
-  if (status === "ENVIADA") {
-    botoes.push({
-      label: "Marcar como respondida",
-      icon: RotateCcw,
-      proximo: "RESPONDIDA",
-      variant: "default",
-    });
-  }
-  if (status === "RESPONDIDA" || status === "ENVIADA") {
-    botoes.push({ label: "Aceitar", icon: ThumbsUp, proximo: "ACEITA", variant: "default" });
-    botoes.push({ label: "Recusar", icon: ThumbsDown, proximo: "RECUSADA", variant: "outline" });
-  }
-  if (status === "ACEITA" || status === "RECUSADA") {
-    botoes.push({
-      label: "Voltar a rascunho",
-      icon: RotateCcw,
-      proximo: "RASCUNHO",
-      variant: "outline",
-    });
-  }
+  // Simplificado em 07/08/2026 — a decisão de aceitar/recusar não mora
+  // mais aqui, virou responsabilidade da etapa de Negociação (registra
+  // a decisão do cliente e marca a cotação vencedora automaticamente).
+  // Aqui só sobra sinalizar que foi enviada ao fornecedor.
+  if (status !== "RASCUNHO") return null;
 
   return (
-    <>
-      {botoes.map((b) => {
-        const Icon = b.icon;
-        return (
-          <Button key={b.proximo} size="sm" variant={b.variant} onClick={() => onMudar(b.proximo)}>
-            <Icon className="mr-1.5 h-4 w-4" />
-            {b.label}
-          </Button>
-        );
-      })}
-    </>
+    <Button size="sm" variant="default" onClick={() => onMudar("ENVIADA")}>
+      <Send className="mr-1.5 h-4 w-4" />
+      Marcar como enviada
+    </Button>
   );
 }
 
