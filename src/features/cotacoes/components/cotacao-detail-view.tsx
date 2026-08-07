@@ -27,6 +27,10 @@ import { criarPedidoCompra } from "@/features/suprimentos/actions/pedido-compra-
 export interface CotacaoDetalhe {
   id: string;
   numero: string;
+  /** Número da Rodada compartilhado entre todos os fornecedores da
+   * mesma leva — é esse que aparece pro usuário, não o `numero`
+   * individual (mantido só como referência interna). */
+  numeroRodada: string;
   status: string;
   fornecedor: {
     nomeExibido: string;
@@ -167,7 +171,7 @@ export function CotacaoDetailView({ cotacao }: { cotacao: CotacaoDetalhe }) {
                 {LABELS_STATUS[cotacao.status]}
               </span>
               <span className="ml-auto font-mono text-xs text-muted-foreground">
-                {cotacao.numero}
+                {cotacao.numeroRodada}
               </span>
             </div>
             <div className="text-xs text-muted-foreground">
