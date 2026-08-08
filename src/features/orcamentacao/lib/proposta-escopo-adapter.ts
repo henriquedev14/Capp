@@ -159,19 +159,6 @@ export function montarEscopoTemplate(data: PropostaInstitucionalData): EscopoTem
     ehPrimeira: i === 0,
   }));
 
-  // Gráfico de participação por fabricante — pedido pelo Henrique em
-  // 08/08/2026, especificamente pra aparecer também no Anexo (não só
-  // na página de Investimento). Usa o subtotal NUMÉRICO bruto de
-  // `data.anexoMateriais.grupos` — o de `gruposAnexoBrutos` já vem
-  // formatado como texto ("R$ 1.234,56"), não dá pra fazer conta com ele.
-  const totalGeralMateriais = data.anexoMateriais.totalGeral;
-  const participacaoAnexo = data.anexoMateriais.grupos
-    .map((g) => {
-      const pct = totalGeralMateriais > 0 ? (g.subtotal / totalGeralMateriais) * 100 : 0;
-      return { nome: g.fabricante, pctLabel: `${pct.toFixed(1)}%`, pctWidth: `${pct.toFixed(1)}%` };
-    })
-    .filter((p) => parseFloat(p.pctWidth) > 0);
-
   const conditions = [
     "Faturamento dos materiais direto ao cliente",
     `Responsabilidade pelo frete: ${data.fretePor ?? NAO_INFORMADO}`,
@@ -219,6 +206,5 @@ export function montarEscopoTemplate(data: PropostaInstitucionalData): EscopoTem
 
     paginasAnexo: paginasAnexoComFlag,
     totalGeralMateriaisAnexo: formatBRL(data.anexoMateriais.totalGeral),
-    participacaoAnexo,
   };
 }
