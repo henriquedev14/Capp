@@ -70,7 +70,7 @@ export async function GET(_req: NextRequest, { params }: { params: { rodadaId: s
 
   const buffer = await renderToBuffer(<RodadaPdfDocument data={data} />);
 
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `inline; filename="cotacao-${rodada.numero}-completa.pdf"`,
