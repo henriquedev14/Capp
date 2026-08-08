@@ -1,113 +1,157 @@
 import * as React from "react";
-import { Document, Page, Text, View, StyleSheet, Svg, Rect, Text as SvgText } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, Svg, Rect, Line, Circle, Text as SvgText } from "@react-pdf/renderer";
 
 // PDF consolidado da Rodada de Cotação — reúne todos os fornecedores
-// num documento só: uma página de comparativo + uma página por
-// fornecedor com o detalhe dos itens. Fase 2 do redesenho de
-// Negociação (07/08/2026) — antes só existia exportação por
-// fornecedor individual.
+// num documento só, fluindo numa página contínua (react-pdf quebra
+// pra próxima folha sozinho conforme o conteúdo enche). Fase 2 do
+// redesenho de Negociação (07/08/2026), visual elevado em 08/08/2026
+// a pedido do Henrique (mesma identidade visual do PDF individual).
 
 const NAVY = "#0B0F1A";
 const ORANGE_HGI = "#FF731D";
+const GREEN = "#22C55E";
 const GRAY = "#6B7280";
-const GRAY_LIGHT = "#E5E7EB";
-const GRAY_BG = "#F4F5F7";
+const GRAY_LIGHT = "#E8E9EC";
+const GRAY_BG = "#F7F7F8";
 const WHITE = "#FFFFFF";
 
+function LogoMalha({ size = 30 }: { size?: number }) {
+  // Mesmo símbolo do PDF individual, pra manter a identidade consistente.
+  const pts: [number, number][] = [
+    [8, 6],
+    [24, 2],
+    [38, 10],
+    [30, 26],
+    [14, 30],
+    [4, 20],
+  ];
+  return (
+    <Svg width={size} height={size} viewBox="0 0 44 34">
+      {pts.map(([x1, y1], i) =>
+        pts.slice(i + 1).map(([x2, y2], j) => (
+          <Line key={`${i}-${j}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={WHITE} strokeWidth={0.5} strokeOpacity={0.5} />
+        ))
+      )}
+      {pts.map(([x, y], i) => (
+        <Circle key={i} cx={x} cy={y} r={1.8} fill={ORANGE_HGI} />
+      ))}
+    </Svg>
+  );
+}
+
 const styles = StyleSheet.create({
-  page: { fontFamily: "Helvetica", fontSize: 8, color: "#1A1A1A", padding: 24, paddingBottom: 44 },
+  page: { fontFamily: "Helvetica", fontSize: 8, color: "#1A1A1A", padding: 26, paddingBottom: 46 },
+
   headerBar: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    padding: 10,
+    padding: 12,
     backgroundColor: NAVY,
-    marginBottom: 14,
+    borderRadius: 8,
+    marginBottom: 16,
   },
-  headerNome: { fontSize: 12, fontWeight: 700, color: WHITE },
-  headerMeta: { fontSize: 8, color: "#C7CCD6", marginTop: 2 },
-  headerNumero: { fontSize: 11, fontWeight: 700, color: ORANGE_HGI },
+  headerLogoBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  headerInfo: { flex: 1 },
+  headerNome: { fontSize: 12, fontWeight: 700, color: WHITE, letterSpacing: 0.2 },
+  headerMeta: { fontSize: 8, color: "#B9C0CC", marginTop: 3 },
+  headerRight: { alignItems: "flex-end" },
+  headerNumero: { fontSize: 12, fontWeight: 700, color: ORANGE_HGI },
+  headerData: { fontSize: 7.5, color: "#9AA3B2", marginTop: 3 },
 
   secaoTitulo: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: 700,
     color: NAVY,
     marginBottom: 8,
     textTransform: "uppercase",
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
+  },
+  secaoSub: { fontSize: 7.5, color: GRAY, marginTop: -6, marginBottom: 10 },
+
+  card: {
+    borderWidth: 1,
+    borderColor: GRAY_LIGHT,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
   },
 
-  compTableHeader: { flexDirection: "row", backgroundColor: NAVY },
-  compTh: { fontSize: 7.5, fontWeight: 700, color: WHITE, padding: 6, textTransform: "uppercase" },
+  compTableHeader: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: GRAY_LIGHT, paddingBottom: 5 },
+  compTh: { fontSize: 7, fontWeight: 700, color: GRAY, textTransform: "uppercase", letterSpacing: 0.3 },
   compThNome: { flex: 1, textAlign: "left" },
-  compThStatus: { width: 90, textAlign: "center" },
   compThTotal: { width: 90, textAlign: "right" },
 
-  compRow: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: GRAY_LIGHT },
-  compTd: { fontSize: 8, padding: 6, color: "#333" },
-  compTdNome: { flex: 1, textAlign: "left", fontWeight: 700 },
-  compTdStatus: { width: 90, textAlign: "center", color: GRAY },
-  compTdTotal: { width: 90, textAlign: "right", fontWeight: 700, color: NAVY },
+  compRow: { flexDirection: "row", paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: GRAY_LIGHT },
+  compTd: { fontSize: 8.5 },
+  compTdNome: { flex: 1, textAlign: "left", fontWeight: 700, color: NAVY },
+  compTdTotal: { width: 90, textAlign: "right", fontWeight: 700, color: ORANGE_HGI },
 
   fornecedorHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 8,
-    backgroundColor: GRAY_BG,
-    marginBottom: 6,
-    borderLeftWidth: 3,
-    borderLeftColor: ORANGE_HGI,
+    alignItems: "center",
+    marginBottom: 8,
   },
-  fornecedorNome: { fontSize: 10, fontWeight: 700, color: NAVY },
-  fornecedorStatus: { fontSize: 8, color: GRAY },
+  fornecedorBolinha: { width: 6, height: 6, borderRadius: 3, backgroundColor: ORANGE_HGI, marginRight: 6 },
+  fornecedorNome: { fontSize: 10.5, fontWeight: 700, color: NAVY },
 
   fabricanteSubtitulo: {
-    fontSize: 8,
+    fontSize: 7.5,
     fontWeight: 700,
     color: ORANGE_HGI,
     textTransform: "uppercase",
-    letterSpacing: 0.3,
-    marginBottom: 3,
-    marginTop: 2,
+    letterSpacing: 0.4,
+    marginBottom: 4,
+    marginTop: 6,
   },
 
-  tableHeader: { flexDirection: "row", backgroundColor: NAVY, marginTop: 2 },
-  th: { fontSize: 7.5, fontWeight: 700, color: WHITE, padding: 5, textTransform: "uppercase" },
+  tableHeader: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: NAVY, paddingBottom: 4 },
+  th: { fontSize: 6.8, fontWeight: 700, color: GRAY, textTransform: "uppercase", letterSpacing: 0.2 },
   thDescricao: { flex: 1, textAlign: "left" },
-  thUnd: { width: 32, textAlign: "center" },
-  thQtde: { width: 46, textAlign: "right" },
-  thVUnit: { width: 62, textAlign: "right" },
+  thUnd: { width: 30, textAlign: "center" },
+  thQtde: { width: 44, textAlign: "right" },
+  thVUnit: { width: 60, textAlign: "right" },
   thVTotal: { width: 62, textAlign: "right" },
 
-  itemRow: { flexDirection: "row", borderBottomWidth: 0.3, borderBottomColor: GRAY_LIGHT },
-  td: { fontSize: 7.5, padding: 4, color: "#333" },
+  itemRow: { flexDirection: "row", paddingVertical: 4, borderBottomWidth: 0.4, borderBottomColor: GRAY_LIGHT },
+  td: { fontSize: 7.5, color: "#333" },
   tdDescricao: { flex: 1, textAlign: "left" },
-  tdUnd: { width: 32, textAlign: "center", textTransform: "uppercase" },
-  tdQtde: { width: 46, textAlign: "right" },
-  tdVUnit: { width: 62, textAlign: "right" },
-  tdVTotal: { width: 62, textAlign: "right", fontWeight: 700 },
+  tdUnd: { width: 30, textAlign: "center", textTransform: "uppercase", color: GRAY },
+  tdQtde: { width: 44, textAlign: "right" },
+  tdVUnit: { width: 60, textAlign: "right", color: GRAY },
+  tdVTotal: { width: 62, textAlign: "right", fontWeight: 700, color: NAVY },
 
   totalRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    padding: 8,
-    backgroundColor: "#FAFAFA",
-    borderTopWidth: 0.5,
-    borderTopColor: "#D1D5DB",
+    alignItems: "center",
+    paddingTop: 8,
     marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: NAVY,
   },
-  totalLabel: { fontSize: 9, fontWeight: 700, color: "#333", marginRight: 10 },
-  totalValor: { fontSize: 10, fontWeight: 700, color: ORANGE_HGI },
+  totalLabel: { fontSize: 8, fontWeight: 700, color: GRAY, marginRight: 10, textTransform: "uppercase", letterSpacing: 0.3 },
+  totalValor: { fontSize: 11, fontWeight: 700, color: ORANGE_HGI },
 
   footer: {
     position: "absolute",
-    bottom: 16,
-    left: 24,
-    right: 24,
+    bottom: 18,
+    left: 26,
+    right: 26,
     flexDirection: "row",
     justifyContent: "space-between",
     fontSize: 6.5,
     color: GRAY,
+    borderTopWidth: 0.5,
+    borderTopColor: GRAY_LIGHT,
+    paddingTop: 6,
   },
 });
 
@@ -149,67 +193,93 @@ export interface RodadaPdfData {
 }
 
 export function RodadaPdfDocument({ data }: { data: RodadaPdfData }) {
+  const somaTotal = data.fornecedores.reduce((s, f) => s + f.totalGeral, 0);
+
   return (
     <Document>
-      {/* Tudo numa página contínua — react-pdf quebra pra próxima folha
-          automaticamente conforme o conteúdo enche, sem forçar 1 página
-          fixa por fornecedor. Ajustado em 07/08/2026 a pedido do
-          Henrique: queria tudo concatenado, não separado. */}
       <Page size="A4" style={styles.page}>
+        {/* Cabeçalho */}
         <View style={styles.headerBar}>
-          <View>
+          <View style={styles.headerLogoBox}>
+            <LogoMalha />
+          </View>
+          <View style={styles.headerInfo}>
             <Text style={styles.headerNome}>{data.nomeEmissor}</Text>
             <Text style={styles.headerMeta}>
               {data.clienteNome} · {data.empreendimentoNome}
             </Text>
           </View>
-          <Text style={styles.headerNumero}>{data.numero}</Text>
+          <View style={styles.headerRight}>
+            <Text style={styles.headerNumero}>{data.numero}</Text>
+            <Text style={styles.headerData}>Emitida em {data.dataEmissao}</Text>
+          </View>
         </View>
 
-        <Text style={styles.secaoTitulo}>Comparativo entre fornecedores</Text>
-        <View style={styles.compTableHeader}>
-          <Text style={[styles.compTh, styles.compThNome]}>Fornecedor</Text>
-          <Text style={[styles.compTh, styles.compThTotal]}>Total Geral</Text>
+        {/* Comparativo */}
+        <View style={styles.card} wrap={false}>
+          <Text style={styles.secaoTitulo}>Comparativo entre fornecedores</Text>
+          <Text style={styles.secaoSub}>Valor total cotado por cada fornecedor consultado nesta rodada</Text>
+
+          <View style={styles.compTableHeader}>
+            <Text style={[styles.compTh, styles.compThNome]}>Fornecedor</Text>
+            <Text style={[styles.compTh, styles.compThTotal]}>Total Geral</Text>
+          </View>
+          {data.fornecedores.map((f) => (
+            <View key={f.id} style={styles.compRow}>
+              <Text style={[styles.compTd, styles.compTdNome]}>{f.nome}</Text>
+              <Text style={[styles.compTd, styles.compTdTotal]}>{formatBRL(f.totalGeral)}</Text>
+            </View>
+          ))}
+
+          {/* Gráfico de participação — barras finas, pontas arredondadas */}
+          {data.fornecedores.length > 0 && (
+            <View style={{ marginTop: 14 }}>
+              <Text style={{ fontSize: 7, fontWeight: 700, color: GRAY, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 8 }}>
+                Participação no total
+              </Text>
+              <Svg width="100%" height={data.fornecedores.length * 24 + 4} viewBox={`0 0 500 ${data.fornecedores.length * 24 + 4}`}>
+                {(() => {
+                  const larguraMaxima = 300;
+                  const inicioBarraX = 150;
+                  const alturaBarra = 7;
+                  return data.fornecedores.map((f, i) => {
+                    const pct = somaTotal > 0 ? (f.totalGeral / somaTotal) * 100 : 0;
+                    const larguraBarra = Math.max((pct / 100) * larguraMaxima, alturaBarra);
+                    const y = i * 24;
+                    return (
+                      <React.Fragment key={f.id}>
+                        <SvgText x={0} y={y + 12} style={{ fontSize: 7.5, fill: "#333333" }}>
+                          {f.nome.length > 20 ? f.nome.slice(0, 19) + "…" : f.nome}
+                        </SvgText>
+                        <Rect
+                          x={inicioBarraX}
+                          y={y + 8}
+                          width={larguraMaxima}
+                          height={alturaBarra}
+                          fill={GRAY_LIGHT}
+                          rx={alturaBarra / 2}
+                        />
+                        <Rect
+                          x={inicioBarraX}
+                          y={y + 8}
+                          width={larguraBarra}
+                          height={alturaBarra}
+                          fill={ORANGE_HGI}
+                          rx={alturaBarra / 2}
+                        />
+                        <SvgText x={inicioBarraX + larguraMaxima + 10} y={y + 14} style={{ fontSize: 7.5, fontWeight: 700, fill: NAVY }}>
+                          {`${pct.toFixed(1)}%`}
+                        </SvgText>
+                      </React.Fragment>
+                    );
+                  });
+                })()}
+              </Svg>
+            </View>
+          )}
         </View>
-        {data.fornecedores.map((f) => (
-          <View key={f.id} style={styles.compRow} wrap={false}>
-            <Text style={[styles.compTd, styles.compTdNome]}>{f.nome}</Text>
-            <Text style={[styles.compTd, styles.compTdTotal]}>{formatBRL(f.totalGeral)}</Text>
-          </View>
-        ))}
 
-        {/* Gráfico de barras — % que cada fornecedor representa do
-            total somado da rodada. Pedido pelo Henrique em 07/08/2026. */}
-        {data.fornecedores.length > 0 && (
-          <View style={{ marginTop: 14 }} wrap={false}>
-            <Text style={styles.secaoTitulo}>Participação no total</Text>
-            <Svg width="100%" height={data.fornecedores.length * 26 + 10} viewBox={`0 0 500 ${data.fornecedores.length * 26 + 10}`}>
-              {(() => {
-                const somaTotal = data.fornecedores.reduce((s, f) => s + f.totalGeral, 0);
-                const larguraMaxima = 320;
-                const inicioBarraX = 160;
-                return data.fornecedores.map((f, i) => {
-                  const pct = somaTotal > 0 ? (f.totalGeral / somaTotal) * 100 : 0;
-                  const larguraBarra = (pct / 100) * larguraMaxima;
-                  const y = i * 26;
-                  return (
-                    <React.Fragment key={f.id}>
-                      <SvgText x={0} y={y + 14} style={{ fontSize: 8, fill: "#333333" }}>
-                        {f.nome.length > 22 ? f.nome.slice(0, 21) + "…" : f.nome}
-                      </SvgText>
-                      <Rect x={inicioBarraX} y={y + 4} width={larguraMaxima} height={14} fill="#F0F0F0" rx={2} />
-                      <Rect x={inicioBarraX} y={y + 4} width={Math.max(larguraBarra, 2)} height={14} fill="#FF731D" rx={2} />
-                      <SvgText x={inicioBarraX + larguraMaxima + 8} y={y + 14} style={{ fontSize: 8, fill: "#0B0F1A" }}>
-                        {`${pct.toFixed(1)}%`}
-                      </SvgText>
-                    </React.Fragment>
-                  );
-                });
-              })()}
-            </Svg>
-          </View>
-        )}
-
+        {/* Uma seção por fornecedor */}
         {data.fornecedores.map((f) => {
           const agrupados = new Map<string, typeof f.itens>();
           for (const item of [...f.itens].sort((a, b) => a.fabricante.localeCompare(b.fabricante))) {
@@ -219,13 +289,14 @@ export function RodadaPdfDocument({ data }: { data: RodadaPdfData }) {
           }
 
           return (
-            <View key={f.id} style={{ marginTop: 16 }}>
-              <View style={styles.fornecedorHeader} wrap={false}>
+            <View key={f.id} style={styles.card} wrap={false}>
+              <View style={styles.fornecedorHeader}>
+                <View style={styles.fornecedorBolinha} />
                 <Text style={styles.fornecedorNome}>{f.nome}</Text>
               </View>
 
               {Array.from(agrupados.entries()).map(([fabricante, itens]) => (
-                <View key={fabricante} wrap={false} style={{ marginBottom: 6 }}>
+                <View key={fabricante} style={{ marginBottom: 4 }}>
                   <Text style={styles.fabricanteSubtitulo}>{fabricante}</Text>
                   <View style={styles.tableHeader}>
                     <Text style={[styles.th, styles.thDescricao]}>Descrição</Text>
@@ -235,7 +306,7 @@ export function RodadaPdfDocument({ data }: { data: RodadaPdfData }) {
                     <Text style={[styles.th, styles.thVTotal]}>V. Total</Text>
                   </View>
                   {itens.map((item) => (
-                    <View key={item.id} style={styles.itemRow} wrap={false}>
+                    <View key={item.id} style={styles.itemRow}>
                       <Text style={[styles.td, styles.tdDescricao]}>{item.descricao}</Text>
                       <Text style={[styles.td, styles.tdUnd]}>{item.unidade}</Text>
                       <Text style={[styles.td, styles.tdQtde]}>{item.quantidade}</Text>
@@ -246,8 +317,8 @@ export function RodadaPdfDocument({ data }: { data: RodadaPdfData }) {
                 </View>
               ))}
 
-              <View style={styles.totalRow} wrap={false}>
-                <Text style={styles.totalLabel}>TOTAL {f.nome.toUpperCase()}</Text>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total {f.nome}</Text>
                 <Text style={styles.totalValor}>{formatBRL(f.totalGeral)}</Text>
               </View>
             </View>
@@ -258,7 +329,7 @@ export function RodadaPdfDocument({ data }: { data: RodadaPdfData }) {
           style={styles.footer}
           fixed
           render={({ pageNumber, totalPages }) =>
-            `Documento gerado pelo ${data.nomeEmissor} — emitido em ${data.dataEmissao} — página ${pageNumber}/${totalPages}`
+            `${data.nomeEmissor} · Cotação ${data.numero} · Emitida em ${data.dataEmissao} · Página ${pageNumber} de ${totalPages}`
           }
         />
       </Page>
