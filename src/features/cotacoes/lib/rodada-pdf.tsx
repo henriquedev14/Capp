@@ -194,12 +194,12 @@ export function RodadaPdfDocument({ data }: { data: RodadaPdfData }) {
                   const y = i * 26;
                   return (
                     <React.Fragment key={f.id}>
-                      <SvgText x={0} y={y + 14} fontSize={8} fill="#333333">
+                      <SvgText x={0} y={y + 14} style={{ fontSize: 8, fill: "#333333" }}>
                         {f.nome.length > 22 ? f.nome.slice(0, 21) + "…" : f.nome}
                       </SvgText>
                       <Rect x={inicioBarraX} y={y + 4} width={larguraMaxima} height={14} fill="#F0F0F0" rx={2} />
                       <Rect x={inicioBarraX} y={y + 4} width={Math.max(larguraBarra, 2)} height={14} fill="#FF731D" rx={2} />
-                      <SvgText x={inicioBarraX + larguraMaxima + 8} y={y + 14} fontSize={8} fill="#0B0F1A">
+                      <SvgText x={inicioBarraX + larguraMaxima + 8} y={y + 14} style={{ fontSize: 8, fill: "#0B0F1A" }}>
                         {`${pct.toFixed(1)}%`}
                       </SvgText>
                     </React.Fragment>
