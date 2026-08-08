@@ -143,7 +143,10 @@ export interface RodadaPdfData {
 export function RodadaPdfDocument({ data }: { data: RodadaPdfData }) {
   return (
     <Document>
-      {/* Página 1 — comparativo entre fornecedores */}
+      {/* Tudo numa página contínua — react-pdf quebra pra próxima folha
+          automaticamente conforme o conteúdo enche, sem forçar 1 página
+          fixa por fornecedor. Ajustado em 07/08/2026 a pedido do
+          Henrique: queria tudo concatenado, não separado. */}
       <Page size="A4" style={styles.page}>
         <View style={styles.headerBar}>
           <View>
@@ -162,55 +165,33 @@ export function RodadaPdfDocument({ data }: { data: RodadaPdfData }) {
           <Text style={[styles.compTh, styles.compThTotal]}>Total Geral</Text>
         </View>
         {data.fornecedores.map((f) => (
-          <View key={f.id} style={styles.compRow}>
+          <View key={f.id} style={styles.compRow} wrap={false}>
             <Text style={[styles.compTd, styles.compTdNome]}>{f.nome}</Text>
             <Text style={[styles.compTd, styles.compTdStatus]}>{LABELS_STATUS[f.status] ?? f.status}</Text>
             <Text style={[styles.compTd, styles.compTdTotal]}>{formatBRL(f.totalGeral)}</Text>
           </View>
         ))}
 
-        <Text style={styles.footer} fixed>
-          <Text>{`Documento gerado pelo ${data.nomeEmissor} — emitido em ${data.dataEmissao}`}</Text>
-        </Text>
-      </Page>
+        {data.fornecedores.map((f) => {
+          const itensOrdenados = [...f.itens].sort((a, b) => a.fabricante.localeCompare(b.fabricante));
 
-      {/* Uma página por fornecedor, com o detalhe dos itens */}
-      {data.fornecedores.map((f) => {
-        const agrupados = new Map<string, typeof f.itens>();
-        for (const item of [...f.itens].sort((a, b) => a.fabricante.localeCompare(b.fabricante))) {
-          const arr = agrupados.get(item.fabricante) ?? [];
-          arr.push(item);
-          agrupados.set(item.fabricante, arr);
-        }
-
-        return (
-          <Page key={f.id} size="A4" style={styles.page}>
-            <View style={styles.headerBar}>
-              <View>
-                <Text style={styles.headerNome}>{data.nomeEmissor}</Text>
-                <Text style={styles.headerMeta}>
-                  {data.clienteNome} · {data.empreendimentoNome}
-                </Text>
+          return (
+            <View key={f.id} style={{ marginTop: 16 }}>
+              <View style={styles.fornecedorHeader} wrap={false}>
+                <Text style={styles.fornecedorNome}>{f.nome}</Text>
+                <Text style={styles.fornecedorStatus}>{LABELS_STATUS[f.status] ?? f.status}</Text>
               </View>
-              <Text style={styles.headerNumero}>{data.numero}</Text>
-            </View>
 
-            <View style={styles.fornecedorHeader}>
-              <Text style={styles.fornecedorNome}>{f.nome}</Text>
-              <Text style={styles.fornecedorStatus}>{LABELS_STATUS[f.status] ?? f.status}</Text>
-            </View>
-
-            <View style={styles.tableHeader}>
-              <Text style={[styles.th, styles.thFab]}>Fabricante</Text>
-              <Text style={[styles.th, styles.thDescricao]}>Descrição</Text>
-              <Text style={[styles.th, styles.thUnd]}>Und</Text>
-              <Text style={[styles.th, styles.thQtde]}>Qtde</Text>
-              <Text style={[styles.th, styles.thVUnit]}>V. Unit.</Text>
-              <Text style={[styles.th, styles.thVTotal]}>V. Total</Text>
-            </View>
-            {Array.from(agrupados.entries()).map(([, itens]) =>
-              itens.map((item) => (
-                <View key={item.id} style={styles.itemRow}>
+              <View style={styles.tableHeader} wrap={false}>
+                <Text style={[styles.th, styles.thFab]}>Fabricante</Text>
+                <Text style={[styles.th, styles.thDescricao]}>Descrição</Text>
+                <Text style={[styles.th, styles.thUnd]}>Und</Text>
+                <Text style={[styles.th, styles.thQtde]}>Qtde</Text>
+                <Text style={[styles.th, styles.thVUnit]}>V. Unit.</Text>
+                <Text style={[styles.th, styles.thVTotal]}>V. Total</Text>
+              </View>
+              {itensOrdenados.map((item) => (
+                <View key={item.id} style={styles.itemRow} wrap={false}>
                   <Text style={[styles.td, styles.tdFab]}>{item.fabricante}</Text>
                   <Text style={[styles.td, styles.tdDescricao]}>{item.descricao}</Text>
                   <Text style={[styles.td, styles.tdUnd]}>{item.unidade}</Text>
@@ -218,20 +199,24 @@ export function RodadaPdfDocument({ data }: { data: RodadaPdfData }) {
                   <Text style={[styles.td, styles.tdVUnit]}>{formatBRL(item.precoUnitario)}</Text>
                   <Text style={[styles.td, styles.tdVTotal]}>{formatBRL(item.total)}</Text>
                 </View>
-              ))
-            )}
+              ))}
 
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>TOTAL GERAL</Text>
-              <Text style={styles.totalValor}>{formatBRL(f.totalGeral)}</Text>
+              <View style={styles.totalRow} wrap={false}>
+                <Text style={styles.totalLabel}>TOTAL {f.nome.toUpperCase()}</Text>
+                <Text style={styles.totalValor}>{formatBRL(f.totalGeral)}</Text>
+              </View>
             </View>
+          );
+        })}
 
-            <Text style={styles.footer} fixed>
-              <Text>{`Documento gerado pelo ${data.nomeEmissor} — emitido em ${data.dataEmissao}`}</Text>
-            </Text>
-          </Page>
-        );
-      })}
+        <Text
+          style={styles.footer}
+          fixed
+          render={({ pageNumber, totalPages }) =>
+            `Documento gerado pelo ${data.nomeEmissor} — emitido em ${data.dataEmissao} — página ${pageNumber}/${totalPages}`
+          }
+        />
+      </Page>
     </Document>
   );
 }
