@@ -123,6 +123,26 @@ export function CotacoesUnificadas({ cotacoes, totalMateriais, aplicarTabelaPrec
             </div>
           )}
           {aplicarTabelaPrecoSlot}
+          {rodadaId && (
+            <>
+              <button
+                onClick={() => window.open(`/api/cotacoes/rodada/${rodadaId}/pdf`, "_blank")}
+                title="Baixar PDF completo (todos os fornecedores)"
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                PDF completo
+              </button>
+              <button
+                onClick={() => (window.location.href = `/api/cotacoes/rodada/${rodadaId}/csv`)}
+                title="Baixar CSV completo (todos os fornecedores)"
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                CSV completo
+              </button>
+            </>
+          )}
           {algumaEmRascunho && (
             <Button size="sm" onClick={handleMarcarRodadaEnviada} disabled={enviando}>
               {enviando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
