@@ -1,4 +1,5 @@
 import type { ItemMaterialOrcamento } from "@/core/orcamentacao/entities/orcamento";
+import { consolidarItensPorMaterial } from "@/core/orcamentacao/use-cases/consolidar-itens-material";
 
 export interface ItemAnexoProposta {
   descricao: string;
@@ -39,7 +40,7 @@ export function montarAnexoMateriaisPorFornecedor(
   itensOrcamento: ItemMaterialOrcamento[],
   nomeFornecedorPorId: Map<string, string>
 ): AnexoMateriaisProposta {
-  const porFornecedor = new Map<string, ItemAnexoProposta[]>();
+  const porFornecedor = new Map<string, ItemMaterialOrcamento[]>();
 
   for (const item of itensOrcamento) {
     const nomeFornecedor = item.fornecedorSelecionadoId
@@ -47,22 +48,45 @@ export function montarAnexoMateriaisPorFornecedor(
       : SEM_FORNECEDOR;
 
     if (!porFornecedor.has(nomeFornecedor)) porFornecedor.set(nomeFornecedor, []);
-    porFornecedor.get(nomeFornecedor)!.push({
-      descricao: item.descricao,
-      marca: item.marca || NAO_INFORMADO_ANEXO,
-      unidade: item.unidade,
-      quantidade: item.quantidade,
-      valorUnitario: item.precoUnitario ?? 0,
-      valorTotal: item.total ?? 0,
-    });
+    porFornecedor.get(nomeFornecedor)!.push(item);
   }
 
   const grupos: GrupoAnexoProposta[] = Array.from(porFornecedor.entries())
-    .map(([fabricante, itens]) => ({
-      fabricante,
-      itens: itens.sort((a, b) => a.descricao.localeCompare(b.descricao)),
-      subtotal: itens.reduce((s, i) => s + i.valorTotal, 0),
-    }))
+    .map(([fabricante, itensDoFornecedor]) => {
+      // Consolida o mesmo material vindo de tipologias diferentes numa
+      // linha só, somando quantidade/total — mesma regra já aplicada no
+      // Bloco 2 do Orçamento (achado #8, 06/08/2026), que nunca tinha
+      // chegado até a Proposta. Achado pelo Henrique em 08/08/2026,
+      // vendo materiais repetidos N vezes no Anexo.
+      const consolidados = consolidarItensPorMaterial(
+        itensDoFornecedor.map((item, i) => ({
+          id: `${fabricante}-${i}`,
+          descricao: item.descricao,
+          marca: item.marca || NAO_INFORMADO_ANEXO,
+          unidade: item.unidade,
+          quantidade: item.quantidade,
+          precoUnitario: item.precoUnitario ?? 0,
+          total: item.total ?? 0,
+        }))
+      );
+
+      const itens: ItemAnexoProposta[] = consolidados
+        .map((c) => ({
+          descricao: c.descricao,
+          marca: c.marca ?? NAO_INFORMADO_ANEXO,
+          unidade: c.unidade,
+          quantidade: c.quantidade,
+          valorUnitario: c.precoUnitario,
+          valorTotal: c.total,
+        }))
+        .sort((a, b) => a.descricao.localeCompare(b.descricao));
+
+      return {
+        fabricante,
+        itens,
+        subtotal: itens.reduce((s, i) => s + i.valorTotal, 0),
+      };
+    })
     // "A definir" sempre por último — grupos com fornecedor real primeiro.
     .sort((a, b) => {
       if (a.fabricante === SEM_FORNECEDOR) return 1;
