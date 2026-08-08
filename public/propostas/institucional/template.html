@@ -212,8 +212,10 @@
 
 <sc-for list="{{ paginasAnexo }}" as="pagina" hint-placeholder-count="2">
 <section data-deck-active data-label="Anexo — Memoria de Materiais" data-speaker-notes="Fabricantes concatenados na mesma pagina ate encher o orcamento de linhas, so abre pagina nova quando necessario." style="position:relative;width:794px;height:1123px;background:#FAFAF8;font-family:'Open Sans',sans-serif;padding:70px 76px 58px;box-sizing:border-box;color:#2B2B2B;">
-  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:2.5px;color:{{ orange }};text-transform:uppercase;">Anexo</div>
-  <h1 style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:24px;color:{{ navy }};margin:12px 0 22px;">Memoria Estimativa de Materiais</h1>
+  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:2.5px;color:{{ orange }};text-transform:uppercase;margin-bottom:14px;">Anexo</div>
+  <sc-if value="{{ pagina.ehPrimeira }}" hint-placeholder-val="{{ true }}">
+  <h1 style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:24px;color:{{ navy }};margin:-2px 0 22px;">Memoria Estimativa de Materiais</h1>
+  </sc-if>
 
   <sc-if value="{{ pagina.ehPrimeira }}" hint-placeholder-val="{{ true }}">
   <div style="margin-bottom:24px;">
@@ -231,7 +233,7 @@
   </sc-if>
 
   <sc-for list="{{ pagina.grupos }}" as="grupo" hint-placeholder-count="3">
-  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;color:#fff;background:{{ navy }};padding:8px 12px;margin-top:16px;">{{ grupo.tituloTabela }}</div>
+  <div style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:13px;color:{{ navy }};padding:8px 0 6px;margin-top:16px;border-bottom:1.5px solid {{ navy }};">{{ grupo.tituloTabela }}</div>
   <sc-for list="{{ grupo.itens }}" as="r" hint-placeholder-count="7">
     <div style="display:grid;grid-template-columns:2fr 0.9fr 0.5fr 0.9fr 0.9fr 0.9fr;font-size:12px;padding:7px 12px;background:{{ r.bg }};">
       <span>{{ r.desc }}</span><span style="color:#6B6B63;">{{ r.marca }}</span><span style="text-align:center;">{{ r.und }}</span><span style="text-align:right;">{{ r.qty }}</span><span style="text-align:right;">{{ r.unit }}</span><span style="text-align:right;font-weight:{{ r.weight }};">{{ r.total }}</span>
