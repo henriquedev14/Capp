@@ -52,6 +52,11 @@ export function montarAnexoMateriaisPorFornecedor(
   }
 
   const grupos: GrupoAnexoProposta[] = Array.from(porFornecedor.entries())
+    // Item sem fornecedor selecionado não vai pra Proposta — cliente
+    // não deve ver "A definir" num documento que já foi enviado pra
+    // ele. Fica só internamente (Bloco 2/Cotação) até ser precificado
+    // de verdade. Pedido pelo Henrique em 08/08/2026.
+    .filter(([fabricante]) => fabricante !== SEM_FORNECEDOR)
     .map(([fabricante, itensDoFornecedor]) => {
       // Consolida o mesmo material vindo de tipologias diferentes numa
       // linha só, somando quantidade/total — mesma regra já aplicada no
