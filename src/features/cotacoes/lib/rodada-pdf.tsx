@@ -61,9 +61,18 @@ const styles = StyleSheet.create({
   fornecedorNome: { fontSize: 10, fontWeight: 700, color: NAVY },
   fornecedorStatus: { fontSize: 8, color: GRAY },
 
-  tableHeader: { flexDirection: "row", backgroundColor: NAVY, marginTop: 4 },
+  fabricanteSubtitulo: {
+    fontSize: 8,
+    fontWeight: 700,
+    color: ORANGE_HGI,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    marginBottom: 3,
+    marginTop: 2,
+  },
+
+  tableHeader: { flexDirection: "row", backgroundColor: NAVY, marginTop: 2 },
   th: { fontSize: 7.5, fontWeight: 700, color: WHITE, padding: 5, textTransform: "uppercase" },
-  thFab: { width: 90, textAlign: "left" },
   thDescricao: { flex: 1, textAlign: "left" },
   thUnd: { width: 32, textAlign: "center" },
   thQtde: { width: 46, textAlign: "right" },
@@ -72,7 +81,6 @@ const styles = StyleSheet.create({
 
   itemRow: { flexDirection: "row", borderBottomWidth: 0.3, borderBottomColor: GRAY_LIGHT },
   td: { fontSize: 7.5, padding: 4, color: "#333" },
-  tdFab: { width: 90, textAlign: "left", fontWeight: 700, color: NAVY },
   tdDescricao: { flex: 1, textAlign: "left" },
   tdUnd: { width: 32, textAlign: "center", textTransform: "uppercase" },
   tdQtde: { width: 46, textAlign: "right" },
@@ -161,43 +169,48 @@ export function RodadaPdfDocument({ data }: { data: RodadaPdfData }) {
         <Text style={styles.secaoTitulo}>Comparativo entre fornecedores</Text>
         <View style={styles.compTableHeader}>
           <Text style={[styles.compTh, styles.compThNome]}>Fornecedor</Text>
-          <Text style={[styles.compTh, styles.compThStatus]}>Status</Text>
           <Text style={[styles.compTh, styles.compThTotal]}>Total Geral</Text>
         </View>
         {data.fornecedores.map((f) => (
           <View key={f.id} style={styles.compRow} wrap={false}>
             <Text style={[styles.compTd, styles.compTdNome]}>{f.nome}</Text>
-            <Text style={[styles.compTd, styles.compTdStatus]}>{LABELS_STATUS[f.status] ?? f.status}</Text>
             <Text style={[styles.compTd, styles.compTdTotal]}>{formatBRL(f.totalGeral)}</Text>
           </View>
         ))}
 
         {data.fornecedores.map((f) => {
-          const itensOrdenados = [...f.itens].sort((a, b) => a.fabricante.localeCompare(b.fabricante));
+          const agrupados = new Map<string, typeof f.itens>();
+          for (const item of [...f.itens].sort((a, b) => a.fabricante.localeCompare(b.fabricante))) {
+            const arr = agrupados.get(item.fabricante) ?? [];
+            arr.push(item);
+            agrupados.set(item.fabricante, arr);
+          }
 
           return (
             <View key={f.id} style={{ marginTop: 16 }}>
               <View style={styles.fornecedorHeader} wrap={false}>
                 <Text style={styles.fornecedorNome}>{f.nome}</Text>
-                <Text style={styles.fornecedorStatus}>{LABELS_STATUS[f.status] ?? f.status}</Text>
               </View>
 
-              <View style={styles.tableHeader} wrap={false}>
-                <Text style={[styles.th, styles.thFab]}>Fabricante</Text>
-                <Text style={[styles.th, styles.thDescricao]}>Descrição</Text>
-                <Text style={[styles.th, styles.thUnd]}>Und</Text>
-                <Text style={[styles.th, styles.thQtde]}>Qtde</Text>
-                <Text style={[styles.th, styles.thVUnit]}>V. Unit.</Text>
-                <Text style={[styles.th, styles.thVTotal]}>V. Total</Text>
-              </View>
-              {itensOrdenados.map((item) => (
-                <View key={item.id} style={styles.itemRow} wrap={false}>
-                  <Text style={[styles.td, styles.tdFab]}>{item.fabricante}</Text>
-                  <Text style={[styles.td, styles.tdDescricao]}>{item.descricao}</Text>
-                  <Text style={[styles.td, styles.tdUnd]}>{item.unidade}</Text>
-                  <Text style={[styles.td, styles.tdQtde]}>{item.quantidade}</Text>
-                  <Text style={[styles.td, styles.tdVUnit]}>{formatBRL(item.precoUnitario)}</Text>
-                  <Text style={[styles.td, styles.tdVTotal]}>{formatBRL(item.total)}</Text>
+              {Array.from(agrupados.entries()).map(([fabricante, itens]) => (
+                <View key={fabricante} wrap={false} style={{ marginBottom: 6 }}>
+                  <Text style={styles.fabricanteSubtitulo}>{fabricante}</Text>
+                  <View style={styles.tableHeader}>
+                    <Text style={[styles.th, styles.thDescricao]}>Descrição</Text>
+                    <Text style={[styles.th, styles.thUnd]}>Und</Text>
+                    <Text style={[styles.th, styles.thQtde]}>Qtde</Text>
+                    <Text style={[styles.th, styles.thVUnit]}>V. Unit.</Text>
+                    <Text style={[styles.th, styles.thVTotal]}>V. Total</Text>
+                  </View>
+                  {itens.map((item) => (
+                    <View key={item.id} style={styles.itemRow} wrap={false}>
+                      <Text style={[styles.td, styles.tdDescricao]}>{item.descricao}</Text>
+                      <Text style={[styles.td, styles.tdUnd]}>{item.unidade}</Text>
+                      <Text style={[styles.td, styles.tdQtde]}>{item.quantidade}</Text>
+                      <Text style={[styles.td, styles.tdVUnit]}>{formatBRL(item.precoUnitario)}</Text>
+                      <Text style={[styles.td, styles.tdVTotal]}>{formatBRL(item.total)}</Text>
+                    </View>
+                  ))}
                 </View>
               ))}
 
