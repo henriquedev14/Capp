@@ -108,7 +108,7 @@ export function montarEscopoTemplate(data: PropostaInstitucionalData): EscopoTem
     barMargin: "0px",
   });
 
-  const gruposAnexo = data.anexoMateriais.grupos.map((g) => ({
+  const gruposAnexoBrutos = data.anexoMateriais.grupos.map((g) => ({
     titulo: g.fabricante,
     tituloTabela: g.fabricante.toUpperCase(),
     subtotalLabel: `Subtotal ${g.fabricante}`,
@@ -123,6 +123,35 @@ export function montarEscopoTemplate(data: PropostaInstitucionalData): EscopoTem
         total: formatBRL(item.valorTotal),
       }))
     ),
+  }));
+
+  // Agrupa vários fabricantes na MESMA página do anexo, até o orçamento
+  // de linhas encher — antes era sempre 1 fabricante = 1 página inteira,
+  // mesmo quando cabiam 3-4 juntos numa só. Pedido pelo Henrique em
+  // 08/08/2026, mesmo padrão aplicado na Cotação Única no mesmo dia.
+  //
+  // Orçamento conservador: ~16 "unidades de linha" por página (cada
+  // fabricante custa 2 unidades de cabeçalho/subtotal + 1 por item).
+  // Ajustar esse número se algum dia o layout mudar de densidade.
+  const ORCAMENTO_LINHAS_POR_PAGINA = 16;
+  const paginasAnexo: { grupos: typeof gruposAnexoBrutos }[] = [];
+  let paginaAtual: typeof gruposAnexoBrutos = [];
+  let linhasNaPagina = 0;
+
+  for (const grupo of gruposAnexoBrutos) {
+    const custoGrupo = grupo.itens.length + 2;
+    if (paginaAtual.length > 0 && linhasNaPagina + custoGrupo > ORCAMENTO_LINHAS_POR_PAGINA) {
+      paginasAnexo.push({ grupos: paginaAtual });
+      paginaAtual = [];
+      linhasNaPagina = 0;
+    }
+    paginaAtual.push(grupo);
+    linhasNaPagina += custoGrupo;
+  }
+  if (paginaAtual.length > 0) paginasAnexo.push({ grupos: paginaAtual });
+  const paginasAnexoComFlag = paginasAnexo.map((p, i) => ({
+    ...p,
+    ehUltima: i === paginasAnexo.length - 1,
   }));
 
   const conditions = [
@@ -170,6 +199,7 @@ export function montarEscopoTemplate(data: PropostaInstitucionalData): EscopoTem
     conditions,
     nextSteps: PROXIMOS_PASSOS,
 
-    gruposAnexo,
+    paginasAnexo: paginasAnexoComFlag,
+    totalGeralMateriaisAnexo: formatBRL(data.anexoMateriais.totalGeral),
   };
 }
