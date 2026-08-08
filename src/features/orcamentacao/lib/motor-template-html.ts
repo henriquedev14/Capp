@@ -55,35 +55,48 @@ function findMatchingClose(html: string, openTag: string, closeTag: string, sear
 }
 
 export function renderTemplateHtml(html: string, scope: EscopoTemplate): string {
-  // 1) <sc-if value="{{ expr }}" ...> ... </sc-if>
+  // Processa sc-if e sc-for na ordem em que aparecem no HTML (não mais
+  // "todos os sc-if primeiro, depois todos os sc-for") — bug real
+  // encontrado em 08/08/2026: um <sc-if> que depende de uma variável
+  // criada por um <sc-for> ENVOLVENTE (ainda não expandido na hora que
+  // o sc-if era avaliado) sempre via a variável como undefined e
+  // sumia o bloco inteiro, mesmo quando deveria aparecer.
   const ifOpenRe = /<sc-if\s+value="\{\{\s*([^}]+?)\s*\}\}"[^>]*>/;
-  while (true) {
-    const m = ifOpenRe.exec(html);
-    if (!m) break;
-    const openEnd = m.index + m[0]!.length;
-    const closeIdx = findMatchingClose(html, "<sc-if", "</sc-if>", openEnd);
-    const inner = html.slice(openEnd, closeIdx);
-    const condVal = getPath(scope, m[1]!.trim());
-    const replacement = condVal ? renderTemplateHtml(inner, scope) : "";
-    html = html.slice(0, m.index) + replacement + html.slice(closeIdx + "</sc-if>".length);
-  }
-
-  // 2) <sc-for list="{{ arr }}" as="nome" ...> ... </sc-for> (aninhado)
   const forOpenRe = /<sc-for\s+list="\{\{\s*([^}]+?)\s*\}\}"\s+as="([^"]+)"[^>]*>/;
+
   while (true) {
-    const m = forOpenRe.exec(html);
-    if (!m) break;
-    const openEnd = m.index + m[0]!.length;
-    const closeIdx = findMatchingClose(html, "<sc-for", "</sc-for>", openEnd);
-    const inner = html.slice(openEnd, closeIdx);
-    const listPath = m[1]!.trim();
-    const asName = m[2]!.trim();
-    const list = (getPath(scope, listPath) as unknown[] | undefined) ?? [];
-    const rendered = list.map((item) => renderTemplateHtml(inner, { ...scope, [asName]: item })).join("");
-    html = html.slice(0, m.index) + rendered + html.slice(closeIdx + "</sc-for>".length);
+    const ifMatch = ifOpenRe.exec(html);
+    const forMatch = forOpenRe.exec(html);
+
+    if (!ifMatch && !forMatch) break;
+
+    // Processa sempre o que aparece primeiro no texto — assim um
+    // sc-for envolvente sempre expande ANTES de qualquer sc-if que
+    // dependa de uma variável que ele cria.
+    const processarIf = ifMatch && (!forMatch || ifMatch.index < forMatch.index);
+
+    if (processarIf) {
+      const m = ifMatch!;
+      const openEnd = m.index + m[0]!.length;
+      const closeIdx = findMatchingClose(html, "<sc-if", "</sc-if>", openEnd);
+      const inner = html.slice(openEnd, closeIdx);
+      const condVal = getPath(scope, m[1]!.trim());
+      const replacement = condVal ? renderTemplateHtml(inner, scope) : "";
+      html = html.slice(0, m.index) + replacement + html.slice(closeIdx + "</sc-if>".length);
+    } else {
+      const m = forMatch!;
+      const openEnd = m.index + m[0]!.length;
+      const closeIdx = findMatchingClose(html, "<sc-for", "</sc-for>", openEnd);
+      const inner = html.slice(openEnd, closeIdx);
+      const listPath = m[1]!.trim();
+      const asName = m[2]!.trim();
+      const list = (getPath(scope, listPath) as unknown[] | undefined) ?? [];
+      const rendered = list.map((item) => renderTemplateHtml(inner, { ...scope, [asName]: item })).join("");
+      html = html.slice(0, m.index) + rendered + html.slice(closeIdx + "</sc-for>".length);
+    }
   }
 
-  // 3) {{ caminho }} simples restante
+  // {{ caminho }} simples restante
   html = html.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, path: string) => {
     path = path.trim();
     if (path === "true") return "true";
