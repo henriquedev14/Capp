@@ -37,7 +37,7 @@ async function main() {
 
   console.log(`Total de GRUPOS (fabricantes) após consolidar: ${anexo.grupos.length}\n`);
   for (const g of anexo.grupos) {
-    console.log(`- ${g.fabricante}: ${g.itens.length} item(ns), subtotal R$ ${g.subtotal.toFixed(2)}`);
+    console.log(`- ${g.fabricante}: ${g.itens.length} item(ns) consolidados, subtotal R$ ${Number(g.subtotal).toFixed(2)}`);
   }
 }
 
