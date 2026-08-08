@@ -130,10 +130,14 @@ export function montarEscopoTemplate(data: PropostaInstitucionalData): EscopoTem
   // mesmo quando cabiam 3-4 juntos numa só. Pedido pelo Henrique em
   // 08/08/2026, mesmo padrão aplicado na Cotação Única no mesmo dia.
   //
-  // Orçamento conservador: ~16 "unidades de linha" por página (cada
-  // fabricante custa 2 unidades de cabeçalho/subtotal + 1 por item).
-  // Ajustar esse número se algum dia o layout mudar de densidade.
-  const ORCAMENTO_LINHAS_POR_PAGINA = 16;
+  // Orçamento de linhas por página — recalculado em 08/08/2026 depois
+  // de testar com dado real (Henrique reportou que quase nada estava
+  // combinando). Página A4 tem ~995px úteis (1123 - padding), cada
+  // grupo custa ~65px de cabeçalho/subtotal + ~24px por item — dá pra
+  // caber uns 35-38 "unidades de linha" por página com folga. Usando
+  // 25 (não 30) pra sobrar espaço pro gráfico de participação que
+  // agora entra na primeira página também.
+  const ORCAMENTO_LINHAS_POR_PAGINA = 25;
   const paginasAnexo: { grupos: typeof gruposAnexoBrutos }[] = [];
   let paginaAtual: typeof gruposAnexoBrutos = [];
   let linhasNaPagina = 0;
@@ -152,7 +156,21 @@ export function montarEscopoTemplate(data: PropostaInstitucionalData): EscopoTem
   const paginasAnexoComFlag = paginasAnexo.map((p, i) => ({
     ...p,
     ehUltima: i === paginasAnexo.length - 1,
+    ehPrimeira: i === 0,
   }));
+
+  // Gráfico de participação por fabricante — pedido pelo Henrique em
+  // 08/08/2026, especificamente pra aparecer também no Anexo (não só
+  // na página de Investimento). Usa o subtotal NUMÉRICO bruto de
+  // `data.anexoMateriais.grupos` — o de `gruposAnexoBrutos` já vem
+  // formatado como texto ("R$ 1.234,56"), não dá pra fazer conta com ele.
+  const totalGeralMateriais = data.anexoMateriais.totalGeral;
+  const participacaoAnexo = data.anexoMateriais.grupos
+    .map((g) => {
+      const pct = totalGeralMateriais > 0 ? (g.subtotal / totalGeralMateriais) * 100 : 0;
+      return { nome: g.fabricante, pctLabel: `${pct.toFixed(1)}%`, pctWidth: `${pct.toFixed(1)}%` };
+    })
+    .filter((p) => parseFloat(p.pctWidth) > 0);
 
   const conditions = [
     "Faturamento dos materiais direto ao cliente",
@@ -201,5 +219,6 @@ export function montarEscopoTemplate(data: PropostaInstitucionalData): EscopoTem
 
     paginasAnexo: paginasAnexoComFlag,
     totalGeralMateriaisAnexo: formatBRL(data.anexoMateriais.totalGeral),
+    participacaoAnexo,
   };
 }
