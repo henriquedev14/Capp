@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, Svg, Rect, Text as SvgText } from "@react-pdf/renderer";
 
 // PDF consolidado da Rodada de Cotação — reúne todos os fornecedores
 // num documento só: uma página de comparativo + uma página por
@@ -177,6 +177,38 @@ export function RodadaPdfDocument({ data }: { data: RodadaPdfData }) {
             <Text style={[styles.compTd, styles.compTdTotal]}>{formatBRL(f.totalGeral)}</Text>
           </View>
         ))}
+
+        {/* Gráfico de barras — % que cada fornecedor representa do
+            total somado da rodada. Pedido pelo Henrique em 07/08/2026. */}
+        {data.fornecedores.length > 0 && (
+          <View style={{ marginTop: 14 }} wrap={false}>
+            <Text style={styles.secaoTitulo}>Participação no total</Text>
+            <Svg width="100%" height={data.fornecedores.length * 26 + 10} viewBox={`0 0 500 ${data.fornecedores.length * 26 + 10}`}>
+              {(() => {
+                const somaTotal = data.fornecedores.reduce((s, f) => s + f.totalGeral, 0);
+                const larguraMaxima = 320;
+                const inicioBarraX = 160;
+                return data.fornecedores.map((f, i) => {
+                  const pct = somaTotal > 0 ? (f.totalGeral / somaTotal) * 100 : 0;
+                  const larguraBarra = (pct / 100) * larguraMaxima;
+                  const y = i * 26;
+                  return (
+                    <React.Fragment key={f.id}>
+                      <SvgText x={0} y={y + 14} fontSize={8} fill="#333333">
+                        {f.nome.length > 22 ? f.nome.slice(0, 21) + "…" : f.nome}
+                      </SvgText>
+                      <Rect x={inicioBarraX} y={y + 4} width={larguraMaxima} height={14} fill="#F0F0F0" rx={2} />
+                      <Rect x={inicioBarraX} y={y + 4} width={Math.max(larguraBarra, 2)} height={14} fill="#FF731D" rx={2} />
+                      <SvgText x={inicioBarraX + larguraMaxima + 8} y={y + 14} fontSize={8} fill="#0B0F1A">
+                        {`${pct.toFixed(1)}%`}
+                      </SvgText>
+                    </React.Fragment>
+                  );
+                });
+              })()}
+            </Svg>
+          </View>
+        )}
 
         {data.fornecedores.map((f) => {
           const agrupados = new Map<string, typeof f.itens>();
