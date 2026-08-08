@@ -39,6 +39,26 @@ async function main() {
   for (const g of anexo.grupos) {
     console.log(`- ${g.fabricante}: ${g.itens.length} item(ns) consolidados, subtotal R$ ${Number(g.subtotal).toFixed(2)}`);
   }
+
+  // Simula o empacotamento de páginas com o orçamento atual (25 linhas).
+  const ORCAMENTO_LINHAS_POR_PAGINA = 25;
+  const paginas: { grupos: string[] }[] = [];
+  let paginaAtual: string[] = [];
+  let linhasNaPagina = 0;
+  for (const g of anexo.grupos) {
+    const custo = g.itens.length + 2;
+    if (paginaAtual.length > 0 && linhasNaPagina + custo > ORCAMENTO_LINHAS_POR_PAGINA) {
+      paginas.push({ grupos: paginaAtual });
+      paginaAtual = [];
+      linhasNaPagina = 0;
+    }
+    paginaAtual.push(g.fabricante);
+    linhasNaPagina += custo;
+  }
+  if (paginaAtual.length > 0) paginas.push({ grupos: paginaAtual });
+
+  console.log(`\nSimulação com orçamento=${ORCAMENTO_LINHAS_POR_PAGINA}: ${paginas.length} página(s)`);
+  paginas.forEach((p, i) => console.log(`  Página ${i + 1}: ${p.grupos.join(", ")}`));
 }
 
 main()
