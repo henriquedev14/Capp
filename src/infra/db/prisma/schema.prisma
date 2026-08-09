@@ -184,6 +184,80 @@ model DecisaoNegociacao {
   @@map("decisoes_negociacao")
 }
 
+// Timeline de interações da Negociação v2 — substitui DecisaoNegociacao
+// como fonte de verdade pra tudo daqui pra frente (o histórico antigo
+// foi migrado, ver `migrar-decisoes-para-interacoes.ts`). Uma linha
+// por evento: contato, contraproposta, ganha, perdida, ou retorno pra
+// engenharia quando o reajuste pedido exige mudar preço/cotação de
+// verdade. O status ATUAL da negociação é sempre derivado da última
+// interação — não existe campo de status redundante.
+// Desenhado em 08/08/2026 (docs/negociacao-desenho-v2.md).
+model InteracaoNegociacao {
+  id               String @id @default(cuid())
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+
+  tipo String
+  // "CONTATO" | "CONTRAPROPOSTA" | "GANHA" | "PERDIDA" | "RETORNO_ENGENHARIA" | "COTACAO_ENVIADA"
+
+  // Só preenchido em CONTRAPROPOSTA/GANHA — o valor negociado NESSE momento.
+  valorNegociado Decimal? @db.Decimal(12, 2) @map("valor_negociado")
+
+  // Só preenchido em PERDIDA.
+  motivoPerda String? @map("motivo_perda")
+  // "PRECO" | "PRAZO" | "ESCOPO" | "CONCORRENCIA" | "DESISTIU" | "OUTRO"
+
+  // Só preenchido em GANHA — qual Cotação virou a vencedora.
+  cotacaoVencedoraId String? @map("cotacao_vencedora_id")
+
+  observacoes String? @db.Text
+
+  // Follow-up — vale em qualquer tipo de interação.
+  proximaAcao     String?   @db.Text @map("proxima_acao")
+  proximaAcaoData DateTime? @map("proxima_acao_data")
+
+  registradoPorId String?  @map("registrado_por_id")
+  registradoPor   Usuario? @relation("InteracoesRegistradas", fields: [registradoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([empreendimentoId])
+  @@index([proximaAcaoData])
+  @@map("interacoes_negociacao")
+}
+
+// Gerado automaticamente quando uma Negociação vira GANHA — os dados
+// do cliente ficam CONGELADOS aqui no momento da confirmação (não é
+// uma referência viva ao Cliente, que pode mudar depois; o contrato
+// preserva o que foi confirmado naquele momento). Desenhado em
+// 08/08/2026 (docs/negociacao-desenho-v2.md, item C).
+model Contrato {
+  id               String @id @default(cuid())
+  numero           String @unique // "CTR-2026-0001"
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Restrict)
+
+  empresaGrupoId String       @map("empresa_grupo_id")
+  empresaGrupo   EmpresaGrupo @relation(fields: [empresaGrupoId], references: [id], onDelete: Restrict)
+
+  // Snapshot do cliente no momento da confirmação — editável na hora,
+  // não muda mais depois (contrato preserva o que foi confirmado).
+  clienteRazaoSocial  String @map("cliente_razao_social")
+  clienteCnpj         String @map("cliente_cnpj")
+  clienteEndereco     String? @map("cliente_endereco")
+  clienteCidade       String? @map("cliente_cidade")
+  clienteEstado       String? @db.VarChar(2) @map("cliente_estado")
+
+  valorFinal Decimal @db.Decimal(12, 2) @map("valor_final")
+
+  geradoEm     DateTime @default(now()) @map("gerado_em")
+  geradoPorId  String?  @map("gerado_por_id")
+  geradoPor    Usuario? @relation(fields: [geradoPorId], references: [id], onDelete: SetNull)
+
+  @@index([empreendimentoId])
+  @@map("contratos")
+}
+
 model Empreendimento {
   id     String @id @default(cuid())
   // Código legível para humanos — gerado automaticamente na criação
@@ -307,6 +381,8 @@ model Empreendimento {
   // Timeline — eventos, anotações e documentos do empreendimento
   eventos    EventoEmpreendimento[]
   decisoesNegociacao DecisaoNegociacao[]
+  interacoesNegociacao InteracaoNegociacao[]
+  contratos Contrato[]
   documentos DocumentoEmpreendimento[]
 
   // Módulo 6 — Engenharia
@@ -613,6 +689,8 @@ model Usuario {
   levantamentosHidraulicosValidados LevantamentoHidraulico[] @relation("HidraulicoValidadoPor")
   levantamentosMateriaisValidados LevantamentoMateriais[] @relation("MateriaisValidadoPor")
   decisoesNegociacaoRegistradas   DecisaoNegociacao[]
+  interacoesNegociacaoRegistradas InteracaoNegociacao[] @relation("InteracoesRegistradas")
+  contratosGerados                Contrato[]
   orcamentosCriados        Orcamento[]
   propostasGeradas         Orcamento[] @relation("PropostasGeradas")
   orcamentosResponsavel    Orcamento[] @relation("OrcamentosResponsavel")
@@ -1821,12 +1899,20 @@ model EmpresaGrupo {
   nome  String  @unique // ex: "ConstruApp Fábrica", "ConstruApp Projetos"
   ativo Boolean @default(true)
 
+  // Identidade formal — necessária pra gerar Contrato com essa empresa
+  // como responsável. Adicionado em 08/08/2026 (Negociação v2).
+  cnpj       String?
+  endereco   String?
+  cidade     String?
+  estado     String? @db.VarChar(2)
+
   contasPagar     ContaPagar[]
   contasFixas     ContaFixaModelo[]
   contasReceber   ContaReceber[]
   remessas        Remessa[]
   motoristas      Motorista[]
   veiculos        Veiculo[]
+  contratos       Contrato[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
