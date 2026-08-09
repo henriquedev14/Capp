@@ -29,7 +29,7 @@ export default async function PrecosPage() {
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        breadcrumb={["Orçamentação", "Preços"]}
+        breadcrumb={["Engenharia", "Preços"]}
         title="Tabela de Preços e Tiers"
         description="Valores base de mão de obra por kit/área e multiplicadores por padrão construtivo — usados em todo cálculo de orçamento."
       />
