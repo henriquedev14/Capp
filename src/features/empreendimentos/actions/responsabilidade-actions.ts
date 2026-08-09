@@ -32,7 +32,7 @@ const CAMPO_CONCLUIDO: Record<Area, string> = {
 const LABEL_AREA: Record<Area, string> = {
   COMERCIAL: "Comercial",
   ENGENHARIA: "Engenharia",
-  ORCAMENTACAO: "Orçamentação",
+  ORCAMENTACAO: "Engenharia",
 };
 
 const PERMISSAO_AREA: Record<Area, PermissaoChave> = {
