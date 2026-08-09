@@ -12,7 +12,7 @@ export default async function MateriaisPexPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-start justify-between gap-4">
         <PageHeader
-          breadcrumb={["Orçamentação", "Catálogo PEX"]}
+          breadcrumb={["Engenharia", "Catálogo PEX"]}
           title="Catálogo de Materiais PEX"
           description="Repositório de conexões e tubos PEX — linha Barbi do Brasil, usado no Levantamento Hidráulico."
         />
