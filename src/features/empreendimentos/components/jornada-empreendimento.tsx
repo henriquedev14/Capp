@@ -3,7 +3,7 @@ import { CheckCircle2, Circle, XCircle } from "lucide-react";
 const ETAPAS_JORNADA = [
   { status: "PROSPECCAO", label: "Prospecção" },
   { status: "COMERCIAL", label: "Comercial" },
-  { status: "ORCAMENTACAO", label: "Orçamentação" },
+  { status: "ORCAMENTACAO", label: "Engenharia" },
   { status: "NEGOCIACAO", label: "Negociação" },
   { status: "CONTRATADO", label: "Contrato" },
   { status: "SUPRIMENTOS", label: "Suprimentos" },
