@@ -111,6 +111,11 @@ export async function buscarFilaOrcamentos(
     where: {
       empreendimento: {
         excluidoEm: null,
+        // Só empreendimentos AINDA em Orçamentação/Engenharia — antes
+        // não filtrava por status nenhum, então um item continuava
+        // aparecendo aqui pra sempre, mesmo depois de migrar pra
+        // Negociação/Contratado/etc. Achado pelo Henrique em 09/08/2026.
+        status: "ORCAMENTACAO",
         ...(filtros.responsavelComercialUserId && {
           responsavelComercialUserId: filtros.responsavelComercialUserId,
         }),
