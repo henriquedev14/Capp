@@ -12,7 +12,7 @@ export default async function MateriaisEletricosPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-start justify-between gap-4">
         <PageHeader
-          breadcrumb={["Orçamentação", "Catálogo Elétrico"]}
+          breadcrumb={["Engenharia", "Catálogo Elétrico"]}
           title="Catálogo de Materiais Elétricos"
           description="Repositório de materiais elétricos e QDC por fabricante — alimenta o Levantamento de Materiais e o Bloco 2 do Orçamento."
         />
