@@ -21,7 +21,8 @@ const ROTA_DO_MODULO: Record<string, string> = {
   "Fornecedores": "/fornecedores",
   "Clientes": "/clientes",
   "Analytics": "/painel",
-  "Engenharia": "/painel",
+  "Engenharia": "/orcamentacao",
+  "Negociação": "/negociacao",
 };
 
 /**
