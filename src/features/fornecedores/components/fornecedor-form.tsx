@@ -158,7 +158,7 @@ export function FornecedorForm({ fornecedor }: FornecedorFormProps) {
         <FormSection
           icon={Tag}
           title="Tipos de Fornecimento"
-          description="Selecione ao menos um tipo de material ou serviço que este fornecedor oferece. Usado para filtragem na Orçamentação."
+          description="Selecione ao menos um tipo de material ou serviço que este fornecedor oferece. Usado para filtragem na Engenharia."
         >
           <FormField
             control={form.control}
