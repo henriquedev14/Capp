@@ -16,16 +16,16 @@ export default async function NegociacaoPage({ params }: Props) {
   const empreendimento = await empreendimentoRepo.findById(params.id);
   if (!empreendimento) notFound();
 
-  const { cotacoes, historico } = await buscarDadosNegociacao(params.id);
+  const dados = await buscarDadosNegociacao(params.id);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         breadcrumb={["Empreendimentos", empreendimento.nome, "Negociação"]}
         title="Negociação"
-        description="Registre a decisão do cliente depois de conversar com ele — ligação, e-mail ou reunião."
+        description="Timeline de interações com o cliente — contato, contraproposta, ganha ou perdida."
       />
-      <NegociacaoView empreendimentoId={params.id} cotacoes={cotacoes} historico={historico} />
+      <NegociacaoView empreendimentoId={params.id} {...dados} />
     </div>
   );
 }
