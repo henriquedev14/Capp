@@ -56,8 +56,8 @@ export function ModalConfirmarContrato({ empreendimentoId, onFechar }: Props) {
       setCidade(r.clienteCidade ?? "");
       setEstado(r.clienteEstado ?? "");
       setValorFinal(r.valorAtual);
-      if (r.empresasGrupo.length === 1) setEmpresaGrupoId(r.empresasGrupo[0].id);
-      if (r.cotacoesAtivas.length === 1) setCotacaoVencedoraId(r.cotacoesAtivas[0].id);
+      if (r.empresasGrupo.length === 1 && r.empresasGrupo[0]) setEmpresaGrupoId(r.empresasGrupo[0].id);
+      if (r.cotacoesAtivas.length === 1 && r.cotacoesAtivas[0]) setCotacaoVencedoraId(r.cotacoesAtivas[0].id);
       setCarregando(false);
     });
   }, [empreendimentoId]);
