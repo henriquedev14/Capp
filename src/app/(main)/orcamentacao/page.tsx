@@ -77,8 +77,8 @@ export default async function OrcamentacaoHubPage({ searchParams }: Props) {
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        breadcrumb={["Orçamentação"]}
-        title="Orçamentação"
+        breadcrumb={["Engenharia"]}
+        title="Engenharia"
         description="Fila de trabalho: levantamentos, cotações e composição de propostas."
       />
 
