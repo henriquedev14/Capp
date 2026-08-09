@@ -168,7 +168,7 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
           className="flex items-center gap-1.5 text-sm font-medium text-primary transition-colors hover:text-primary/80"
         >
           <Calculator className="h-4 w-4" />
-          Ir para Orçamentação
+          Ir para Engenharia
         </Link>
       </div>
 
@@ -177,9 +177,9 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
           breadcrumb={[
             "Empreendimentos",
             empreendimento.nome,
-            "Orçamentação",
+            "Engenharia",
           ]}
-          title="Orçamentação"
+          title="Engenharia"
           description={empreendimento.nome}
         />
         <NovoOrcamentoButton
@@ -330,7 +330,6 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                       propostaJaGerada={!!propostaInfo.propostaGeradaEm}
                       propostaGeradaEm={propostaInfo.propostaGeradaEm}
                       documentoId={propostaInfo.documentoId}
-                      decisaoCliente={propostaInfo.decisaoCliente}
                       podeSobrescrever={podeSobrescreverProposta}
                     />
                     <GerarCotacaoButton
