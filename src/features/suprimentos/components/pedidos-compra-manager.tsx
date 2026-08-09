@@ -182,7 +182,7 @@ export function PedidosCompraManager({
       <div className="flex flex-col gap-4">
         {secaoCotacoesAceitas}
         <div className="rounded-lg border border-border bg-card py-10 text-center text-sm text-muted-foreground">
-          Nenhum pedido de compra ainda. Aceite uma cotação em Orçamentação pra ela aparecer aqui em cima.
+          Nenhum pedido de compra ainda. Aceite uma cotação em Engenharia pra ela aparecer aqui em cima.
         </div>
       </div>
     );
