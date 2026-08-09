@@ -32,7 +32,7 @@ const ABAS: { id: AbaId; label: string; icon: React.ComponentType<{ className?: 
   { id: "coordenador", label: "Coordenação", icon: ShieldCheck, permissao: PERMISSOES.DASHBOARD_VER_COORDENACAO },
   { id: "comercial", label: "Comercial", icon: Briefcase, permissao: PERMISSOES.DASHBOARD_VER_COMERCIAL },
   { id: "engenharia", label: "Engenharia", icon: Wrench, permissao: PERMISSOES.DASHBOARD_VER_ENGENHARIA },
-  { id: "orcamentacao", label: "Orçamentação", icon: FileEdit, permissao: PERMISSOES.DASHBOARD_VER_ORCAMENTACAO },
+  { id: "orcamentacao", label: "Engenharia", icon: FileEdit, permissao: PERMISSOES.DASHBOARD_VER_ORCAMENTACAO },
   { id: "financeiro", label: "Financeiro", icon: Wallet, permissao: PERMISSOES.DASHBOARD_VER_FINANCEIRO },
   { id: "suprimentos", label: "Suprimentos", icon: Package, permissao: PERMISSOES.DASHBOARD_VER_SUPRIMENTOS },
   { id: "producaoAnalytics", label: "Produção", icon: Factory, permissao: PERMISSOES.PRODUCAO_VER_DASHBOARD },
