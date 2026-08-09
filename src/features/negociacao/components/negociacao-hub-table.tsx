@@ -132,7 +132,7 @@ export function NegociacaoHubTable({ linhas }: { linhas: LinhaHubNegociacao[] })
             </thead>
             <tbody>
               {filtradas.map((l) => {
-                const statusInfo = LABELS_STATUS[l.status];
+                const statusInfo = LABELS_STATUS[l.status] ?? { label: l.status, classe: "bg-muted text-muted-foreground" };
                 return (
                   <tr
                     key={l.empreendimentoId}
