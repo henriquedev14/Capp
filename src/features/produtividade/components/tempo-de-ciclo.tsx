@@ -48,7 +48,7 @@ export function TempoDeCiclo({ kpis }: { kpis: KpisCronologicos }) {
     { nome: "Prospecção", dias: kpis.comercial.tempoMedioProspeccaoDias, amostras: kpis.comercial.amostrasProspeccao },
     { nome: "Negociação", dias: kpis.comercial.tempoMedioNegociacaoDias, amostras: kpis.comercial.amostrasNegociacao },
     { nome: "Engenharia", dias: kpis.engenharia.tempoMedioDias, amostras: kpis.engenharia.amostras },
-    { nome: "Orçamentação", dias: kpis.orcamentacao.tempoMedioDias, amostras: kpis.orcamentacao.amostras },
+    { nome: "Engenharia", dias: kpis.orcamentacao.tempoMedioDias, amostras: kpis.orcamentacao.amostras },
     { nome: "Suprimentos", dias: kpis.producao.tempoMedioSuprimentosDias, amostras: kpis.producao.amostras },
     { nome: "Produção", dias: kpis.producao.tempoMedioProducaoDias, amostras: kpis.producao.amostras },
   ];
