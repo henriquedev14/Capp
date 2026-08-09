@@ -43,35 +43,37 @@ describe("derivarStatusNegociacao", () => {
 });
 
 describe("calcularPrioridade", () => {
+  const AGORA = new Date("2026-08-08T12:00:00Z");
+
   it("sem interação nenhuma, prioridade normal (nada aconteceu ainda)", () => {
-    const r = calcularPrioridade([]);
+    const r = calcularPrioridade([], AGORA);
     expect(r.prioridade).toBe("normal");
   });
 
   it("interação recente (1 dia) é normal", () => {
-    const r = calcularPrioridade([interacao("CONTATO", 1)]);
+    const r = calcularPrioridade([interacao("CONTATO", 1)], AGORA);
     expect(r.prioridade).toBe("normal");
     expect(r.diasSemInteracao).toBe(1);
   });
 
   it("4-7 dias sem interação vira atenção", () => {
-    const r = calcularPrioridade([interacao("CONTATO", 5)]);
+    const r = calcularPrioridade([interacao("CONTATO", 5)], AGORA);
     expect(r.prioridade).toBe("atencao");
   });
 
   it("mais de 7 dias sem interação vira crítica", () => {
-    const r = calcularPrioridade([interacao("CONTATO", 8)]);
+    const r = calcularPrioridade([interacao("CONTATO", 8)], AGORA);
     expect(r.prioridade).toBe("critica");
   });
 
   it("follow-up vencido é crítica mesmo com poucos dias desde a última interação", () => {
-    const r = calcularPrioridade([interacao("CONTRAPROPOSTA", 1, 1)]); // próxima ação já passou ontem
+    const r = calcularPrioridade([interacao("CONTRAPROPOSTA", 1, 1)], AGORA); // próxima ação já passou ontem
     expect(r.prioridade).toBe("critica");
     expect(r.followUpVencido).toBe(true);
   });
 
   it("follow-up NO FUTURO não conta como vencido", () => {
-    const r = calcularPrioridade([interacao("CONTRAPROPOSTA", 1, -2)]); // próxima ação daqui a 2 dias
+    const r = calcularPrioridade([interacao("CONTRAPROPOSTA", 1, -2)], AGORA); // próxima ação daqui a 2 dias
     expect(r.followUpVencido).toBe(false);
     expect(r.prioridade).toBe("normal");
   });
