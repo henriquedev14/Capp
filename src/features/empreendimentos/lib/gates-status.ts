@@ -41,7 +41,7 @@ export async function verificarGateOrcamentacao(
 
   if (pendencias.length > 0) {
     return {
-      erro: `Falta validar: ${pendencias.join(", ")}. Vá em Levantamentos, valide o que falta, e só depois conclua a Orçamentação de novo.`,
+      erro: `Falta validar: ${pendencias.join(", ")}. Vá em Levantamentos, valide o que falta, e só depois conclua a Engenharia de novo.`,
     };
   }
   return { ok: true };
