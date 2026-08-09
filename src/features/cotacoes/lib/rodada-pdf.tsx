@@ -9,11 +9,8 @@ import { Document, Page, Text, View, StyleSheet, Svg, Rect, Line, Circle, Text a
 
 const NAVY = "#0B0F1A";
 const ORANGE_HGI = "#FF731D";
-const GREEN = "#22C55E";
 const GRAY = "#6B7280";
 const GRAY_LIGHT = "#E8E9EC";
-const GRAY_BG = "#F7F7F8";
-const WHITE = "#FFFFFF";
 
 function LogoMalha({ size = 30 }: { size?: number }) {
   // Mesmo símbolo do PDF individual, pra manter a identidade consistente.
@@ -29,7 +26,7 @@ function LogoMalha({ size = 30 }: { size?: number }) {
     <Svg width={size} height={size} viewBox="0 0 44 34">
       {pts.map(([x1, y1], i) =>
         pts.slice(i + 1).map(([x2, y2], j) => (
-          <Line key={`${i}-${j}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={WHITE} strokeWidth={0.5} strokeOpacity={0.5} />
+          <Line key={`${i}-${j}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={NAVY} strokeWidth={0.5} strokeOpacity={0.4} />
         ))
       )}
       {pts.map(([x, y], i) => (
@@ -46,25 +43,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
-    backgroundColor: NAVY,
-    borderRadius: 8,
+    paddingLeft: 0,
+    borderBottomWidth: 1.5,
+    borderBottomColor: NAVY,
     marginBottom: 16,
   },
   headerLogoBox: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: NAVY,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
   },
   headerInfo: { flex: 1 },
-  headerNome: { fontSize: 12, fontWeight: 700, color: WHITE, letterSpacing: 0.2 },
-  headerMeta: { fontSize: 8, color: "#B9C0CC", marginTop: 3 },
+  headerNome: { fontSize: 12, fontWeight: 700, color: NAVY, letterSpacing: 0.2 },
+  headerMeta: { fontSize: 8, color: GRAY, marginTop: 3 },
   headerRight: { alignItems: "flex-end" },
   headerNumero: { fontSize: 12, fontWeight: 700, color: ORANGE_HGI },
-  headerData: { fontSize: 7.5, color: "#9AA3B2", marginTop: 3 },
+  headerData: { fontSize: 7.5, color: GRAY, marginTop: 3 },
 
   secaoTitulo: {
     fontSize: 9.5,
