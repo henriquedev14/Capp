@@ -86,7 +86,7 @@ export const STATUS_EMPREENDIMENTO: StatusOption[] = [
   },
   {
     value: "ORCAMENTACAO",
-    label: "Orçamentação",
+    label: "Engenharia",
     grupo: "comercial",
     descricao: "Levantamento validado — montagem da proposta de materiais e serviço HGI.",
     proximos: ["NEGOCIACAO", "ARQUIVADO"],
