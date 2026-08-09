@@ -21,7 +21,7 @@ export default async function NegociacaoPage({ params }: Props) {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        breadcrumb={["Empreendimentos", empreendimento.nome, "Negociação"]}
+        breadcrumb={["Negociação", empreendimento.nome]}
         title="Negociação"
         description="Timeline de interações com o cliente — contato, contraproposta, ganha ou perdida."
       />
