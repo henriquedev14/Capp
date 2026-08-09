@@ -77,6 +77,7 @@ export function NegociacaoView({
 
   const desconto = valorOriginal > 0 ? ((valorOriginal - valorAtual) / valorOriginal) * 100 : 0;
   const podeAgir = status === "AGUARDANDO_CLIENTE" || status === "EM_REVISAO";
+  const statusInfo = LABELS_STATUS[status] ?? { label: status, classe: "bg-muted text-muted-foreground" };
 
   function limparForm() {
     setFormAberto(null);
@@ -123,8 +124,8 @@ export function NegociacaoView({
       <Card>
         <CardHeader className="flex-row items-center justify-between border-b border-border">
           <CardTitle className="text-[15px]">Status da negociação</CardTitle>
-          <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${LABELS_STATUS[status].classe}`}>
-            {LABELS_STATUS[status].label}
+          <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${statusInfo.classe}`}>
+            {statusInfo.label}
           </span>
         </CardHeader>
         <CardContent className="pt-5">
