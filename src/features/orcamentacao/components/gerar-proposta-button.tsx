@@ -7,15 +7,12 @@ import {
   Loader2,
   Lock,
   CheckCircle2,
-  ThumbsUp,
-  ThumbsDown,
   RotateCcw,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   gerarPropostaComercial,
-  registrarDecisaoCliente,
 } from "@/features/orcamentacao/actions/proposta-actions";
 
 interface Props {
@@ -29,7 +26,6 @@ interface Props {
   propostaJaGerada: boolean;
   propostaGeradaEm?: string | null;
   documentoId?: string | null;
-  decisaoCliente?: "PENDENTE" | "ACEITA" | "RECUSADA" | null;
   // Só Diretor/Admin pode gerar de novo depois de já ter sido gerada.
   podeSobrescrever: boolean;
 }
@@ -41,12 +37,10 @@ export function GerarPropostaButton({
   propostaJaGerada,
   propostaGeradaEm,
   documentoId,
-  decisaoCliente,
   podeSobrescrever,
 }: Props) {
   const router = useRouter();
   const [gerando, setGerando] = React.useState(false);
-  const [registrando, setRegistrando] = React.useState<"ACEITA" | "RECUSADA" | null>(null);
 
   async function gerar() {
     setGerando(true);
@@ -65,21 +59,6 @@ export function GerarPropostaButton({
     } else {
       window.open(`/api/orcamentos/${orcamentoId}/proposta`, "_blank");
     }
-  }
-
-  async function decidir(decisao: "ACEITA" | "RECUSADA") {
-    const obs =
-      decisao === "RECUSADA"
-        ? window.prompt("Motivo da recusa (opcional):") ?? undefined
-        : undefined;
-    setRegistrando(decisao);
-    const r = await registrarDecisaoCliente(orcamentoId, decisao, obs);
-    setRegistrando(null);
-    if (r.erro) {
-      alert(r.erro);
-      return;
-    }
-    router.refresh();
   }
 
   // Bloqueado por pré-requisitos normais (orçamento não aprovado, materiais
@@ -112,49 +91,10 @@ export function GerarPropostaButton({
           Ver PDF
         </Button>
 
-        {/* Decisão do cliente — só faz sentido depois de gerada */}
-        {decisaoCliente === "ACEITA" ? (
-          <span className="flex items-center gap-1.5 rounded-md bg-success/10 px-3 py-1.5 text-xs font-medium text-success">
-            <ThumbsUp className="h-3.5 w-3.5" />
-            Cliente aceitou
-          </span>
-        ) : decisaoCliente === "RECUSADA" ? (
-          <span className="flex items-center gap-1.5 rounded-md bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive">
-            <ThumbsDown className="h-3.5 w-3.5" />
-            Cliente recusou
-          </span>
-        ) : (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => decidir("ACEITA")}
-              disabled={registrando !== null}
-              className="border-success/40 text-success hover:bg-success/10"
-            >
-              {registrando === "ACEITA" ? (
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-              ) : (
-                <ThumbsUp className="mr-1.5 h-4 w-4" />
-              )}
-              Cliente aceitou
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => decidir("RECUSADA")}
-              disabled={registrando !== null}
-              className="border-destructive/40 text-destructive hover:bg-destructive/10"
-            >
-              {registrando === "RECUSADA" ? (
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-              ) : (
-                <ThumbsDown className="mr-1.5 h-4 w-4" />
-              )}
-              Cliente recusou
-            </Button>
-          </>
-        )}
+        {/* Decisão do cliente agora vive só na etapa de Negociação —
+            esse bloco de Aceitar/Recusar aqui ficou como sobra da v1,
+            competindo/confundindo com o fluxo novo. Removido em
+            08/08/2026 a pedido do Henrique. */}
 
         {/* Sobrescrever — só Diretor/Admin, e só se quiser mesmo */}
         {podeSobrescrever && (
