@@ -35,7 +35,7 @@ export function SaudeGeral({ orcamentosParados, cotacoesParadas, percentualProdu
       <Card className={ESTILOS[statusOrcamentacao]}>
         <CardContent className="relative pt-5">
           <span className={`absolute right-4 top-4 h-2.5 w-2.5 rounded-full ${FAROL[statusOrcamentacao]}`} />
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Orçamentação</p>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Engenharia</p>
           <p className="text-2xl font-extrabold">
             {orcamentosParados} <span className="text-xs font-semibold text-muted-foreground">parados</span>
           </p>
