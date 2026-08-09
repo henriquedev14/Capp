@@ -101,7 +101,7 @@ export default async function EmpreendimentoDetalhePage({
   }
   if (empreendimento.status === "ORCAMENTACAO" && !empreendimento.responsavelOrcamentacaoUserId) {
     pendencias.push({
-      titulo: "Sem responsável de Engenharia definido",
+      titulo: "Sem responsável de Orçamento definido",
       detalhe: "Ninguém está formalmente cuidando dessa etapa agora.",
     });
   }
@@ -270,7 +270,7 @@ export default async function EmpreendimentoDetalhePage({
           },
           {
             area: "ORCAMENTACAO",
-            label: "Engenharia (proposta)",
+            label: "Orçamento",
             responsavelId: empreendimento.responsavelOrcamentacaoUserId ?? null,
             responsavelNome: respOrcamentacao?.nome ?? null,
             concluidoEm: conclusoes?.orcamentacaoConcluidaEm?.toISOString() ?? null,
@@ -408,7 +408,7 @@ export default async function EmpreendimentoDetalhePage({
               <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <Campo label="Comercial" valor={respComercial?.nome ?? "Não atribuído"} />
                 <Campo label="Engenharia" valor={respEngenharia?.nome ?? "Não atribuído"} />
-                <Campo label="Engenharia" valor={respOrcamentacao?.nome ?? "Não atribuído"} />
+                <Campo label="Orçamento" valor={respOrcamentacao?.nome ?? "Não atribuído"} />
               </dl>
             </CardContent>
           </Card>
