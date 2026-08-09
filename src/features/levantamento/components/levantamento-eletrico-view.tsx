@@ -237,7 +237,7 @@ export function LevantamentoEletricoView({
             <Link href={`/empreendimentos/${empreendimentoId}/orcamento`}>
               <Button size="sm" variant="outline">
                 <FileDown className="h-4 w-4" />
-                Ir para Orçamentação
+                Ir para Engenharia
               </Button>
             </Link>
           )}
