@@ -101,7 +101,7 @@ export default async function EmpreendimentoDetalhePage({
   }
   if (empreendimento.status === "ORCAMENTACAO" && !empreendimento.responsavelOrcamentacaoUserId) {
     pendencias.push({
-      titulo: "Sem responsável de Orçamentação definido",
+      titulo: "Sem responsável de Engenharia definido",
       detalhe: "Ninguém está formalmente cuidando dessa etapa agora.",
     });
   }
@@ -270,7 +270,7 @@ export default async function EmpreendimentoDetalhePage({
           },
           {
             area: "ORCAMENTACAO",
-            label: "Orçamentação (proposta)",
+            label: "Engenharia (proposta)",
             responsavelId: empreendimento.responsavelOrcamentacaoUserId ?? null,
             responsavelNome: respOrcamentacao?.nome ?? null,
             concluidoEm: conclusoes?.orcamentacaoConcluidaEm?.toISOString() ?? null,
@@ -408,7 +408,7 @@ export default async function EmpreendimentoDetalhePage({
               <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <Campo label="Comercial" valor={respComercial?.nome ?? "Não atribuído"} />
                 <Campo label="Engenharia" valor={respEngenharia?.nome ?? "Não atribuído"} />
-                <Campo label="Orçamentação" valor={respOrcamentacao?.nome ?? "Não atribuído"} />
+                <Campo label="Engenharia" valor={respOrcamentacao?.nome ?? "Não atribuído"} />
               </dl>
             </CardContent>
           </Card>
@@ -486,7 +486,7 @@ export default async function EmpreendimentoDetalhePage({
           />
           <ModuloComGate
             icon={Calculator}
-            titulo="Orçamentação"
+            titulo="Engenharia"
             descricao="Valor do empreendimento e proposta"
             href={`/empreendimentos/${empreendimento.id}/orcamento`}
             statusEmpreendimento={empreendimento.status}
@@ -647,7 +647,7 @@ const FASES_ORCAMENTO_CONSULTA = new Set([
 const FASES_LABELS: Record<string, string> = {
   PROSPECCAO: "Prospecção",
   COMERCIAL: "Comercial",
-  ORCAMENTACAO: "Orçamentação",
+  ORCAMENTACAO: "Engenharia",
   NEGOCIACAO: "Negociação",
   CONTRATADO: "Contratado",
   SUPRIMENTOS: "Suprimentos",
