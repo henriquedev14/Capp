@@ -16,7 +16,7 @@ import type { DashboardData } from "@/features/dashboard/lib/queries";
 const LABELS_STATUS: Record<string, string> = {
   PROSPECCAO: "Prospecção",
   COMERCIAL: "Comercial",
-  ORCAMENTACAO: "Orçamentação",
+  ORCAMENTACAO: "Engenharia",
   NEGOCIACAO: "Negociação",
   CONTRATADO: "Contratado",
   SUPRIMENTOS: "Suprimentos",

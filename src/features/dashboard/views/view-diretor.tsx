@@ -39,7 +39,7 @@ const CORES_STATUS: Record<string, string> = {
 const LABELS_STATUS: Record<string, string> = {
   PROSPECCAO: "Prospecção",
   COMERCIAL: "Comercial",
-  ORCAMENTACAO: "Orçamentação",
+  ORCAMENTACAO: "Engenharia",
   NEGOCIACAO: "Negociação",
   CONTRATADO: "Contratado",
   SUPRIMENTOS: "Suprimentos",
@@ -288,7 +288,7 @@ export function ViewDiretor({ data, metasPorArea }: { data: DashboardData; metas
             meta: metasPorArea.engenharia,
           },
           {
-            nome: "Orçamentação",
+            nome: "Engenharia",
             tempoDias: data.kpisCronologicos.orcamentacao.tempoMedioDias,
             amostras: data.kpisCronologicos.orcamentacao.amostras,
             detalhe: "tempo médio de proposta",
