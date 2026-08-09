@@ -268,6 +268,24 @@ export async function atualizarStatusOrcamento(
     await repo.enviarParaAprovacao(id);
   } else if (status === "ORCAMENTO_APROVADO") {
     await repo.aprovarOrcamento(id, usuarioId);
+    // Ajustado em 08/08/2026 (Negociação v2): a aprovação SOZINHA já
+    // empurra o empreendimento pra Negociação — não espera mais a
+    // geração da Proposta como gate. "Gerar Proposta" continua
+    // disponível, só que agora é uma ação de dentro da Negociação, não
+    // um pré-requisito pra chegar lá. Atualiza direto (sem passar pelo
+    // gate de verificarGateNegociacao, que ainda exige propostaGeradaEm
+    // — esse gate continua valendo pra quem tenta avançar manualmente,
+    // só não trava mais esse fluxo automático).
+    const empreendimentoAtual = await prisma.empreendimento.findUnique({
+      where: { id: empreendimentoId },
+      select: { status: true },
+    });
+    if (empreendimentoAtual && empreendimentoAtual.status === "ORCAMENTACAO") {
+      await prisma.empreendimento.update({
+        where: { id: empreendimentoId },
+        data: { status: "NEGOCIACAO" },
+      });
+    }
   } else if (status === "ORCAMENTO_DEVOLVIDO") {
     await repo.devolverOrcamento(id, motivoDevolucao?.trim() || "Devolvido sem motivo específico informado.");
   } else {
@@ -276,7 +294,9 @@ export async function atualizarStatusOrcamento(
 
   revalidatePath(`/empreendimentos/${empreendimentoId}/orcamento`);
   revalidatePath(`/empreendimentos/${empreendimentoId}`);
+  revalidatePath(`/empreendimentos/${empreendimentoId}/negociacao`);
   revalidatePath("/orcamentacao");
+  revalidatePath("/negociacao");
   return { ok: true };
 }
 
