@@ -15,6 +15,7 @@ import { verificarEmpreendimentoNaoArquivado } from "@/core/empreendimentos/use-
 import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empreendimento-ativo";
 import { validarRemessaExcluivel } from "@/core/expedicao/use-cases/validacoes-expedicao";
 import { ehGestorSenior } from "@/infra/auth/eh-gestor-senior";
+import { verificarCronogramaCompleto } from "@/core/empreendimentos/use-cases/verificar-cronograma-completo";
 
 type Resultado<T = { ok: true }> = T | { erro: string };
 
@@ -184,6 +185,28 @@ export async function finalizarConferenciaAction(
   const session = await exigirPermissao(PERMISSOES.EXPEDICAO_GERENCIAR_CONFERENCIA);
   const bloqueio = await guardaArquivadoPorRemessa(remessaId);
   if (bloqueio) return bloqueio;
+
+  // Trava do Cronograma da Obra (item 1 da Jornada do Orçamento,
+  // 10/08/2026): remessa só libera pra carregamento/recebimento se
+  // TODO pavimento do empreendimento (não só os que essa remessa
+  // cobre) já tiver data prevista definida.
+  const remessa = await prisma.remessa.findUnique({
+    where: { id: remessaId },
+    select: { empreendimentoId: true },
+  });
+  if (remessa) {
+    const pavimentos = await prisma.pavimento.findMany({
+      where: { OR: [{ torre: { empreendimentoId: remessa.empreendimentoId } }, { bloco: { torre: { empreendimentoId: remessa.empreendimentoId } } }] },
+      select: { dataPrevistaRemessa: true },
+    });
+    if (!verificarCronogramaCompleto(pavimentos)) {
+      return {
+        erro:
+          "O Cronograma da Obra desse empreendimento não está 100% preenchido — preencha a data prevista de todos os pavimentos antes de liberar essa remessa.",
+      };
+    }
+  }
+
   try {
     await prisma.$transaction((tx) => repo.finalizarConferencia(tx, remessaId, session.user.id));
     revalidatePath(`/expedicao/${remessaId}`);
