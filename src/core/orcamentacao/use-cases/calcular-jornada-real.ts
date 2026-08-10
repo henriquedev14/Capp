@@ -1,6 +1,5 @@
 import type { EtapaJornada, OrcamentoJornadaEtapa, StatusEtapaJornada } from "@/core/orcamentacao/entities/orcamento";
 import { ETAPAS_JORNADA } from "@/core/orcamentacao/entities/orcamento";
-
 export interface DadosParaCalcularJornada {
   jornadaExistente: OrcamentoJornadaEtapa[];
   /** Resultado de verificarGateOrcamentacao — todas as tipologias com levantamento validado. */
@@ -11,7 +10,6 @@ export interface DadosParaCalcularJornada {
   statusOrcamento: "EM_LEVANTAMENTO" | "ENVIADO_APROVACAO_GESTOR" | "ORCAMENTO_APROVADO" | "ORCAMENTO_DEVOLVIDO";
   propostaGeradaEm: string | null;
 }
-
 /**
  * Calcula o status REAL de cada etapa da Jornada do Orçamento, a partir
  * do estado de verdade do sistema — em vez de depender só do que foi
@@ -28,10 +26,8 @@ export interface DadosParaCalcularJornada {
  */
 export function calcularJornadaReal(dados: DadosParaCalcularJornada): OrcamentoJornadaEtapa[] {
   const porEtapa = new Map(dados.jornadaExistente.map((j) => [j.etapa, j]));
-
   const temCotacaoAceita = dados.cotacoes.some((c) => c.status === "ACEITA");
   const temAlgumaCotacao = dados.cotacoes.length > 0;
-
   const statusCalculado: Record<EtapaJornada, StatusEtapaJornada> = {
     LEVANTAMENTOS: dados.levantamentosOk ? "CONCLUIDA" : "EM_ANDAMENTO",
     COMPOSICAO: dados.totalServicosHgi > 0 ? "CONCLUIDA" : "NAO_INICIADA",
@@ -54,16 +50,13 @@ export function calcularJornadaReal(dados: DadosParaCalcularJornada): OrcamentoJ
             : "NAO_INICIADA",
     PROPOSTA: dados.propostaGeradaEm ? "CONCLUIDA" : "NAO_INICIADA",
   };
-
   // Etapas manuais que representam decisão humana explícita — não dá
   // pra inferir do estado do sistema, então respeita o que já tinha.
   const RESPEITAR_MANUAL: StatusEtapaJornada[] = ["BLOQUEADA", "CANCELADA"];
-
   return ETAPAS_JORNADA.map((etapa) => {
     const existente = porEtapa.get(etapa);
     const statusManualExplicito =
       existente && RESPEITAR_MANUAL.includes(existente.status) ? existente.status : null;
-
     return {
       id: existente?.id ?? `calculado-${etapa}`,
       orcamentoId: existente?.orcamentoId ?? "",
