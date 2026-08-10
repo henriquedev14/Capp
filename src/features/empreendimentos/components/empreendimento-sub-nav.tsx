@@ -27,6 +27,7 @@ export function EmpreendimentoSubNav({ empreendimentoId, kitEletrico, kitHidraul
     { href: `${base}/levantamento-materiais`, label: "Levantamento de Materiais" },
     { href: `${base}/orcamento`, label: "Orçamento" },
     { href: `${base}/negociacao`, label: "Negociação" },
+    { href: `${base}/cronograma`, label: "Cronograma da Obra" },
     { href: `${base}/documentos`, label: "Documentos" },
   ].filter(Boolean) as { href: string; label: string; exato?: boolean }[];
 
