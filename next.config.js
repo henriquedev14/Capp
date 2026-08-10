@@ -12,10 +12,12 @@ const nextConfig = {
   // serem processados pelo bundler do Next.js.
   serverExternalPackages: ["@prisma/client", "pg"],
   // Limite padrão de Server Actions é 1MB — pequeno demais para anexar
-  // contratos/plantas/fotos no Empreendimento. Sobe para 20MB.
+  // contratos/plantas/fotos no Empreendimento. Sobe pra 55MB (documento
+  // em si trava em 50MB, essa margem cobre o overhead de codificação
+  // do multipart/base64). Aumentado em 10/08/2026.
   experimental: {
     serverActions: {
-      bodySizeLimit: "20mb",
+      bodySizeLimit: "55mb",
     },
   },
   // Headers de segurança aplicados a toda resposta — mitigam clickjacking
