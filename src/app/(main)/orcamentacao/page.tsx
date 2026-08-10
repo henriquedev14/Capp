@@ -18,9 +18,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { authOptions } from "@/infra/auth/auth-options.full";
 import { UsuarioPrismaRepository } from "@/infra/db/prisma/repositories/usuario-prisma-repository";
 import { buscarFilaOrcamentos } from "@/features/orcamentacao/queries/fila-orcamentos";
+import { prisma } from "@/infra/db/prisma/client";
 import { FiltrosFilaOrcamentacao } from "@/features/orcamentacao/components/filtros-fila-orcamentacao";
 import { StatusOrcamentoBadge } from "@/features/orcamentacao/components/status-orcamento-badge";
 import { EtapaJornadaBadge } from "@/features/orcamentacao/components/etapa-jornada-badge";
+import { FilaAguardandoLevantamento } from "@/features/orcamentacao/components/fila-aguardando-levantamento";
 import { cn } from "@/lib/utils";
 import type { StatusOrcamento } from "@/core/orcamentacao/entities/orcamento";
 import { redirect } from "next/navigation";
@@ -46,6 +48,40 @@ interface Props {
   };
 }
 
+/**
+ * Busca DIRETO do Empreendimento (não via Orçamento) — um item recém
+ * chegado do Comercial pra Engenharia ainda não tem Orçamento criado
+ * nenhum, só ganha um quando alguém começa o levantamento. A fila
+ * antiga (buscarFilaOrcamentos) parte de Orçamentos existentes, então
+ * nunca pegava esses itens. Achado pelo Henrique em 10/08/2026.
+ */
+async function buscarAguardandoLevantamento(responsavelComercialUserId?: string) {
+  const empreendimentos = await prisma.empreendimento.findMany({
+    where: {
+      status: "ORCAMENTACAO",
+      excluidoEm: null,
+      responsavelOrcamentacaoUserId: null,
+      ...(responsavelComercialUserId && { responsavelComercialUserId }),
+    },
+    select: {
+      id: true,
+      nome: true,
+      cidade: true,
+      estado: true,
+      cliente: { select: { razaoSocial: true, nomeFantasia: true } },
+    },
+    orderBy: { updatedAt: "asc" },
+  });
+
+  return empreendimentos.map((e) => ({
+    empreendimentoId: e.id,
+    empreendimentoNome: e.nome,
+    clienteNome: e.cliente.nomeFantasia ?? e.cliente.razaoSocial,
+    cidade: e.cidade ?? "",
+    estado: e.estado ?? "",
+  }));
+}
+
 export default async function OrcamentacaoHubPage({ searchParams }: Props) {
   const podeVer = await temPermissao(PERMISSOES.ORCAMENTO_VER);
   if (!podeVer) redirect("/painel");
@@ -58,7 +94,7 @@ export default async function OrcamentacaoHubPage({ searchParams }: Props) {
   // em 28/07/2026: dava pra contornar a restrição vindo por aqui).
   const restringirAosProprios = await temPermissao(PERMISSOES.EMPREENDIMENTO_VER_APENAS_PROPRIOS);
 
-  const [usuarios, { linhas, indicadores }] = await Promise.all([
+  const [usuarios, { linhas, indicadores }, aguardandoLevantamento] = await Promise.all([
     usuarioRepo.findMany(),
     buscarFilaOrcamentos({
       responsavelId: searchParams.responsavel,
@@ -68,6 +104,7 @@ export default async function OrcamentacaoHubPage({ searchParams }: Props) {
       visao: visao as "minha_fila" | "equipe" | "todos" | "atrasados" | "aguardando_aprovacao",
       responsavelComercialUserId: restringirAosProprios ? session?.user?.id : undefined,
     }),
+    buscarAguardandoLevantamento(restringirAosProprios ? session?.user?.id : undefined),
   ]);
 
   const responsaveisAtivos = usuarios
@@ -121,6 +158,14 @@ export default async function OrcamentacaoHubPage({ searchParams }: Props) {
           icon={Wallet}
         />
       </div>
+
+      {/* Fila "Aguardando Levantamento" — demandas sem responsável ainda,
+          "Tomar Propriedade" aqui é a única forma de assumir. Busca
+          direto do Empreendimento (não via Orçamento) — um item recém
+          chegado do Comercial ainda não tem Orçamento criado, só ganha
+          um depois que alguém começa o levantamento. Achado pelo
+          Henrique em 10/08/2026. */}
+      <FilaAguardandoLevantamento linhas={aguardandoLevantamento} />
 
       {/* Filtros e visões */}
       <FiltrosFilaOrcamentacao
