@@ -25,11 +25,17 @@ interface LinhaCronograma {
  * aberta poluía a página inteira do empreendimento antes de chegar em
  * qualquer outra informação.
  */
-export function CronogramaRemessasCard({ linhas: linhasIniciais }: { linhas: LinhaCronograma[] }) {
+export function CronogramaRemessasCard({
+  linhas: linhasIniciais,
+  abertoPorPadrao = false,
+}: {
+  linhas: LinhaCronograma[];
+  abertoPorPadrao?: boolean;
+}) {
   const router = useRouter();
   const [linhas, setLinhas] = React.useState(linhasIniciais);
   const [salvandoId, setSalvandoId] = React.useState<string | null>(null);
-  const [aberto, setAberto] = React.useState(false);
+  const [aberto, setAberto] = React.useState(abertoPorPadrao);
 
   if (linhas.length === 0) return null;
 
