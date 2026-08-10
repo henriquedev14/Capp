@@ -36,6 +36,7 @@ export default async function EmpreendimentosPage({ searchParams }: Props) {
     busca: searchParams.busca,
     status,
     responsavelComercialUserId: restringirAosProprios ? session?.user?.id : undefined,
+    ordenacao: "antigo",
   });
 
   return (
