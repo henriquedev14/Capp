@@ -20,6 +20,10 @@ export interface EmpreendimentoFiltros {
   // Restringe aos empreendimentos onde esse usuário é o responsável
   // comercial — usado quando o papel tem EMPREENDIMENTO_VER_APENAS_PROPRIOS.
   responsavelComercialUserId?: string;
+  // "recente" (padrão, mais atualizado primeiro) ou "antigo" (mais
+  // antigo primeiro — novo cadastro sempre no final da fila). Pedido
+  // pelo Henrique em 10/08/2026, só pra lista geral de Empreendimentos.
+  ordenacao?: "recente" | "antigo";
 }
 
 /**
