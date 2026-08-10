@@ -6,6 +6,7 @@ import { PERMISSOES } from "@/core/auth/permissions";
 import { revalidatePath } from "next/cache";
 import { buscarTodasCotacoesDetalhadas } from "@/features/cotacoes/actions/buscar-todas-detalhadas";
 import { proximoNumeroContrato } from "@/features/negociacao/lib/numero-contrato";
+import { criarContaReceberAutomatica } from "@/features/financeiro/lib/criar-conta-receber-automatica";
 import {
   derivarStatusNegociacao,
   calcularPrioridade,
@@ -311,6 +312,13 @@ export async function registrarGanhaEGerarContrato(
     where: { id: input.empreendimentoId },
     data: { status: "CONTRATADO" },
   });
+
+  // Só nasce a Conta a Receber quando o cliente REALMENTE aceitou — antes
+  // existia um código velho (removido em 09/08/2026) que disparava isso
+  // já na geração da Proposta, achando que "gerou proposta em Negociação"
+  // significava "cliente aceitou". Agora só acontece aqui, no fluxo real
+  // de Ganha, junto com o Contrato.
+  await criarContaReceberAutomatica(input.empreendimentoId);
 
   const numero = await proximoNumeroContrato();
   const contrato = await prisma.contrato.create({
