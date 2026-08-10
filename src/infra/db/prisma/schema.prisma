@@ -258,6 +258,28 @@ model Contrato {
   @@map("contratos")
 }
 
+// Log de auditoria da Fila "Aguardando Levantamento" — quem tomou
+// propriedade, quem devolveu, quando, e o motivo. Item 2 da Jornada
+// do Orçamento, 10/08/2026 — o Henrique pediu explicitamente log
+// salvo pra devolução de demanda.
+model LogMovimentacaoOrcamento {
+  id               String @id @default(cuid())
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+
+  tipo String // "TOMOU_PROPRIEDADE" | "DEVOLVEU_FILA"
+
+  motivo String? @db.Text // só preenchido em DEVOLVEU_FILA
+
+  usuarioId String?  @map("usuario_id")
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([empreendimentoId])
+  @@map("logs_movimentacao_orcamento")
+}
+
 model Empreendimento {
   id     String @id @default(cuid())
   // Código legível para humanos — gerado automaticamente na criação
@@ -328,6 +350,12 @@ model Empreendimento {
   responsavelEngenhariaUser     Usuario? @relation("EmpreendimentoResponsavelEngenharia", fields: [responsavelEngenhariaUserId], references: [id])
   responsavelOrcamentacaoUserId String?  @map("responsavel_orcamentacao_user_id")
   responsavelOrcamentacaoUser   Usuario? @relation("EmpreendimentoResponsavelOrcamentacao", fields: [responsavelOrcamentacaoUserId], references: [id])
+  // Quando alguém tomou propriedade na Fila de "Aguardando Levantamento"
+  // — início do relógio de SLA do engenheiro. Null de novo se devolvido
+  // pra fila. Item 2 da Jornada do Orçamento, 10/08/2026.
+  tomouPropriedadeEm DateTime? @map("tomou_propriedade_em")
+
+  logsMovimentacaoOrcamento LogMovimentacaoOrcamento[]
 
   // Conclusão de etapa por área — cada uma dispara o avanço automático de
   // status correspondente (ver concluirEtapaComercial/Engenharia/
@@ -691,6 +719,7 @@ model Usuario {
   decisoesNegociacaoRegistradas   DecisaoNegociacao[]
   interacoesNegociacaoRegistradas InteracaoNegociacao[] @relation("InteracoesRegistradas")
   contratosGerados                Contrato[]
+  logsMovimentacaoOrcamento       LogMovimentacaoOrcamento[]
   orcamentosCriados        Orcamento[]
   propostasGeradas         Orcamento[] @relation("PropostasGeradas")
   orcamentosResponsavel    Orcamento[] @relation("OrcamentosResponsavel")
@@ -985,6 +1014,10 @@ model Orcamento {
   aprovadoPor Usuario? @relation("OrcamentosAprovados", fields: [aprovadoPorId], references: [id], onDelete: SetNull)
   
   dataAprovacao DateTime? @map("data_aprovacao")
+  // Fim do relógio de SLA do engenheiro (início é
+  // Empreendimento.tomouPropriedadeEm). Item 2 da Jornada do
+  // Orçamento, 10/08/2026.
+  enviadoAprovacaoEm DateTime? @map("enviado_aprovacao_em")
   motivoDevolucao String? @map("motivo_devolucao") @db.Text
 
   // Trava de proposta: uma vez gerada, o botão "Gerar Proposta Comercial"
