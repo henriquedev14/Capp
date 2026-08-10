@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { UserCheck, UserX, CheckCircle2, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { devolverParaFila } from "@/features/empreendimentos/actions/fila-levantamento-actions";
 import {
   assumirResponsabilidade,
   liberarResponsabilidade,
@@ -64,6 +65,21 @@ export function ResponsabilidadeEtapaCard({ empreendimentoId, statusAtual, usuar
   }
 
   async function handleLiberar() {
+    // Orçamentação usa a função nova (com log de auditoria obrigatório)
+    // — as outras áreas continuam no mecanismo simples de sempre.
+    if (areaAtiva!.area === "ORCAMENTACAO") {
+      const motivo = window.prompt("Motivo da devolução pra fila (fica registrado no log):");
+      if (motivo === null) return; // cancelou
+      setProcessando(true);
+      try {
+        const r = await devolverParaFila(empreendimentoId, motivo);
+        if ("erro" in r) alert(r.erro);
+        else router.refresh();
+      } finally {
+        setProcessando(false);
+      }
+      return;
+    }
     setProcessando(true);
     try {
       const r = await liberarResponsabilidade(empreendimentoId, areaAtiva!.area);
@@ -104,6 +120,14 @@ export function ResponsabilidadeEtapaCard({ empreendimentoId, statusAtual, usuar
           >
             {processando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
           </button>
+        ) : areaAtiva.area === "ORCAMENTACAO" ? (
+          // "Assumir" de Orçamentação virou exclusivo da Fila
+          // "Aguardando Levantamento" — pedido do Henrique em
+          // 10/08/2026 (item 2 da Jornada do Orçamento), pra garantir
+          // que o relógio de SLA sempre começa do mesmo lugar.
+          <span className="text-xs text-muted-foreground">
+            Tome propriedade pela <a href="/orcamentacao" className="underline">Fila de Engenharia</a>
+          </span>
         ) : (
           <Button size="sm" variant="outline" onClick={handleAssumir} disabled={processando}>
             {processando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
