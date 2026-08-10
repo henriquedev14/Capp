@@ -15,7 +15,7 @@ const timelineRepo = new TimelinePrismaRepository();
 // arquivos gigantescos — sem infra de storage externo (S3), tudo fica
 // salvo direto no Postgres como bytes. Bom para dezenas de MB; não é o
 // lugar certo pra vídeos ou pastas de fotos enormes.
-const TAMANHO_MAXIMO_BYTES = 15 * 1024 * 1024; // 15MB
+const TAMANHO_MAXIMO_BYTES = 50 * 1024 * 1024; // 50MB — aumentado de 15MB em 10/08/2026
 
 export interface DocumentoResumo {
   id: string;
@@ -50,7 +50,7 @@ export async function uploadDocumentoEmpreendimento(
 
   if (arquivo.size > TAMANHO_MAXIMO_BYTES) {
     return {
-      erro: `Arquivo muito grande (${(arquivo.size / 1024 / 1024).toFixed(1)}MB). Limite: 15MB.`,
+      erro: `Arquivo muito grande (${(arquivo.size / 1024 / 1024).toFixed(1)}MB). Limite: ${TAMANHO_MAXIMO_BYTES / 1024 / 1024}MB.`,
     };
   }
 
