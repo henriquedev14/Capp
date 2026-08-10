@@ -495,6 +495,9 @@ export class OrcamentacaoPrismaRepository {
         status: "ENVIADO_APROVACAO_GESTOR",
         statusAprovacao: "AGUARDANDO_APROVACAO",
         motivoDevolucao: null,
+        // Fim do relógio de SLA do engenheiro — item 2 da Jornada do
+        // Orçamento, 10/08/2026.
+        enviadoAprovacaoEm: new Date(),
       },
     });
   }
