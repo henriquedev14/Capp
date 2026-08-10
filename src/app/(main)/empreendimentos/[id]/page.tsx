@@ -44,7 +44,6 @@ import { ehGestorSenior } from "@/infra/auth/eh-gestor-senior";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/infra/auth/auth-options.full";
 import { ResponsabilidadeEtapaCard } from "@/features/empreendimentos/components/responsabilidade-etapa-card";
-import { CronogramaRemessasCard } from "@/features/empreendimentos/components/cronograma-remessas-card";
 import { listarPavimentosParaCronograma } from "@/features/empreendimentos/actions/cronograma-remessas-actions";
 
 const empreendimentoRepo = new EmpreendimentoPrismaRepository();
@@ -91,6 +90,7 @@ export default async function EmpreendimentoDetalhePage({
     pendencias.push({
       titulo: `${remessasSemPlanejamento} de ${linhasCronograma.length} remessa(s) sem planejamento`,
       detalhe: "Sem data prevista, o Financeiro e a Produção não sabem quando essa parte vai ser entregue.",
+      href: `/empreendimentos/${params.id}/cronograma`,
     });
   }
   if (["COMERCIAL", "PROSPECCAO"].includes(empreendimento.status) && !empreendimento.responsavelComercialUserId) {
@@ -279,7 +279,6 @@ export default async function EmpreendimentoDetalhePage({
         ]}
       />
 
-      <CronogramaRemessasCard linhas={linhasCronograma} />
 
       {/* Layout principal: dados + timeline */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
