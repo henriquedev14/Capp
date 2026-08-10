@@ -21,7 +21,7 @@ import { buscarFilaOrcamentos } from "@/features/orcamentacao/queries/fila-orcam
 import { prisma } from "@/infra/db/prisma/client";
 import { FiltrosFilaOrcamentacao } from "@/features/orcamentacao/components/filtros-fila-orcamentacao";
 import { StatusOrcamentoBadge } from "@/features/orcamentacao/components/status-orcamento-badge";
-import { EtapaJornadaBadge } from "@/features/orcamentacao/components/etapa-jornada-badge";
+import { JornadaProgressoVisual } from "@/features/orcamentacao/components/jornada-progresso-visual";
 import { FilaAguardandoLevantamento } from "@/features/orcamentacao/components/fila-aguardando-levantamento";
 import { cn } from "@/lib/utils";
 import type { StatusOrcamento } from "@/core/orcamentacao/entities/orcamento";
@@ -234,7 +234,7 @@ export default async function OrcamentacaoHubPage({ searchParams }: Props) {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <EtapaJornadaBadge etapa={l.etapaAtual} status={l.etapaStatus} />
+                        <JornadaProgressoVisual etapa={l.etapaAtual} status={l.etapaStatus} />
                         {l.bloqueado && l.motivoBloqueio && (
                           <div className="mt-1 max-w-[220px] text-[11px] text-destructive">
                             {l.motivoBloqueio}
