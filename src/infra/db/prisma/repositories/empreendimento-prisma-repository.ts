@@ -70,7 +70,7 @@ export class EmpreendimentoPrismaRepository implements EmpreendimentoRepository 
         }),
       },
       include: { cliente: { select: { razaoSocial: true, nomeFantasia: true } } },
-      orderBy: { updatedAt: "desc" },
+      orderBy: filtros?.ordenacao === "antigo" ? { createdAt: "asc" } : { updatedAt: "desc" },
     });
 
     return records.map((r) => ({
