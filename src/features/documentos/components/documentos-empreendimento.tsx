@@ -152,7 +152,7 @@ export function DocumentosEmpreendimento({ empreendimentoId, documentos }: Props
               Clique ou arraste um arquivo aqui
             </span>
             <span className="text-xs text-muted-foreground">
-              Contratos, plantas, fotos — até 15MB
+              Contratos, plantas, fotos — até 50MB
             </span>
           </div>
         )}
