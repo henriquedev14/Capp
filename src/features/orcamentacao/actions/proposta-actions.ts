@@ -8,9 +8,8 @@ import { ehGestorSenior } from "@/infra/auth/eh-gestor-senior";
 import { PERMISSOES } from "@/core/auth/permissions";
 import { TimelinePrismaRepository } from "@/infra/db/prisma/repositories/timeline-prisma-repository";
 import { renderizarPropostaPdf } from "@/features/orcamentacao/lib/renderizar-proposta";
-import { criarContaReceberAutomatica } from "@/features/financeiro/lib/criar-conta-receber-automatica";
 import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empreendimento-ativo";
-import { verificarPodeGerarProposta, verificarPropostaJaGerada } from "@/features/empreendimentos/lib/gates-status";
+import { verificarPodeGerarProposta } from "@/features/empreendimentos/lib/gates-status";
 
 const timelineRepo = new TimelinePrismaRepository();
 
@@ -123,82 +122,4 @@ export async function gerarPropostaComercial(orcamentoId: string): Promise<Resul
   revalidatePath(`/empreendimentos/${resultado.empreendimentoId}`);
 
   return { ok: true, documentoId: documento.id };
-}
-
-/**
- * Registra a decisão do cliente sobre a proposta gerada (aceitou/recusou).
- * Isso é preenchido manualmente pelo Comercial depois de conversar com o
- * cliente — o sistema não tem portal do cliente, então não há como capturar
- * isso automaticamente.
- */
-export async function registrarDecisaoCliente(
-  orcamentoId: string,
-  decisao: "ACEITA" | "RECUSADA",
-  observacao?: string
-): Promise<Resultado> {
-  let sessao;
-  try {
-    sessao = await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
-  } catch (e) {
-    return { erro: e instanceof Error ? e.message : "Não autorizado." };
-  }
-
-  const orcamento = await prisma.orcamento.findUnique({
-    where: { id: orcamentoId },
-    select: { propostaGeradaEm: true, empreendimentoId: true, revisao: true },
-  });
-  if (!orcamento) return { erro: "Orçamento não encontrado." };
-  const validacaoProposta = verificarPropostaJaGerada(orcamento);
-  if (!validacaoProposta.permitido) return { erro: validacaoProposta.motivo! };
-
-  const guardaArquivado = await verificarEmpreendimentoAtivo(orcamento.empreendimentoId);
-  if (!guardaArquivado.permitido) return { erro: guardaArquivado.motivo! };
-
-  await prisma.orcamento.update({
-    where: { id: orcamentoId },
-    data: {
-      decisaoCliente: decisao,
-      decisaoClienteEm: new Date(),
-      decisaoClienteObs: observacao ?? null,
-    },
-  });
-
-  await timelineRepo.criarEvento({
-    empreendimentoId: orcamento.empreendimentoId,
-    tipo: "ANOTACAO",
-    titulo:
-      decisao === "ACEITA"
-        ? `Cliente aceitou a proposta (rev. ${orcamento.revisao})`
-        : `Cliente recusou a proposta (rev. ${orcamento.revisao})`,
-    descricao: observacao || undefined,
-    usuarioId: sessao.user.id,
-  });
-
-  // Avanço automático: cliente aceitando a proposta é o gatilho natural pra
-  // fechar contrato — só avança se ainda estiver em NEGOCIACAO (não mexe se
-  // já estiver em outro lugar por algum motivo).
-  if (decisao === "ACEITA") {
-    const empreendimentoAtual = await prisma.empreendimento.findUnique({
-      where: { id: orcamento.empreendimentoId },
-      select: { status: true },
-    });
-    if (empreendimentoAtual?.status === "NEGOCIACAO") {
-      await prisma.empreendimento.update({
-        where: { id: orcamento.empreendimentoId },
-        data: { status: "CONTRATADO" },
-      });
-      await timelineRepo.criarEvento({
-        empreendimentoId: orcamento.empreendimentoId,
-        tipo: "MUDANCA_STATUS",
-        titulo: "Avançou para Contratado automaticamente",
-        descricao: "Cliente aceitou a proposta — negociação concluída.",
-        usuarioId: sessao.user.id,
-      });
-      await criarContaReceberAutomatica(orcamento.empreendimentoId);
-    }
-  }
-
-  revalidatePath(`/empreendimentos/${orcamento.empreendimentoId}/orcamento`);
-  revalidatePath(`/empreendimentos/${orcamento.empreendimentoId}`);
-  return { ok: true };
 }
