@@ -9,6 +9,7 @@ import {
   TabelaTiersEditavel,
 } from "@/features/orcamentacao/components/tabela-precos-editavel";
 import { CriterioPrecificacaoToggle } from "@/features/orcamentacao/components/criterio-precificacao-toggle";
+import { ValorFixoGlobalEditor } from "@/features/orcamentacao/components/valor-fixo-global-editor";
 import { FormulaKitPontosCard } from "@/features/orcamentacao/components/formula-kit-pontos-card";
 import { OrcamentacaoPrismaRepository } from "@/infra/db/prisma/repositories/orcamentacao-prisma-repository";
 import { temPermissao } from "@/infra/auth/exigir-permissao";
@@ -50,6 +51,13 @@ export default async function PrecosPage() {
           valorMinimo={Number(configuracao?.kitValorMinimo ?? 550)}
           pontosInclusos={configuracao?.kitPontosInclusos ?? 6}
           valorPorPontoExtra={Number(configuracao?.kitValorPorPontoExtra ?? 70)}
+          podeEditar={podeEditar}
+        />
+      ) : criterioAtivo === "VALOR_FIXO" ? (
+        <ValorFixoGlobalEditor
+          eletrico={configuracao?.precoFixoEletrico != null ? Number(configuracao.precoFixoEletrico) : null}
+          hidraulico={configuracao?.precoFixoHidraulico != null ? Number(configuracao.precoFixoHidraulico) : null}
+          qdc={configuracao?.precoFixoQdc != null ? Number(configuracao.precoFixoQdc) : null}
           podeEditar={podeEditar}
         />
       ) : (
