@@ -7,7 +7,12 @@ import { Loader2, Ruler, Hash } from "lucide-react";
 import { atualizarCriterioPrecificacao } from "@/features/orcamentacao/actions/precos-actions";
 
 interface Props {
-  criterioAtual: "AREA" | "PONTOS_TETO";
+  // VALOR_FIXO só faz sentido POR empreendimento (precisa dos 3 valores
+  // específicos daquele projeto) — não é uma opção real aqui na tela
+  // global, mas o enum do banco agora inclui essa 3ª opção, então o
+  // tipo precisa aceitar (mesmo que esse componente só desenhe as
+  // outras 2 abas).
+  criterioAtual: "AREA" | "PONTOS_TETO" | "VALOR_FIXO";
   podeEditar: boolean;
 }
 
