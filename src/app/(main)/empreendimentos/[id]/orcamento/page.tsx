@@ -26,6 +26,9 @@ import { UsuarioPrismaRepository } from "@/infra/db/prisma/repositories/usuario-
 import { JornadaVisual } from "@/features/orcamentacao/components/jornada-visual";
 import { ResponsavelPrazoEditor } from "@/features/orcamentacao/components/responsavel-prazo-editor";
 import { podeGerenciarJornada } from "@/features/orcamentacao/actions/jornada-actions";
+import { PrecoFixoTipologiaCard } from "@/features/orcamentacao/components/preco-fixo-tipologia-card";
+import { listarPrecosFixosTipologia } from "@/features/orcamentacao/actions/preco-fixo-actions";
+import { prisma } from "@/infra/db/prisma/client";
 import { buscarInfoPropostaOrcamento, listarCotacoesDoOrcamento, listarFornecedoresAtivosResumo } from "@/features/orcamentacao/actions/orcamento-actions";
 import { consolidarItensPorMaterial } from "@/core/orcamentacao/use-cases/consolidar-itens-material";
 import { CotacoesUnificadas } from "@/features/cotacoes/components/cotacoes-unificadas";
@@ -153,8 +156,26 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
     empreendimento.kitQdc && "QDC",
   ].filter(Boolean) as string[];
 
+  // Preço fixo por Tipologia — cada apartamento pode ter seu próprio
+  // valor, editável direto aqui. Pedido pelo Henrique em 11/08/2026
+  // (revertido de "valor único por critério" pra "por apartamento").
+  const tipologiasDoEmpreendimento = await prisma.tipologia.findMany({
+    where: { empreendimentoId: params.id },
+    select: { id: true, nome: true },
+    orderBy: { nome: "asc" },
+  });
+  const tipologiasComPrecos = await Promise.all(
+    tipologiasDoEmpreendimento.map(async (t) => ({
+      ...t,
+      precosFixos: await listarPrecosFixosTipologia(t.id),
+    }))
+  );
+
   return (
     <div className="flex flex-col gap-6">
+      {kitsAtivos.length > 0 && tipologiasComPrecos.length > 0 && (
+        <PrecoFixoTipologiaCard tipologias={tipologiasComPrecos} kitsDisponiveis={kitsAtivos} />
+      )}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <Link
           href={`/empreendimentos/${params.id}`}
