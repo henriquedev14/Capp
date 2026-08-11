@@ -2,16 +2,11 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Ruler, Hash } from "lucide-react";
+import { Loader2, Ruler, Hash, Lock } from "lucide-react";
 
 import { atualizarCriterioPrecificacao } from "@/features/orcamentacao/actions/precos-actions";
 
 interface Props {
-  // VALOR_FIXO só faz sentido POR empreendimento (precisa dos 3 valores
-  // específicos daquele projeto) — não é uma opção real aqui na tela
-  // global, mas o enum do banco agora inclui essa 3ª opção, então o
-  // tipo precisa aceitar (mesmo que esse componente só desenhe as
-  // outras 2 abas).
   criterioAtual: "AREA" | "PONTOS_TETO" | "VALOR_FIXO";
   podeEditar: boolean;
 }
@@ -20,7 +15,7 @@ export function CriterioPrecificacaoToggle({ criterioAtual, podeEditar }: Props)
   const router = useRouter();
   const [salvando, setSalvando] = React.useState(false);
 
-  async function escolher(criterio: "AREA" | "PONTOS_TETO") {
+  async function escolher(criterio: "AREA" | "PONTOS_TETO" | "VALOR_FIXO") {
     if (criterio === criterioAtual || !podeEditar) return;
     setSalvando(true);
     const r = await atualizarCriterioPrecificacao(criterio);
@@ -57,6 +52,17 @@ export function CriterioPrecificacaoToggle({ criterioAtual, podeEditar }: Props)
         >
           <Hash className="h-3.5 w-3.5" />
           Por Pontos de Teto
+        </button>
+        <button
+          onClick={() => escolher("VALOR_FIXO")}
+          disabled={salvando || !podeEditar}
+          className={
+            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors " +
+            (criterioAtual === "VALOR_FIXO" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
+          }
+        >
+          <Lock className="h-3.5 w-3.5" />
+          Valor Fixo
         </button>
       </div>
       {salvando && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
