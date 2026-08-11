@@ -101,7 +101,7 @@ export async function atualizarFormulaKitPontos(dados: {
 }
 
 export async function atualizarCriterioPrecificacao(
-  criterio: "AREA" | "PONTOS_TETO"
+  criterio: "AREA" | "PONTOS_TETO" | "VALOR_FIXO"
 ): Promise<{ ok: true } | { erro: string }> {
   try {
     await exigirPermissao(PERMISSOES.ADMIN_GERENCIAR_PRECOS);
@@ -113,6 +113,26 @@ export async function atualizarCriterioPrecificacao(
     where: { id: "default" },
     update: { criterioPrecificacao: criterio },
     create: { id: "default", criterioPrecificacao: criterio },
+  });
+  revalidatePath("/orcamentacao/precos");
+  return { ok: true };
+}
+
+export async function atualizarValorFixoGlobal(
+  eletrico: number | null,
+  hidraulico: number | null,
+  qdc: number | null
+): Promise<{ ok: true } | { erro: string }> {
+  try {
+    await exigirPermissao(PERMISSOES.ADMIN_GERENCIAR_PRECOS);
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : "Não autorizado." };
+  }
+  const { prisma } = await import("@/infra/db/prisma/client");
+  await prisma.configuracaoSistema.upsert({
+    where: { id: "default" },
+    update: { precoFixoEletrico: eletrico, precoFixoHidraulico: hidraulico, precoFixoQdc: qdc },
+    create: { id: "default", precoFixoEletrico: eletrico, precoFixoHidraulico: hidraulico, precoFixoQdc: qdc },
   });
   revalidatePath("/orcamentacao/precos");
   return { ok: true };
