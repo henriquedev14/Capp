@@ -70,7 +70,10 @@ export function calcularItensServico({
   tabelaPreco: TabelaPrecoBase[];
   multiplicadorTier: number;
   /** Critério de precificação ativo globalmente no sistema */
-  criterio?: "AREA" | "PONTOS_TETO";
+  /** VALOR_FIXO não tem lógica própria aqui — quando ativo, o chamador
+   * já preenche `precosFixos` pra TODAS as tipologias, então cai no
+   * mesmo caminho de qualquer preço travado na mão. */
+  criterio?: "AREA" | "PONTOS_TETO" | "VALOR_FIXO";
   /** Map tipologiaId → quantidade de pontos de teto (só usado se criterio=PONTOS_TETO) */
   pontosTetoPorTipologia?: Map<string, number>;
   /** Parâmetros da fórmula do critério PONTOS_TETO — substituiu as 4
