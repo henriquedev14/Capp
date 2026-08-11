@@ -182,10 +182,28 @@ export async function criarOrcamento(
   // mecanismo que calcularItensServico já sabe usar.
   const precosFixos = new Map<string, number>();
   if (criterio === "VALOR_FIXO") {
+    // Cada kit cai pro padrão global se o empreendimento não tiver
+    // definido o próprio valor — mesma lógica de herança que já existe
+    // pro criterioPrecificacao em si (empreendimento ?? global).
     const valoresPorKit: Record<string, number | null> = {
-      ELETRICO: empreendimentoCriterio?.precoFixoEletrico != null ? Number(empreendimentoCriterio.precoFixoEletrico) : null,
-      HIDRAULICO: empreendimentoCriterio?.precoFixoHidraulico != null ? Number(empreendimentoCriterio.precoFixoHidraulico) : null,
-      QDC: empreendimentoCriterio?.precoFixoQdc != null ? Number(empreendimentoCriterio.precoFixoQdc) : null,
+      ELETRICO:
+        empreendimentoCriterio?.precoFixoEletrico != null
+          ? Number(empreendimentoCriterio.precoFixoEletrico)
+          : configuracao?.precoFixoEletrico != null
+            ? Number(configuracao.precoFixoEletrico)
+            : null,
+      HIDRAULICO:
+        empreendimentoCriterio?.precoFixoHidraulico != null
+          ? Number(empreendimentoCriterio.precoFixoHidraulico)
+          : configuracao?.precoFixoHidraulico != null
+            ? Number(configuracao.precoFixoHidraulico)
+            : null,
+      QDC:
+        empreendimentoCriterio?.precoFixoQdc != null
+          ? Number(empreendimentoCriterio.precoFixoQdc)
+          : configuracao?.precoFixoQdc != null
+            ? Number(configuracao.precoFixoQdc)
+            : null,
     };
     for (const tipologia of tipologias) {
       for (const [kit, valor] of Object.entries(valoresPorKit)) {
