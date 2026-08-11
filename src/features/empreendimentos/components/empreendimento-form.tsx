@@ -203,7 +203,6 @@ export function EmpreendimentoForm({
   }, [clienteSelecionadoId]);
 
   const tierAtual = form.watch("tier");
-  const criterioSelecionado = form.watch("criterioPrecificacao");
   const tierDoClienteSelecionado = clientesAtivos.find(
     (c) => c.value === clienteSelecionadoId
   )?.tier;
@@ -630,20 +629,9 @@ export function EmpreendimentoForm({
             options={[
               { value: "PONTOS_TETO", label: "Ponto de teto" },
               { value: "AREA", label: "Metro quadrado (área privativa)" },
-              { value: "VALOR_FIXO", label: "Valor fixo (mesmo valor pra toda tipologia)" },
             ]}
             placeholder="Usar o padrão do sistema"
           />
-          {criterioSelecionado === "VALOR_FIXO" && (
-            <div className="sm:col-span-2 grid grid-cols-1 gap-4 rounded-lg border border-border bg-secondary/20 p-4 sm:grid-cols-3">
-              <p className="sm:col-span-3 text-xs text-muted-foreground">
-                Esse valor vale pra QUALQUER tipologia desse empreendimento — não varia por área nem pontos de teto.
-              </p>
-              <TextFormField control={form.control} name="precoFixoEletrico" label="Elétrico (R$)" inputMode="decimal" />
-              <TextFormField control={form.control} name="precoFixoHidraulico" label="Hidráulico (R$)" inputMode="decimal" />
-              <TextFormField control={form.control} name="precoFixoQdc" label="QDC (R$)" inputMode="decimal" />
-            </div>
-          )}
           <DateFormField
             control={form.control}
             name="dataPrevistaInicio"
