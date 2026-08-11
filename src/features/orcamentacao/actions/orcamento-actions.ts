@@ -140,7 +140,15 @@ export async function criarOrcamento(
     repo.buscarTabelaPreco(),
     repo.buscarMultiplicadorTier(tier),
     prisma.configuracaoSistema.findUnique({ where: { id: "default" } }),
-    prisma.empreendimento.findUnique({ where: { id: empreendimentoId }, select: { criterioPrecificacao: true } }),
+    prisma.empreendimento.findUnique({
+      where: { id: empreendimentoId },
+      select: {
+        criterioPrecificacao: true,
+        precoFixoEletrico: true,
+        precoFixoHidraulico: true,
+        precoFixoQdc: true,
+      },
+    }),
   ]);
   const criterio = empreendimentoCriterio?.criterioPrecificacao ?? configuracao?.criterioPrecificacao ?? "AREA";
   const formulaPontos = {
@@ -167,17 +175,24 @@ export async function criarOrcamento(
     }
   }
 
-  // Calcula itens de serviço
-  // Preços travados na mão pra Tipologia+Kit específicos — sobrescrevem
-  // a regra (área/pontos) completamente. Pedido pelo Henrique em
-  // 11/08/2026.
-  const precosFixosRaw = await prisma.precoFixoTipologia.findMany({
-    where: { tipologiaId: { in: tipologias.map((t) => t.id) } },
-    select: { tipologiaId: true, kit: true, valorUnitario: true },
-  });
-  const precosFixos = new Map(
-    precosFixosRaw.map((p) => [`${p.tipologiaId}:${p.kit}`, Number(p.valorUnitario)])
-  );
+  // Critério "Valor Fixo" (pedido pelo Henrique em 11/08/2026): quando
+  // ativo, o MESMO valor por kit vale pra QUALQUER tipologia desse
+  // empreendimento — não é por tipologia individual. Preenche o mapa
+  // repetindo o mesmo valor pra cada tipologia, reaproveitando o
+  // mecanismo que calcularItensServico já sabe usar.
+  const precosFixos = new Map<string, number>();
+  if (criterio === "VALOR_FIXO") {
+    const valoresPorKit: Record<string, number | null> = {
+      ELETRICO: empreendimentoCriterio?.precoFixoEletrico != null ? Number(empreendimentoCriterio.precoFixoEletrico) : null,
+      HIDRAULICO: empreendimentoCriterio?.precoFixoHidraulico != null ? Number(empreendimentoCriterio.precoFixoHidraulico) : null,
+      QDC: empreendimentoCriterio?.precoFixoQdc != null ? Number(empreendimentoCriterio.precoFixoQdc) : null,
+    };
+    for (const tipologia of tipologias) {
+      for (const [kit, valor] of Object.entries(valoresPorKit)) {
+        if (valor != null) precosFixos.set(`${tipologia.id}:${kit}`, valor);
+      }
+    }
+  }
 
   const itensServico = calcularItensServico({
     tipologias,
