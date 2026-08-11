@@ -168,6 +168,17 @@ export async function criarOrcamento(
   }
 
   // Calcula itens de serviço
+  // Preços travados na mão pra Tipologia+Kit específicos — sobrescrevem
+  // a regra (área/pontos) completamente. Pedido pelo Henrique em
+  // 11/08/2026.
+  const precosFixosRaw = await prisma.precoFixoTipologia.findMany({
+    where: { tipologiaId: { in: tipologias.map((t) => t.id) } },
+    select: { tipologiaId: true, kit: true, valorUnitario: true },
+  });
+  const precosFixos = new Map(
+    precosFixosRaw.map((p) => [`${p.tipologiaId}:${p.kit}`, Number(p.valorUnitario)])
+  );
+
   const itensServico = calcularItensServico({
     tipologias,
     quantidadesPorTipologia,
@@ -178,6 +189,7 @@ export async function criarOrcamento(
     criterio,
     pontosTetoPorTipologia,
     formulaPontos,
+    precosFixos,
   });
 
   if (itensServico.length === 0) {
