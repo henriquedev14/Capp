@@ -2219,6 +2219,11 @@ model Bancada {
 
   registros RegistroProducao[]
   ordensProducao OrdemProducao[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("bancadas")
 }
 
 // Operador de bancada — cadastro simples, SEM login/senha própria (quem
@@ -2239,6 +2244,11 @@ model OperadorProducao {
 
   registros RegistroProducao[]
   ordensProducaoAtuais OrdemProducao[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("operadores_producao")
 }
 
 // Cada lançamento de produção — um operador, numa bancada, produzindo
