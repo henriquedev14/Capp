@@ -132,6 +132,33 @@ export async function buscarFilaEngenhariaUnificada(responsavelComercialUserId?:
     if (!orcamento) {
       const diasSemAtualizacao = Math.floor((Date.now() - e.updatedAt.getTime()) / (1000 * 60 * 60 * 24));
       const atrasado = diasSemAtualizacao > 5;
+
+      // Achado pelo Henrique em 11/08/2026: aqui era hardcoded "Não
+      // iniciado"/"Iniciar levantamento" sempre que não existia
+      // Orçamento ainda — mesmo quando o levantamento já estava 100%
+      // pronto (só faltava criar o Orçamento, um passo separado). Usa
+      // o progresso REAL igual o resto do sistema.
+      let statusBadgeTexto: string;
+      let statusBadgeCategoria: "neutro" | "azul" | "verde";
+      let proximaAcaoLabel: string;
+      if (!e.responsavelOrcamentacaoUserId) {
+        statusBadgeTexto = "Não iniciado";
+        statusBadgeCategoria = "neutro";
+        proximaAcaoLabel = "Aguardando responsável";
+      } else if (progresso.completo) {
+        statusBadgeTexto = "Levantamento completo";
+        statusBadgeCategoria = "verde";
+        proximaAcaoLabel = "Criar orçamento";
+      } else if (progresso.naoIniciado) {
+        statusBadgeTexto = "Não iniciado";
+        statusBadgeCategoria = "neutro";
+        proximaAcaoLabel = "Iniciar levantamento";
+      } else {
+        statusBadgeTexto = "Em andamento";
+        statusBadgeCategoria = "azul";
+        proximaAcaoLabel = "Continuar levantamento";
+      }
+
       linhas.push({
         empreendimentoId: e.id,
         empreendimentoCodigo: e.codigo,
@@ -147,9 +174,9 @@ export async function buscarFilaEngenhariaUnificada(responsavelComercialUserId?:
         etapaLabel: "Levantamento",
         levantamentoLabel,
         progressoIndice: 0,
-        statusBadgeTexto: "Não iniciado",
-        statusBadgeCategoria: "neutro",
-        proximaAcaoLabel: e.responsavelOrcamentacaoUserId ? "Iniciar levantamento" : "Aguardando responsável",
+        statusBadgeTexto,
+        statusBadgeCategoria,
+        proximaAcaoLabel,
         proximaAcaoDetalhe: null,
         proximaAcaoAcionavel: !!e.responsavelOrcamentacaoUserId,
         pendencias,
