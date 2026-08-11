@@ -15,7 +15,6 @@ import {
   FileWarning,
   Factory,
   ChevronRight,
-  Monitor,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -83,20 +82,11 @@ export default async function GestaoProducaoPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageHeader
-          breadcrumb={["Produção"]}
-          title="Gestão da Produção"
-          description="Como está a operação agora, o que decidir hoje, e a tendência da fábrica."
-        />
-        <Link
-          href="/producao/acompanhamento"
-          className="flex items-center gap-1.5 rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-        >
-          <Monitor className="h-4 w-4" />
-          Abrir modo monitor (tablet)
-        </Link>
-      </div>
+      <PageHeader
+        breadcrumb={["Produção"]}
+        title="Gestão da Produção"
+        description="Como está a operação agora, o que decidir hoje, e a tendência da fábrica."
+      />
 
       {/* ============================================================
           NÍVEL 1 — VISÃO EXECUTIVA
