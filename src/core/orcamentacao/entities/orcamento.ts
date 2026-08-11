@@ -182,7 +182,10 @@ export interface OrcamentoResumo {
 export interface TabelaPrecoBase {
   id: string;
   kit: string;
-  criterio: "AREA" | "PONTOS_TETO";
+  // VALOR_FIXO nunca gera linha nessa tabela na prática (não tem
+  // "faixa", é um valor único direto no Empreendimento) — mas o enum
+  // do Prisma agora inclui essa 3ª opção, então o tipo precisa aceitar.
+  criterio: "AREA" | "PONTOS_TETO" | "VALOR_FIXO";
   areaMin: number;
   areaMax: number;
   descricao: string;
