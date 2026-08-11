@@ -942,6 +942,13 @@ model ConfiguracaoSistema {
   criterioPrecificacao CriterioPrecificacao @default(AREA)
   saldoCaixaAtual      Decimal              @default(0) @db.Decimal(12, 2)
 
+  // Só usados quando criterioPrecificacao=VALOR_FIXO — mesmo padrão
+  // global usado como fallback pros empreendimentos que não têm
+  // override próprio. Pedido pelo Henrique em 11/08/2026.
+  precoFixoEletrico   Decimal? @map("preco_fixo_eletrico") @db.Decimal(10, 2)
+  precoFixoHidraulico Decimal? @map("preco_fixo_hidraulico") @db.Decimal(10, 2)
+  precoFixoQdc        Decimal? @map("preco_fixo_qdc") @db.Decimal(10, 2)
+
   // Identidade exibida nos documentos gerados (PDF/CSV de Cotação, etc.)
   // — antes ficava fixo "ConstructApp / HGI GROUP" direto no código do
   // relatório, sem vir de cadastro nenhum. Achado #4 da revisão de
