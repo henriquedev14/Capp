@@ -33,7 +33,7 @@ export async function definirPrecoFixoTipologia(
 ): Promise<{ ok: true } | { erro: string }> {
   let sessao;
   try {
-    sessao = await exigirPermissao(PERMISSOES.ORCAMENTO_EDITAR);
+    sessao = await exigirPermissao(PERMISSOES.ORCAMENTO_APLICAR_PRECO);
   } catch (e) {
     return { erro: e instanceof Error ? e.message : "Não autorizado." };
   }
@@ -61,7 +61,7 @@ export async function removerPrecoFixoTipologia(
   kit: "ELETRICO" | "HIDRAULICO" | "QDC"
 ): Promise<{ ok: true } | { erro: string }> {
   try {
-    await exigirPermissao(PERMISSOES.ORCAMENTO_EDITAR);
+    await exigirPermissao(PERMISSOES.ORCAMENTO_APLICAR_PRECO);
   } catch (e) {
     return { erro: e instanceof Error ? e.message : "Não autorizado." };
   }
