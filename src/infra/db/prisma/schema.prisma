@@ -626,6 +626,7 @@ model Tipologia {
   levantamentos LevantamentoEletrico[]
   movimentacoesEstoque MovimentacaoEstoque[]
   registrosProducao RegistroProducao[]
+  ordensProducao OrdemProducao[]
   marcosOperacionais MarcoOperacional[]
   levantamentosHidraulicos LevantamentoHidraulico[]
   levantamentosMateriais LevantamentoMateriais[]
@@ -2217,11 +2218,7 @@ model Bancada {
   ativo Boolean @default(true)
 
   registros RegistroProducao[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("bancadas")
+  ordensProducao OrdemProducao[]
 }
 
 // Operador de bancada — cadastro simples, SEM login/senha própria (quem
@@ -2241,11 +2238,7 @@ model OperadorProducao {
   turno       TurnoProducao?
 
   registros RegistroProducao[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("operadores_producao")
+  ordensProducaoAtuais OrdemProducao[]
 }
 
 // Cada lançamento de produção — um operador, numa bancada, produzindo
@@ -2256,6 +2249,81 @@ enum TurnoProducao {
   MANHA
   TARDE
   NOITE
+}
+
+// Ordem de Produção — a unidade real de trabalho no chão de fábrica:
+// "produzir a Tipologia X, nessa Bancada". Não duplica dado — quantidadeAlvo
+// vem de Tipologia.quantidadeUnidades, prazo vem da próxima remessa do
+// Cronograma da Obra. Nasce sozinha (garantirOrdensProducao) quando a
+// Tipologia libera materiais pra aquela bancada — não precisa ninguém
+// criar manualmente. Desenhado em 10/08/2026 com o Henrique, baseado no
+// terminal_producao_hgi.html que ele mandou como referência.
+model OrdemProducao {
+  id     String @id @default(cuid())
+  numero String @unique // "OP-000123", sequencial
+
+  tipologiaId String    @map("tipologia_id")
+  tipologia   Tipologia @relation(fields: [tipologiaId], references: [id], onDelete: Restrict)
+
+  bancadaId String  @map("bancada_id")
+  bancada   Bancada @relation(fields: [bancadaId], references: [id], onDelete: Restrict)
+
+  quantidadeAlvo       Int @map("quantidade_alvo")
+  quantidadeAprovada   Int @default(0) @map("quantidade_aprovada")
+  quantidadeRetrabalho Int @default(0) @map("quantidade_retrabalho")
+  quantidadePerda      Int @default(0) @map("quantidade_perda")
+
+  prioridade PrioridadeOrdemProducao @default(MEDIA)
+  prazo      DateTime?
+
+  status             StatusOrdemProducao @default(PENDENTE)
+  tempoTotalSegundos Int                 @default(0) @map("tempo_total_segundos")
+
+  operadorAtualId String?           @map("operador_atual_id")
+  operadorAtual   OperadorProducao? @relation(fields: [operadorAtualId], references: [id], onDelete: SetNull)
+
+  iniciadaEm  DateTime? @map("iniciada_em")
+  finalizadaEm DateTime? @map("finalizada_em")
+
+  pausas PausaOrdemProducao[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([bancadaId, status])
+  @@index([tipologiaId])
+  @@map("ordens_producao")
+}
+
+enum StatusOrdemProducao {
+  PENDENTE
+  EM_ANDAMENTO
+  PAUSADA
+  CONCLUIDA
+}
+
+enum PrioridadeOrdemProducao {
+  ALTA
+  MEDIA
+  BAIXA
+}
+
+// Histórico de pausas de uma OP — motivo obrigatório, pra saber depois
+// pra onde foi o tempo parado (falta de material vs manutenção vs
+// intervalo tem soluções bem diferentes).
+model PausaOrdemProducao {
+  id String @id @default(cuid())
+
+  ordemProducaoId String        @map("ordem_producao_id")
+  ordemProducao   OrdemProducao @relation(fields: [ordemProducaoId], references: [id], onDelete: Cascade)
+
+  motivo String // "Falta de material" | "Manutenção" | "Aguardando" | "Setup / troca" | "Intervalo" | "Outro"
+
+  inicio DateTime
+  fim    DateTime?
+
+  @@index([ordemProducaoId])
+  @@map("pausas_ordem_producao")
 }
 
 model RegistroProducao {
