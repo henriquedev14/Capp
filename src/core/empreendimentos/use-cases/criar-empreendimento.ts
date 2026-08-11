@@ -21,7 +21,10 @@ export interface CriarEmpreendimentoInput {
   responsavelComercial: string;
   // Tier explícito do formulário. Se null/undefined, herda o tier do cliente.
   tier?: number | null;
-  criterioPrecificacao?: "AREA" | "PONTOS_TETO" | null;
+  criterioPrecificacao?: "AREA" | "PONTOS_TETO" | "VALOR_FIXO" | null;
+  precoFixoEletrico?: number | null;
+  precoFixoHidraulico?: number | null;
+  precoFixoQdc?: number | null;
   dataPrevistaInicio?: Date | null;
   dataPrevistaEntrega?: Date | null;
   responsavelComercialUserId?: string | null;
@@ -90,6 +93,9 @@ export class CriarEmpreendimentoUseCase {
       // "o tier é do cliente, mas ajustável por empreendimento".
       tier: input.tier ?? cliente.tier ?? null,
       criterioPrecificacao: input.criterioPrecificacao ?? null,
+      precoFixoEletrico: input.precoFixoEletrico ?? null,
+      precoFixoHidraulico: input.precoFixoHidraulico ?? null,
+      precoFixoQdc: input.precoFixoQdc ?? null,
       valorEstimado: null,
       dataPrevistaInicio: input.dataPrevistaInicio ?? null,
       dataPrevistaEntrega: input.dataPrevistaEntrega ?? null,
