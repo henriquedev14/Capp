@@ -45,6 +45,7 @@ export async function listarDadosContasAPagar() {
     parcelaTotal: c.parcelaTotal,
     empresaNome: c.empresa.nome,
     categoriaNome: c.categoria.nome,
+    boletoNome: c.boletoNome,
   }));
 
   return { empresas, categorias, contas, totalPagoEsteMes: Number(agregadoPagasMes._sum.valor ?? 0) };

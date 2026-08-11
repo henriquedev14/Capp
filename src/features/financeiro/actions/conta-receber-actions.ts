@@ -75,6 +75,7 @@ export async function listarDadosContasAReceber() {
     recebido: c.recebido,
     empresaId: c.empresaId,
     empresaNome: c.empresa?.nome ?? null,
+    boletoNome: c.boletoNome,
   }));
 
   return { empresas, contasReceber };
