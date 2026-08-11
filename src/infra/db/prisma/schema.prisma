@@ -602,6 +602,31 @@ enum StatusProducaoTipologia {
   CONCLUIDA // já terminou tudo, não aparece mais como pendente
 }
 
+// Preço fixo por Tipologia + Kit — sobrescreve a faixa da
+// TabelaPrecoBase (área ou pontos de teto) pra um caso específico.
+// Pedido pelo Henrique em 11/08/2026: às vezes o cliente negocia um
+// valor específico pra um kit, e forçar isso através da faixa/fórmula
+// não faz sentido — é mais direto travar o valor na mão.
+model PrecoFixoTipologia {
+  id          String @id @default(cuid())
+  tipologiaId String @map("tipologia_id")
+  tipologia   Tipologia @relation(fields: [tipologiaId], references: [id], onDelete: Cascade)
+
+  kit           String  // "ELETRICO" | "HIDRAULICO" | "QDC"
+  valorUnitario Decimal @map("valor_unitario") @db.Decimal(10, 2)
+
+  observacoes String? @db.Text
+
+  definidoPorId String?  @map("definido_por_id")
+  definidoPor   Usuario? @relation(fields: [definidoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tipologiaId, kit])
+  @@map("precos_fixos_tipologia")
+}
+
 model Tipologia {
   id               String @id @default(cuid())
   empreendimentoId String @map("empreendimento_id")
@@ -627,6 +652,7 @@ model Tipologia {
   movimentacoesEstoque MovimentacaoEstoque[]
   registrosProducao RegistroProducao[]
   ordensProducao OrdemProducao[]
+  precosFixos PrecoFixoTipologia[]
   marcosOperacionais MarcoOperacional[]
   levantamentosHidraulicos LevantamentoHidraulico[]
   levantamentosMateriais LevantamentoMateriais[]
@@ -721,6 +747,7 @@ model Usuario {
   interacoesNegociacaoRegistradas InteracaoNegociacao[] @relation("InteracoesRegistradas")
   contratosGerados                Contrato[]
   logsMovimentacaoOrcamento       LogMovimentacaoOrcamento[]
+  precosFixosDefinidos            PrecoFixoTipologia[]
   orcamentosCriados        Orcamento[]
   propostasGeradas         Orcamento[] @relation("PropostasGeradas")
   orcamentosResponsavel    Orcamento[] @relation("OrcamentosResponsavel")
@@ -2062,6 +2089,14 @@ model ContaPagar {
 
   observacoes String? @db.Text
 
+  // Boleto anexado — mesmo padrão de armazenamento usado em
+  // DocumentoEmpreendimento (bytes direto no banco, sem storage
+  // externo ainda). Pedido pelo Henrique em 11/08/2026.
+  boletoNome      String?
+  boletoConteudo  Bytes?
+  boletoTamanho   Int?
+  boletoTipo      String?
+
   criadoPorId String?  @map("criado_por_id")
   criadoPor   Usuario? @relation("ContasPagarCriadas", fields: [criadoPorId], references: [id], onDelete: SetNull)
   pagoPorId   String?  @map("pago_por_id")
@@ -2126,6 +2161,12 @@ model ContaReceber {
   recebidoEm DateTime? @map("recebido_em")
 
   observacoes String? @db.Text
+
+  // Boleto anexado — mesmo padrão de ContaPagar.
+  boletoNome      String?
+  boletoConteudo  Bytes?
+  boletoTamanho   Int?
+  boletoTipo      String?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
