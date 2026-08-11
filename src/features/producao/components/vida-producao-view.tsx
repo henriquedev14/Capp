@@ -112,7 +112,7 @@ export function VidaProducaoView({ dados }: { dados: VidaProducaoV2 }) {
             </thead>
             <tbody>
               {dados.tabela.map((t) => {
-                const badge = STATUS_BADGE[t.statusCategoria];
+                const badge = STATUS_BADGE[t.statusCategoria] ?? { bg: COR.idleSoft, cor: COR.idle, texto: t.statusTexto };
                 return (
                   <tr key={t.codigo} style={{ borderBottom: `1px solid ${COR.borderSoft}` }}>
                     <td style={{ padding: "10px 6px", fontFamily: "monospace", fontWeight: 700 }}>{t.codigo}</td>
