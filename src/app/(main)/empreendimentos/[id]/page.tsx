@@ -511,7 +511,7 @@ export default async function EmpreendimentoDetalhePage({
                 ? "Sem tipologias cadastradas ainda"
                 : `${statusProducaoEmpreendimento.progressoMedio}% em média · ${statusProducaoEmpreendimento.tipologiasConcluidas} de ${statusProducaoEmpreendimento.totalTipologias} tipologia(s) concluída(s)`
             }
-            href="/producao"
+            href={`/empreendimentos/${empreendimento.id}/producao`}
             badge={(() => {
               if (statusProducaoEmpreendimento.status === "CONCLUIDA")
                 return { label: "Concluída", cor: "success" as const };
