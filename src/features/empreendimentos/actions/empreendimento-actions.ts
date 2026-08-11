@@ -121,6 +121,9 @@ export async function criarEmpreendimento(
         ? Number(v.tier)
         : null,
       criterioPrecificacao: (v.criterioPrecificacao || null) as Empreendimento["criterioPrecificacao"],
+      precoFixoEletrico: v.precoFixoEletrico ? parseFloat(v.precoFixoEletrico.replace(",", ".")) : null,
+      precoFixoHidraulico: v.precoFixoHidraulico ? parseFloat(v.precoFixoHidraulico.replace(",", ".")) : null,
+      precoFixoQdc: v.precoFixoQdc ? parseFloat(v.precoFixoQdc.replace(",", ".")) : null,
       dataPrevistaInicio: parseDataOpcional(v.dataPrevistaInicio),
       dataPrevistaEntrega: parseDataOpcional(v.dataPrevistaEntrega),
       // Quem cria já vira automaticamente o responsável comercial —
@@ -201,6 +204,9 @@ export async function atualizarEmpreendimento(
       status: v.statusOportunidade as Empreendimento["status"],
       tier: tierNumerico,
       criterioPrecificacao: (v.criterioPrecificacao || null) as Empreendimento["criterioPrecificacao"],
+      precoFixoEletrico: v.precoFixoEletrico ? parseFloat(v.precoFixoEletrico.replace(",", ".")) : null,
+      precoFixoHidraulico: v.precoFixoHidraulico ? parseFloat(v.precoFixoHidraulico.replace(",", ".")) : null,
+      precoFixoQdc: v.precoFixoQdc ? parseFloat(v.precoFixoQdc.replace(",", ".")) : null,
       responsavelEngenhariaUserId: v.responsavelEngenharia || null,
       responsavelOrcamentacaoUserId: v.responsavelOrcamentacao || null,
       observacoes: v.observacoes || null,
