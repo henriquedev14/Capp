@@ -67,7 +67,7 @@ export interface Empreendimento {
   // Tier do empreendimento (0-3) — herdado do cliente na criação, mas
   // ajustável por empreendimento. Usado como default na Orçamentação.
   tier?: number | null;
-  criterioPrecificacao?: "AREA" | "PONTOS_TETO" | "VALOR_FIXO" | null;
+  criterioPrecificacao?: "AREA" | "PONTOS_TETO" | "VALOR_FIXO" | "LIVRE" | null;
   precoFixoEletrico?: number | null;
   precoFixoHidraulico?: number | null;
   precoFixoQdc?: number | null;
