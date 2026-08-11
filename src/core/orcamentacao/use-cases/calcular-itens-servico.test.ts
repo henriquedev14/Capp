@@ -224,4 +224,59 @@ describe("calcularItensServico — critério PONTOS_TETO", () => {
 
     expect(resultado[0].precoBase).toBe(550);
   });
+
+  it("preço fixo sobrescreve a fórmula de pontos completamente", () => {
+    const t = tipologia();
+    const resultado = calcularItensServico({
+      tipologias: [t],
+      quantidadesPorTipologia: new Map([[t.id, 1]]),
+      kitsContratados: ["ELETRICO"],
+      kitsProntosPorTipologia: new Map([[t.id, ["ELETRICO"]]]),
+      tabelaPreco: [],
+      multiplicadorTier: 1.5, // ignorado quando preço é fixo
+      criterio: "PONTOS_TETO",
+      pontosTetoPorTipologia: new Map([[t.id, 20]]), // ignorado também
+      precosFixos: new Map([[`${t.id}:ELETRICO`, 999]]),
+    });
+
+    expect(resultado[0].precoUnitario).toBe(999);
+    expect(resultado[0].precoBase).toBe(999);
+    expect(resultado[0].multiplicador).toBe(1);
+    expect(resultado[0].precoFixado).toBe(true);
+  });
+
+  it("preço fixo sobrescreve a faixa de área completamente", () => {
+    const t = tipologia({ areaPrivativa: 200 }); // faixa alta, mas não importa
+    const resultado = calcularItensServico({
+      tipologias: [t],
+      quantidadesPorTipologia: new Map([[t.id, 1]]),
+      kitsContratados: ["ELETRICO"],
+      kitsProntosPorTipologia: new Map([[t.id, ["ELETRICO"]]]),
+      tabelaPreco: [
+        { id: "1", kit: "ELETRICO", criterio: "AREA", areaMin: 0, areaMax: 999, descricao: "", precoBase: 5000, ativo: true } as never,
+      ],
+      multiplicadorTier: 1.0,
+      precosFixos: new Map([[`${t.id}:ELETRICO`, 300]]),
+    });
+
+    expect(resultado[0].precoUnitario).toBe(300);
+  });
+
+  it("sem preço fixo pra essa tipologia+kit, continua usando a regra normal", () => {
+    const t = tipologia();
+    const resultado = calcularItensServico({
+      tipologias: [t],
+      quantidadesPorTipologia: new Map([[t.id, 1]]),
+      kitsContratados: ["ELETRICO"],
+      kitsProntosPorTipologia: new Map([[t.id, ["ELETRICO"]]]),
+      tabelaPreco: [],
+      multiplicadorTier: 1.0,
+      criterio: "PONTOS_TETO",
+      pontosTetoPorTipologia: new Map([[t.id, 6]]),
+      precosFixos: new Map([["outra-tipologia:ELETRICO", 300]]), // chave diferente
+    });
+
+    expect(resultado[0].precoFixado).toBeFalsy();
+    expect(resultado[0].precoBase).toBe(550);
+  });
 });

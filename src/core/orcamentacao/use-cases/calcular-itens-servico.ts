@@ -21,6 +21,9 @@ export interface ItemServicoCalculado {
   /** Levantamento técnico ainda não validado — valor é estimado pela
    * tabela de preço (área × tier), não por medição de campo confirmada. */
   simulado?: boolean;
+  /** Preço travado na mão pra essa Tipologia+Kit específica — ignora a
+   * regra de área/pontos e o multiplicador de Tier. */
+  precoFixado?: boolean;
 }
 
 /**
@@ -52,6 +55,7 @@ export function calcularItensServico({
   criterio = "AREA",
   pontosTetoPorTipologia,
   formulaPontos,
+  precosFixos,
 }: {
   tipologias: Tipologia[];
   /** Map tipologiaId → total de unidades com essa tipologia */
@@ -73,6 +77,10 @@ export function calcularItensServico({
    * faixas antigas (Baixo/Médio/Alto/Altíssimo Padrão) por uma conta só:
    *   total = valorMinimo + max(0, pontos - pontosInclusos) * valorPorPontoExtra */
   formulaPontos?: { valorMinimo: number; pontosInclusos: number; valorPorPontoExtra: number };
+  /** Map `${tipologiaId}:${kit}` → valor unitário travado na mão —
+   * sobrescreve QUALQUER regra (área, pontos, tier) quando presente.
+   * Pedido pelo Henrique em 11/08/2026. */
+  precosFixos?: Map<string, number>;
 }): ItemServicoCalculado[] {
   const itens: ItemServicoCalculado[] = [];
   const tabelaDoCriterio = tabelaPreco.filter((t) => t.criterio === "AREA");
@@ -90,8 +98,17 @@ export function calcularItensServico({
       let precoUnitario: number;
       let semPreco = false;
       let pontosUsados: number | undefined;
+      let precoFixado = false;
 
-      if (criterio === "PONTOS_TETO") {
+      const chaveFixo = `${tipologia.id}:${kit}`;
+      const valorFixo = precosFixos?.get(chaveFixo);
+
+      if (valorFixo != null) {
+        // Preço travado na mão — ignora completamente área/pontos/tier.
+        precoBase = valorFixo;
+        precoUnitario = valorFixo;
+        precoFixado = true;
+      } else if (criterio === "PONTOS_TETO") {
         const pontos = pontosTetoPorTipologia?.get(tipologia.id) ?? 0;
         pontosUsados = pontos;
         const f = formulaPontos ?? { valorMinimo: 550, pontosInclusos: 6, valorPorPontoExtra: 70 };
@@ -120,12 +137,13 @@ export function calcularItensServico({
         kit,
         quantidade,
         precoBase,
-        multiplicador: multiplicadorTier,
+        multiplicador: precoFixado ? 1 : multiplicadorTier,
         precoUnitario,
         total,
         semPreco,
         simulado,
         pontos: pontosUsados,
+        precoFixado,
       });
     }
   }
