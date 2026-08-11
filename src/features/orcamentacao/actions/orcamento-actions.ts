@@ -177,27 +177,64 @@ export async function criarOrcamento(
 
   // Preços travados na mão pra Tipologia+Kit específicos — cada
   // apartamento pode ter seu próprio valor, sobrescrevendo a regra de
-  // área/pontos SÓ pra aquela combinação. Revertido de "valor único
-  // por empreendimento" pra "por apartamento" — pedido pelo Henrique
-  // em 11/08/2026.
-  const precosFixosRaw = await prisma.precoFixoTipologia.findMany({
-    where: { tipologiaId: { in: tipologias.map((t) => t.id) } },
-    select: { tipologiaId: true, kit: true, valorUnitario: true },
-  });
+  // área/pontos SÓ pra aquela combinação. Não se aplica no critério
+  // LIVRE (que já ignora tudo isso por definição).
+  const precosFixosRaw =
+    criterio === "LIVRE"
+      ? []
+      : await prisma.precoFixoTipologia.findMany({
+          where: { tipologiaId: { in: tipologias.map((t) => t.id) } },
+          select: { tipologiaId: true, kit: true, valorUnitario: true },
+        });
   const precosFixos = new Map(precosFixosRaw.map((p) => [`${p.tipologiaId}:${p.kit}`, Number(p.valorUnitario)]));
 
-  const itensServico = calcularItensServico({
-    tipologias,
-    quantidadesPorTipologia,
-    kitsContratados,
-    kitsProntosPorTipologia,
-    tabelaPreco,
-    multiplicadorTier,
-    criterio,
-    pontosTetoPorTipologia,
-    formulaPontos,
-    precosFixos,
-  });
+  let itensServico: ReturnType<typeof calcularItensServico>;
+
+  if (criterio === "LIVRE") {
+    // Critério "Livre" (pedido pelo Henrique em 11/08/2026): valor
+    // direto por kit, multiplicado pela quantidade TOTAL de unidades
+    // do empreendimento inteiro — sem tier, sem pontos, sem faixa de
+    // área, sem depender de levantamento validado. Gera 1 item por
+    // kit contratado (não mais por tipologia).
+    const totalUnidades = Array.from(quantidadesPorTipologia.values()).reduce((s, q) => s + q, 0);
+    const valoresPorKit: Record<string, number | null> = {
+      ELETRICO: empreendimentoCriterio?.precoFixoEletrico != null ? Number(empreendimentoCriterio.precoFixoEletrico) : null,
+      HIDRAULICO: empreendimentoCriterio?.precoFixoHidraulico != null ? Number(empreendimentoCriterio.precoFixoHidraulico) : null,
+      QDC: empreendimentoCriterio?.precoFixoQdc != null ? Number(empreendimentoCriterio.precoFixoQdc) : null,
+    };
+    itensServico = kitsContratados
+      .filter((kit) => valoresPorKit[kit] != null)
+      .map((kit) => {
+        const precoUnitario = valoresPorKit[kit]!;
+        return {
+          tipologiaId: "TODAS",
+          tipologiaNome: "Todas as tipologias (empreendimento inteiro)",
+          kit,
+          quantidade: totalUnidades,
+          precoBase: precoUnitario,
+          multiplicador: 1,
+          precoUnitario,
+          total: parseFloat((precoUnitario * totalUnidades).toFixed(2)),
+          semPreco: false,
+          simulado: false,
+          precoFixado: true,
+        };
+      });
+  } else {
+    itensServico = calcularItensServico({
+      tipologias,
+      quantidadesPorTipologia,
+      kitsContratados,
+      kitsProntosPorTipologia,
+      tabelaPreco,
+      multiplicadorTier,
+      criterio,
+      pontosTetoPorTipologia,
+      formulaPontos,
+      precosFixos,
+    });
+  }
+
 
   if (itensServico.length === 0) {
     return {
