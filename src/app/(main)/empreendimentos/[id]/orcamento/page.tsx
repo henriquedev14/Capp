@@ -171,8 +171,13 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      {kitsAtivos.length > 0 && tipologiasComPrecos.length > 0 && (
+      {kitsAtivos.length > 0 && tipologiasComPrecos.length > 0 ? (
         <PrecoFixoTipologiaCard tipologias={tipologiasComPrecos} kitsDisponiveis={kitsAtivos} />
+      ) : (
+        <div className="rounded-xl border border-dashed border-border px-5 py-3.5 text-xs text-muted-foreground">
+          Preço fixo por Tipologia fica disponível aqui assim que o empreendimento tiver pelo menos 1 Tipologia
+          cadastrada e 1 kit contratado.
+        </div>
       )}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <Link
