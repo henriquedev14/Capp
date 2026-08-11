@@ -21,7 +21,7 @@ export interface CriarEmpreendimentoInput {
   responsavelComercial: string;
   // Tier explícito do formulário. Se null/undefined, herda o tier do cliente.
   tier?: number | null;
-  criterioPrecificacao?: "AREA" | "PONTOS_TETO" | "VALOR_FIXO" | null;
+  criterioPrecificacao?: "AREA" | "PONTOS_TETO" | "VALOR_FIXO" | "LIVRE" | null;
   precoFixoEletrico?: number | null;
   precoFixoHidraulico?: number | null;
   precoFixoQdc?: number | null;
