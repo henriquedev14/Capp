@@ -907,7 +907,12 @@ model PapelPermissao {
 enum CriterioPrecificacao {
   AREA        // faixa por m² de área privativa (comportamento original)
   PONTOS_TETO // faixa por quantidade de pontos de teto (L) da tipologia
-  VALOR_FIXO  // valor travado na mão, mesmo pra toda tipologia do empreendimento — pedido pelo Henrique em 11/08/2026
+  VALOR_FIXO  // não usado mais na prática — substituído por LIVRE
+  // Valor direto por kit, multiplicado pela quantidade TOTAL de
+  // unidades do empreendimento inteiro (não por tipologia) — sem
+  // multiplicador de tier, sem pontos, sem faixa de área. Pedido pelo
+  // Henrique em 11/08/2026.
+  LIVRE
 }
 
 model TabelaPrecoBase {
