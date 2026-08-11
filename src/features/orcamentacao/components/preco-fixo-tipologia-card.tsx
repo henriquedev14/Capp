@@ -30,7 +30,7 @@ export function PrecoFixoTipologiaCard({
   kitsDisponiveis: string[];
 }) {
   const router = useRouter();
-  const [aberto, setAberto] = React.useState(false);
+  const [aberto, setAberto] = React.useState(true);
   const [editando, setEditando] = React.useState<{ tipologiaId: string; kit: string } | null>(null);
   const [valor, setValor] = React.useState("");
   const [salvando, setSalvando] = React.useState(false);
