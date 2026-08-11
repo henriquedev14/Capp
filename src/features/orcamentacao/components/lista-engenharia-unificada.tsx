@@ -31,6 +31,9 @@ const TOTAL_SEGMENTOS = 7;
  * nenhuma etapa, travando o uso real da tela).
  */
 function linkProximaAcao(l: LinhaEngenharia): string {
+  if (l.proximaAcaoLabel === "Criar orçamento") {
+    return `/empreendimentos/${l.empreendimentoId}/orcamento`;
+  }
   if (l.etapaAtual === "LEVANTAMENTOS" || !l.temOrcamento) {
     return `/empreendimentos/${l.empreendimentoId}/levantamentos`;
   }
