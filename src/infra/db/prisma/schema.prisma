@@ -301,10 +301,18 @@ model Empreendimento {
 
   // Critério de precificação DESTE empreendimento — quando nulo, usa o
   // padrão global (ConfiguracaoSistema.criterioPrecificacao). Permite que
-  // cada obra escolha entre "Ponto de Teto" (padrão HGI) ou "Metro
-  // Quadrado" (faixa por área privativa), já que projetos diferentes
-  // podem fazer mais sentido precificados de um jeito ou de outro.
+  // cada obra escolha entre "Ponto de Teto" (padrão HGI), "Metro
+  // Quadrado" (faixa por área privativa) ou "Valor Fixo" (travado na
+  // mão, mesmo valor pra toda tipologia — pedido pelo Henrique em
+  // 11/08/2026), já que projetos diferentes podem fazer mais sentido
+  // precificados de um jeito ou de outro.
   criterioPrecificacao CriterioPrecificacao?
+
+  // Só preenchidos quando criterioPrecificacao=VALOR_FIXO — mesmo valor
+  // unitário pra QUALQUER tipologia desse empreendimento, por kit.
+  precoFixoEletrico   Decimal? @map("preco_fixo_eletrico") @db.Decimal(10, 2)
+  precoFixoHidraulico Decimal? @map("preco_fixo_hidraulico") @db.Decimal(10, 2)
+  precoFixoQdc        Decimal? @map("preco_fixo_qdc") @db.Decimal(10, 2)
 
   registrosProducao RegistroProducao[]
   movimentacoesEstoque MovimentacaoEstoque[]
@@ -899,6 +907,7 @@ model PapelPermissao {
 enum CriterioPrecificacao {
   AREA        // faixa por m² de área privativa (comportamento original)
   PONTOS_TETO // faixa por quantidade de pontos de teto (L) da tipologia
+  VALOR_FIXO  // valor travado na mão, mesmo pra toda tipologia do empreendimento — pedido pelo Henrique em 11/08/2026
 }
 
 model TabelaPrecoBase {
