@@ -117,7 +117,9 @@ export async function buscarVidaProducaoV2(empreendimentoId: string): Promise<Vi
       .filter((o) => o.tipologia.id === t.id)
       .sort((a, b) => b.bancada.ordem - a.bancada.ordem);
     const atual = ordensDaTipologia[0];
-    const info = atual ? STATUS_MAP[atual.status] : { texto: "Aguardando", categoria: "aguardando" as const };
+    const info = atual
+      ? (STATUS_MAP[atual.status] ?? { texto: atual.status, categoria: "aguardando" as const })
+      : { texto: "Aguardando", categoria: "aguardando" as const };
     const progressoPct =
       atual && atual.quantidadeAlvo > 0 ? Math.round((atual.quantidadeAprovada / atual.quantidadeAlvo) * 100) : 0;
 
