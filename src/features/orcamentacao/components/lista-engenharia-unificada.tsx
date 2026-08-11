@@ -8,7 +8,6 @@ import {
   Loader2,
   AlertTriangle,
   MoreVertical,
-  LayoutGrid,
   ClipboardList,
   Search,
 } from "lucide-react";
@@ -27,6 +26,18 @@ const CLASSE_BADGE: Record<BadgeCategoria, string> = {
 const TOTAL_SEGMENTOS = 7;
 
 /**
+ * Pra onde "próxima ação" leva, de acordo com a etapa — corrigido em
+ * 11/08/2026 (achado pelo Henrique: o texto não era clicável em
+ * nenhuma etapa, travando o uso real da tela).
+ */
+function linkProximaAcao(l: LinhaEngenharia): string {
+  if (l.etapaAtual === "LEVANTAMENTOS" || !l.temOrcamento) {
+    return `/empreendimentos/${l.empreendimentoId}/levantamentos`;
+  }
+  return `/empreendimentos/${l.empreendimentoId}/orcamento`;
+}
+
+/**
  * Central de trabalho da Engenharia — redesenho v4 (10/08/2026),
  * seguindo referência visual enviada pelo Henrique (estilo
  * Linear/Monday). Azul pra progresso/etapa, laranja SÓ pra próxima
@@ -37,6 +48,11 @@ export function ListaEngenhariaUnificada({ linhas }: { linhas: LinhaEngenharia[]
   const [processandoId, setProcessandoId] = React.useState<string | null>(null);
   const [selecionadoId, setSelecionadoId] = React.useState<string | null>(null);
   const [busca, setBusca] = React.useState("");
+  const [filtroCliente, setFiltroCliente] = React.useState("");
+  const [filtroResponsavel, setFiltroResponsavel] = React.useState("");
+  const [filtroEtapa, setFiltroEtapa] = React.useState("");
+  const [filtroStatus, setFiltroStatus] = React.useState("");
+  const [filtroPrioridade, setFiltroPrioridade] = React.useState("");
 
   async function handleTomar(e: React.MouseEvent, empreendimentoId: string) {
     e.stopPropagation();
@@ -50,13 +66,26 @@ export function ListaEngenhariaUnificada({ linhas }: { linhas: LinhaEngenharia[]
     }
   }
 
-  const linhasFiltradas = busca.trim()
-    ? linhas.filter(
-        (l) =>
-          l.empreendimentoNome.toLowerCase().includes(busca.toLowerCase()) ||
-          l.clienteNome.toLowerCase().includes(busca.toLowerCase())
-      )
-    : linhas;
+  // Opções de cada filtro são derivadas dos dados reais — nada de
+  // lista fixa desatualizada. Corrigido em 11/08/2026 (filtros
+  // existiam só visualmente, não faziam nada).
+  const opcoesCliente = Array.from(new Set(linhas.map((l) => l.clienteNome))).sort();
+  const opcoesResponsavel = Array.from(new Set(linhas.map((l) => l.responsavelNome).filter((v): v is string => !!v))).sort();
+  const opcoesEtapa = Array.from(new Set(linhas.map((l) => l.etapaLabel))).sort();
+  const opcoesStatus = Array.from(new Set(linhas.map((l) => l.statusBadgeTexto))).sort();
+
+  const linhasFiltradas = linhas.filter((l) => {
+    if (busca.trim()) {
+      const alvo = busca.toLowerCase();
+      if (!l.empreendimentoNome.toLowerCase().includes(alvo) && !l.clienteNome.toLowerCase().includes(alvo)) return false;
+    }
+    if (filtroCliente && l.clienteNome !== filtroCliente) return false;
+    if (filtroResponsavel && l.responsavelNome !== filtroResponsavel) return false;
+    if (filtroEtapa && l.etapaLabel !== filtroEtapa) return false;
+    if (filtroStatus && l.statusBadgeTexto !== filtroStatus) return false;
+    if (filtroPrioridade && l.prioridade !== filtroPrioridade) return false;
+    return true;
+  });
 
   return (
     <div className="overflow-hidden rounded-xl border border-[#E4E8EC] bg-white">
@@ -72,23 +101,31 @@ export function ListaEngenhariaUnificada({ linhas }: { linhas: LinhaEngenharia[]
               className="h-10 w-full rounded-lg border border-[#DFE4E8] pl-9 pr-3 text-sm text-[#1F252D] outline-none placeholder:text-[#9099A3] focus:border-[#F57C20]/40"
             />
           </div>
-          <div className="ml-auto flex overflow-hidden rounded-lg border border-[#E0E4E7]">
-            <button className="flex items-center gap-1.5 border-b-2 border-[#F57C20] px-4 py-2 text-[13px] font-medium text-[#F57C20]">
-              <ClipboardList className="h-3.5 w-3.5" />
-              Lista
-            </button>
-            <button className="flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium text-[#5E6873]">
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Kanban
-            </button>
+          <div className="ml-auto flex items-center gap-1.5 rounded-lg border border-[#E0E4E7] px-4 py-2 text-[13px] font-medium text-[#F57C20]">
+            <ClipboardList className="h-3.5 w-3.5" />
+            Lista
           </div>
         </div>
         <div className="grid grid-cols-5 gap-3">
-          <FiltroSelect label="Cliente" />
-          <FiltroSelect label="Responsável" />
-          <FiltroSelect label="Etapa atual" />
-          <FiltroSelect label="Status" />
-          <FiltroSelect label="Prioridade" />
+          <FiltroSelect label="Cliente" valor={filtroCliente} opcoes={opcoesCliente} onChange={setFiltroCliente} />
+          <FiltroSelect
+            label="Responsável"
+            valor={filtroResponsavel}
+            opcoes={opcoesResponsavel}
+            onChange={setFiltroResponsavel}
+          />
+          <FiltroSelect label="Etapa atual" valor={filtroEtapa} opcoes={opcoesEtapa} onChange={setFiltroEtapa} />
+          <FiltroSelect label="Status" valor={filtroStatus} opcoes={opcoesStatus} onChange={setFiltroStatus} />
+          <select
+            value={filtroPrioridade}
+            onChange={(ev) => setFiltroPrioridade(ev.target.value)}
+            className="h-9 w-full rounded-lg border border-[#DFE3E7] bg-white px-2.5 text-[12.5px] text-[#525C66]"
+          >
+            <option value="">Prioridade</option>
+            <option value="normal">Normal</option>
+            <option value="atencao">Atenção</option>
+            <option value="critica">Crítica</option>
+          </select>
         </div>
       </div>
 
@@ -181,13 +218,15 @@ export function ListaEngenhariaUnificada({ linhas }: { linhas: LinhaEngenharia[]
                         Tomar propriedade
                       </button>
                     ) : (
-                      <span
-                        className={`text-[13px] font-semibold ${
-                          l.proximaAcaoAcionavel ? "text-[#F57C20]" : "text-[#9099A3]"
+                      <Link
+                        href={linkProximaAcao(l)}
+                        onClick={(ev) => ev.stopPropagation()}
+                        className={`text-[13px] font-semibold hover:underline ${
+                          l.proximaAcaoAcionavel ? "text-[#F57C20]" : "text-[#9099A3] pointer-events-none"
                         }`}
                       >
                         {l.proximaAcaoLabel}
-                      </span>
+                      </Link>
                     )}
                   </td>
                   <td className="px-4 py-3.5 text-right">
@@ -217,10 +256,29 @@ function Th({ children }: { children?: React.ReactNode }) {
   );
 }
 
-function FiltroSelect({ label }: { label: string }) {
+function FiltroSelect({
+  label,
+  valor,
+  opcoes,
+  onChange,
+}: {
+  label: string;
+  valor: string;
+  opcoes: string[];
+  onChange: (v: string) => void;
+}) {
   return (
-    <select className="h-9 w-full rounded-lg border border-[#DFE3E7] bg-white px-2.5 text-[12.5px] text-[#525C66]">
-      <option>{label}</option>
+    <select
+      value={valor}
+      onChange={(ev) => onChange(ev.target.value)}
+      className="h-9 w-full rounded-lg border border-[#DFE3E7] bg-white px-2.5 text-[12.5px] text-[#525C66]"
+    >
+      <option value="">{label}</option>
+      {opcoes.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
     </select>
   );
 }
@@ -326,9 +384,12 @@ function PainelDetalhe({ linha: l }: { linha: LinhaEngenharia }) {
               <p className="mb-1 text-[13px] font-bold text-[#1F252D]">{l.proximaAcaoLabel}</p>
               {l.proximaAcaoDetalhe && <p className="text-[11px] text-[#7A838B]">{l.proximaAcaoDetalhe}</p>}
               {l.proximaAcaoAcionavel && (
-                <button className="mt-3 w-full rounded-lg bg-[#F57C20] py-2.5 text-[13px] font-semibold text-white hover:bg-[#DF6812]">
+                <Link
+                  href={linkProximaAcao(l)}
+                  className="mt-3 block w-full rounded-lg bg-[#F57C20] py-2.5 text-center text-[13px] font-semibold text-white hover:bg-[#DF6812]"
+                >
                   {l.proximaAcaoLabel}
-                </button>
+                </Link>
               )}
             </div>
             <div className="mt-3 text-[11px] text-[#69747E]">
