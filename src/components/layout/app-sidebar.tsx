@@ -104,10 +104,10 @@ export function AppSidebar() {
       className={cn(
         "flex shrink-0 flex-col transition-[width] duration-200",
         "h-screen sticky top-0 overflow-y-auto",
-        // Light: fundo branco com borda direita
-        // Dark: fundo escuro do design (#17130E)
-        "bg-white border-r border-border",
-        "dark:bg-[#17130E] dark:border-white/6",
+        // Sempre grafite escuro, independente do tema claro/escuro do
+        // resto do app — padrão de app SaaS premium (Linear/Monday),
+        // pedido pelo Henrique em 10/08/2026.
+        "bg-[#1F252D] border-r border-white/6",
         isCollapsed ? "w-16" : "w-60"
       )}
     >
@@ -115,7 +115,7 @@ export function AppSidebar() {
       <div
         className={cn(
           "flex h-[68px] items-center gap-3",
-          "border-b border-border dark:border-white/6",
+          "border-b border-white/8",
           isCollapsed ? "justify-center px-3" : "px-5"
         )}
       >
@@ -131,12 +131,12 @@ export function AppSidebar() {
         {!isCollapsed && (
           <div className="flex flex-col leading-none">
             <span
-              className="text-[19px] font-bold tracking-tight text-foreground"
+              className="text-[19px] font-bold tracking-tight text-white"
               style={{ letterSpacing: "-0.02em" }}
             >
               Constru<span style={{ color: "#FF7A1A" }}>App</span>
             </span>
-            <span className="mt-1 text-[9.5px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <span className="mt-1 text-[9.5px] font-semibold uppercase tracking-widest text-white/40">
               by HGI Group
             </span>
           </div>
@@ -155,7 +155,7 @@ export function AppSidebar() {
           return (
           <div key={group.label} className={cn("flex flex-col gap-0.5", isCollapsed && "items-center")}>
             {!isCollapsed && (
-              <span className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+              <span className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-white/35">
                 {group.label}
               </span>
             )}
@@ -170,8 +170,8 @@ export function AppSidebar() {
                       className={cn(
                         "flex h-10 w-10 items-center justify-center rounded-md transition-colors",
                         active
-                          ? "dark:text-white text-primary"
-                          : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                          ? "text-primary"
+                          : "text-white/55 hover:bg-white/6 hover:text-white"
                       )}
                       style={active ? {
                         background: "linear-gradient(100deg, rgba(255,106,0,0.18), rgba(255,106,0,0.04))",
@@ -190,8 +190,8 @@ export function AppSidebar() {
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                     active
-                      ? "text-foreground dark:text-white font-semibold"
-                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                      ? "text-white font-semibold"
+                      : "text-white/55 hover:bg-white/6 hover:text-white"
                   )}
                   style={active ? {
                     background: "linear-gradient(100deg, rgba(255,106,0,0.14), rgba(255,106,0,0.03))",
@@ -209,7 +209,7 @@ export function AppSidebar() {
                       <item.icon className="h-[15px] w-[15px]" style={{ color: "#FF7A1A" }} />
                     </span>
                   ) : (
-                    <item.icon className="h-[17px] w-[17px] shrink-0 text-muted-foreground" />
+                    <item.icon className="h-[17px] w-[17px] shrink-0 text-white/55" />
                   )}
                   {item.label}
                 </Link>
@@ -223,7 +223,7 @@ export function AppSidebar() {
       {/* Rodapé: usuário + toggle + logout */}
       <div
         className={cn(
-          "border-t border-border dark:border-white/6 p-3",
+          "border-t border-white/8 p-3",
           isCollapsed && "flex flex-col items-center gap-2"
         )}
       >
@@ -231,7 +231,7 @@ export function AppSidebar() {
           <>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-xs font-bold border border-border bg-secondary text-foreground">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-xs font-bold border border-white/12 bg-white/8 text-white">
                   {iniciais}
                 </div>
               </TooltipTrigger>
@@ -244,7 +244,7 @@ export function AppSidebar() {
                   type="button"
                   onClick={handleSignOut}
                   aria-label="Sair"
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-white/55 transition-colors hover:bg-white/6 hover:text-white"
                 >
                   <LogOut className="h-4 w-4" />
                 </button>
@@ -254,14 +254,14 @@ export function AppSidebar() {
           </>
         ) : (
           <div className="flex items-center gap-2.5 px-1 py-1.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-xs font-bold border border-border bg-secondary text-foreground">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-xs font-bold border border-white/12 bg-white/8 text-white">
               {iniciais}
             </div>
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm font-semibold text-foreground">
+              <span className="truncate text-sm font-semibold text-white">
                 {nomeUsuario}
               </span>
-              <span className="truncate text-[11px] text-muted-foreground">
+              <span className="truncate text-[11px] text-white/45">
                 {papelPrincipal || "Sem papel atribuído"}
               </span>
             </div>
@@ -270,7 +270,7 @@ export function AppSidebar() {
               type="button"
               onClick={handleSignOut}
               aria-label="Sair"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/55 transition-colors hover:bg-white/6 hover:text-white"
             >
               <LogOut className="h-4 w-4" />
             </button>
