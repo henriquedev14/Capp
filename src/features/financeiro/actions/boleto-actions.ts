@@ -37,7 +37,7 @@ export async function uploadBoletoContaPagar(contaId: string, formData: FormData
     },
   });
 
-  revalidatePath("/financeiro/contas-pagar");
+  revalidatePath("/financeiro");
   return { ok: true };
 }
 
@@ -53,7 +53,7 @@ export async function removerBoletoContaPagar(contaId: string): Promise<Resultad
     data: { boletoNome: null, boletoConteudo: null, boletoTamanho: null, boletoTipo: null },
   });
 
-  revalidatePath("/financeiro/contas-pagar");
+  revalidatePath("/financeiro");
   return { ok: true };
 }
 
@@ -82,7 +82,7 @@ export async function uploadBoletoContaReceber(contaId: string, formData: FormDa
     },
   });
 
-  revalidatePath("/financeiro/contas-receber");
+  revalidatePath("/financeiro");
   return { ok: true };
 }
 
@@ -98,6 +98,6 @@ export async function removerBoletoContaReceber(contaId: string): Promise<Result
     data: { boletoNome: null, boletoConteudo: null, boletoTamanho: null, boletoTipo: null },
   });
 
-  revalidatePath("/financeiro/contas-receber");
+  revalidatePath("/financeiro");
   return { ok: true };
 }
