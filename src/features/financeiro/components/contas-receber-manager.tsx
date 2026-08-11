@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Check, Undo2, Loader2, Pencil, X, Truck, CalendarClock, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { AnexoBoletoButton } from "@/features/financeiro/components/anexo-boleto-button";
+import { uploadBoletoContaReceber, removerBoletoContaReceber } from "@/features/financeiro/actions/boleto-actions";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   marcarContaReceberComoRecebida,
@@ -31,6 +33,7 @@ export interface ContaReceberItem {
   recebido: boolean;
   empresaId: string | null;
   empresaNome: string | null;
+  boletoNome: string | null;
 }
 
 interface Props {
@@ -564,6 +567,13 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <span className="text-sm font-semibold tabular-nums text-foreground">{formatBRL(c.valor)}</span>
+                      <AnexoBoletoButton
+                        contaId={c.id}
+                        tipo="receber"
+                        boletoNome={c.boletoNome}
+                        onUpload={uploadBoletoContaReceber}
+                        onRemover={removerBoletoContaReceber}
+                      />
                       {podeReceber ? (
                         <Button size="sm" variant="outline" onClick={() => handleReceber(c.id)} disabled={processandoId === c.id}>
                           {processandoId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
@@ -613,6 +623,13 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="text-sm font-semibold tabular-nums text-foreground">{formatBRL(c.valor)}</span>
+                      <AnexoBoletoButton
+                        contaId={c.id}
+                        tipo="receber"
+                        boletoNome={c.boletoNome}
+                        onUpload={uploadBoletoContaReceber}
+                        onRemover={removerBoletoContaReceber}
+                      />
                     <BotaoData id={c.id} tipo="projetar" texto="Definir data prevista" />
                   </div>
                 </div>
@@ -702,6 +719,13 @@ export function ContasReceberManager({ contas, empresas, empreendimentos }: Prop
                       </span>
                     )}
                     <span className="text-sm font-semibold tabular-nums text-foreground">{formatBRL(c.valor)}</span>
+                      <AnexoBoletoButton
+                        contaId={c.id}
+                        tipo="receber"
+                        boletoNome={c.boletoNome}
+                        onUpload={uploadBoletoContaReceber}
+                        onRemover={removerBoletoContaReceber}
+                      />
 
                     {!c.recebido && c.tipo === "REMESSA" && !c.dataEnvio && (
                       <BotaoData id={c.id} tipo="confirmar" texto="Confirmar envio" />

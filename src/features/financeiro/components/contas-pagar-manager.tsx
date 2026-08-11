@@ -3,6 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AnexoBoletoButton } from "@/features/financeiro/components/anexo-boleto-button";
+import { uploadBoletoContaPagar, removerBoletoContaPagar } from "@/features/financeiro/actions/boleto-actions";
 import {
   Plus,
   Loader2,
@@ -43,6 +45,7 @@ export interface ContaPagarItem {
   parcelaTotal: number | null;
   empresaNome: string;
   categoriaNome: string;
+  boletoNome: string | null;
 }
 
 interface Props {
@@ -253,6 +256,13 @@ export function ContasPagarManager({ empresas, categorias, contas, totalPagoEste
                       </span>
                     )}
                     <span className="text-sm font-semibold tabular-nums text-foreground">{formatBRL(c.valor)}</span>
+                    <AnexoBoletoButton
+                      contaId={c.id}
+                      tipo="pagar"
+                      boletoNome={c.boletoNome}
+                      onUpload={uploadBoletoContaPagar}
+                      onRemover={removerBoletoContaPagar}
+                    />
                     <button
                       onClick={() => handleMarcarPaga(c.id)}
                       disabled={processandoId === c.id}
