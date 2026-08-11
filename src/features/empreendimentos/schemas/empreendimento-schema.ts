@@ -111,7 +111,7 @@ export const empreendimentoSchema = z.object({
   criterioPrecificacao: z
     .string()
     .optional()
-    .refine((v) => !v || ["AREA", "PONTOS_TETO", "VALOR_FIXO"].includes(v), {
+    .refine((v) => !v || ["AREA", "PONTOS_TETO", "VALOR_FIXO", "LIVRE"].includes(v), {
       message: "Critério inválido",
     }),
   // Só usados quando criterioPrecificacao=VALOR_FIXO — mesmo valor pra
