@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FormSection } from "@/components/form/form-section";
 import { TextFormField } from "@/components/form/text-form-field";
+import { CnpjFormField } from "@/components/form/cnpj-form-field";
 import { EnderecoFields } from "@/components/form/endereco-fields";
 
 import {
@@ -110,14 +111,20 @@ export function FornecedorForm({ fornecedor }: FornecedorFormProps) {
             label="Nome fantasia"
             placeholder="XYZ Elétricos"
           />
-          <TextFormField
-            control={form.control}
+          <CnpjFormField
+            form={form}
             name="cnpj"
-            label="CNPJ"
-            placeholder="00.000.000/0000-00"
             required
-            inputMode="numeric"
-            maxLength={18}
+            mapeamento={{
+              razaoSocial: "razaoSocial",
+              nomeFantasia: "nomeFantasia",
+              telefone: "telefone",
+              logradouro: "logradouro",
+              numero: "numero",
+              cidade: "cidade",
+              estado: "estado",
+              cep: "cep",
+            }}
           />
           <TextFormField
             control={form.control}
