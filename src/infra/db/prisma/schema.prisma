@@ -1028,6 +1028,13 @@ model Orcamento {
   // Tier aplicado neste orçamento (pode diferir do tier padrão do cliente)
   tier             Int     @default(2) // 0-3
 
+  // Critério "Livre" — marcado direto na tela de Orçamento (não no
+  // cadastro do Empreendimento). Quando true, usa os valores fixos do
+  // Empreendimento (precoFixoEletrico/Hidraulico/Qdc) × total de
+  // unidades, ignorando área/pontos/tier. Pedido pelo Henrique em
+  // 11/08/2026.
+  criterioLivre    Boolean @default(false) @map("criterio_livre")
+
   // Totais calculados e armazenados para histórico
   totalServicosHgi Decimal? @map("total_servicos_hgi") @db.Decimal(12, 2)
   totalMateriais   Decimal? @map("total_materiais") @db.Decimal(12, 2)
