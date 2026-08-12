@@ -310,59 +310,42 @@ export async function criarOrcamento(
         });
   const precosFixos = new Map(precosFixosRaw.map((p) => [`${p.tipologiaId}:${p.kit}`, Number(p.valorUnitario)]));
 
-  let itensServico: ReturnType<typeof calcularItensServico>;
+  // Itens de serviço — desde 12/08/2026 vêm SEMPRE dos valores digitados
+  // na tela de Orçamento, nunca de cálculo automático. Decisão do
+  // Henrique: "o preço é sempre negociado antes", então faixa de área,
+  // fórmula de pontos de teto e multiplicador de tier viravam número
+  // que ninguém usava — sempre sobrescrito na negociação.
+  //
+  // Conta: valor do kit x total de unidades do empreendimento.
+  const totalUnidades = Array.from(quantidadesPorTipologia.values()).reduce((s, q) => s + q, 0);
+  const valoresPorKit: Record<string, number | null> = {
+    ELETRICO: empreendimentoCriterio?.precoFixoEletrico != null ? Number(empreendimentoCriterio.precoFixoEletrico) : null,
+    HIDRAULICO: empreendimentoCriterio?.precoFixoHidraulico != null ? Number(empreendimentoCriterio.precoFixoHidraulico) : null,
+    QDC: empreendimentoCriterio?.precoFixoQdc != null ? Number(empreendimentoCriterio.precoFixoQdc) : null,
+  };
 
-  if (criterio === "LIVRE") {
-    // Critério "Livre" (pedido pelo Henrique em 11/08/2026): valor
-    // direto por kit, multiplicado pela quantidade TOTAL de unidades
-    // do empreendimento inteiro — sem tier, sem pontos, sem faixa de
-    // área, sem depender de levantamento validado. Gera 1 item por
-    // kit contratado (não mais por tipologia).
-    const totalUnidades = Array.from(quantidadesPorTipologia.values()).reduce((s, q) => s + q, 0);
-    const valoresPorKit: Record<string, number | null> = {
-      ELETRICO: empreendimentoCriterio?.precoFixoEletrico != null ? Number(empreendimentoCriterio.precoFixoEletrico) : null,
-      HIDRAULICO: empreendimentoCriterio?.precoFixoHidraulico != null ? Number(empreendimentoCriterio.precoFixoHidraulico) : null,
-      QDC: empreendimentoCriterio?.precoFixoQdc != null ? Number(empreendimentoCriterio.precoFixoQdc) : null,
-    };
-    itensServico = kitsContratados
-      .filter((kit) => valoresPorKit[kit] != null)
-      .map((kit) => {
-        const precoUnitario = valoresPorKit[kit]!;
-        return {
-          tipologiaId: "TODAS",
-          tipologiaNome: "Todas as tipologias (empreendimento inteiro)",
-          kit,
-          quantidade: totalUnidades,
-          precoBase: precoUnitario,
-          multiplicador: 1,
-          precoUnitario,
-          total: parseFloat((precoUnitario * totalUnidades).toFixed(2)),
-          semPreco: false,
-          simulado: false,
-          precoFixado: true,
-        };
-      });
-  } else {
-    itensServico = calcularItensServico({
-      tipologias,
-      quantidadesPorTipologia,
-      kitsContratados,
-      kitsProntosPorTipologia,
-      tabelaPreco,
-      multiplicadorTier,
-      criterio,
-      pontosTetoPorTipologia,
-      formulaPontos,
-      precosFixos,
+  const itensServico = kitsContratados
+    .filter((kit) => {
+      const v = valoresPorKit[kit];
+      return v != null && v > 0;
+    })
+    .map((kit) => {
+      const precoUnitario = valoresPorKit[kit]!;
+      return {
+        tipologiaId: "TODAS",
+        tipologiaNome: "Todas as tipologias",
+        kit,
+        quantidade: totalUnidades,
+        precoBase: precoUnitario,
+        multiplicador: 1,
+        precoUnitario,
+        total: parseFloat((precoUnitario * totalUnidades).toFixed(2)),
+      };
     });
-  }
 
-
-  if (itensServico.length === 0) {
-    return {
-      erro: "Nenhum kit contratado tem levantamento validado ainda. Valide o levantamento elétrico e/ou hidráulico de pelo menos uma tipologia antes de criar o orçamento.",
-    };
-  }
+  // Orçamento nasce mesmo sem valor definido — a pessoa preenche na
+  // tela depois. Antes isso era bloqueado exigindo levantamento
+  // validado, o que travava obras onde o preço já estava fechado.
 
   // Revisão sequencial
   const revisao = await repo.proximaRevisao(empreendimentoId);
