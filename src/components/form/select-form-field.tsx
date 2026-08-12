@@ -56,7 +56,7 @@ export function SelectFormField<TFieldValues extends FieldValues>({
             {label}
             {required && <span className="ml-0.5 text-primary">*</span>}
           </FormLabel>
-          <Select onValueChange={field.onChange} value={field.value}>
+          <Select onValueChange={field.onChange} value={field.value || undefined}>
             <FormControl>
               <SelectTrigger>
                 <SelectValue placeholder={placeholder} />
