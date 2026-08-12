@@ -34,6 +34,7 @@ import { getTierOption } from "@/features/tiers/constants";
 
 import {
   empreendimentoSchema,
+  conferirSomaUnidades,
   type EmpreendimentoFormValues,
 } from "@/features/empreendimentos/schemas/empreendimento-schema";
 import {
@@ -203,7 +204,6 @@ export function EmpreendimentoForm({
   }, [clienteSelecionadoId]);
 
   const tierAtual = form.watch("tier");
-  const criterioSelecionado = form.watch("criterioPrecificacao");
   const tierDoClienteSelecionado = clientesAtivos.find(
     (c) => c.value === clienteSelecionadoId
   )?.tier;
@@ -237,25 +237,93 @@ export function EmpreendimentoForm({
     }
   }
 
-  // Mostra erros de validação quando o submit é bloqueado pelo Zod
-  const errosValidacao = Object.entries(form.formState.errors)
-    .map(([, err]) => err?.message)
-    .filter(Boolean) as string[];
+  // Em qual etapa vive cada campo — pra mandar a pessoa direto pro
+  // lugar certo em vez de deixar procurar entre 5 abas.
+  const ETAPA_DO_CAMPO: Record<string, number> = {
+    nome: 0, clienteId: 0, tipo: 0, construtora: 0, incorporadora: 0,
+    cep: 0, logradouro: 0, numero: 0, cidade: 0, estado: 0,
+    torres: 1, tipologias: 1, temHall: 1, hallTipo: 1, hallQuantidadeEspecifica: 1,
+    tipoEstrutura: 1, metodoConstrutivo: 1, tipoLaje: 1, tipoVedacao: 1,
+    kitEletrico: 2, kitHidraulico: 2, kitQdc: 2, tiposInstalacao: 2,
+    responsavelComercial: 2, tier: 2, criterioPrecificacao: 2,
+    statusOportunidade: 2, dataPrevistaInicio: 2, dataPrevistaEntrega: 2,
+    observacoes: 3,
+  };
+
+  const NOME_AMIGAVEL: Record<string, string> = {
+    nome: "Nome", clienteId: "Construtora", tipo: "Tipo de empreendimento",
+    logradouro: "Endereço", cidade: "Cidade", estado: "Estado", cep: "CEP",
+    torres: "Torres", tipologias: "Tipologias", tipoEstrutura: "Tipo de estrutura",
+    responsavelComercial: "Responsável comercial", construtora: "Construtora",
+  };
+
+  /**
+   * Percorre os erros do formulário inclusive os aninhados (torres[0].x,
+   * tipologias[2].y). Corrigido em 12/08/2026: a versão anterior só
+   * lia o primeiro nível, então erro dentro de torre/tipologia ficava
+   * INVISÍVEL — a pessoa clicava em Salvar e nada acontecia, sem
+   * nenhuma explicação na tela.
+   */
+  function coletarErros(obj: unknown, caminho: string[] = []): Array<{ campo: string; msg: string; etapa: number }> {
+    if (!obj || typeof obj !== "object") return [];
+    const acumulado: Array<{ campo: string; msg: string; etapa: number }> = [];
+    const registro = obj as Record<string, unknown>;
+
+    if (typeof registro.message === "string" && registro.message) {
+      const raiz = caminho[0] ?? "";
+      const indice = caminho[1] && /^\d+$/.test(caminho[1]) ? ` ${Number(caminho[1]) + 1}` : "";
+      const rotuloRaiz = NOME_AMIGAVEL[raiz] ?? raiz;
+      acumulado.push({
+        campo: `${rotuloRaiz}${indice}`,
+        msg: registro.message,
+        etapa: ETAPA_DO_CAMPO[raiz] ?? 0,
+      });
+      return acumulado;
+    }
+
+    for (const [chave, valor] of Object.entries(registro)) {
+      if (chave === "ref" || chave === "type") continue;
+      acumulado.push(...coletarErros(valor, [...caminho, chave]));
+    }
+    return acumulado;
+  }
+
+  const errosDetalhados = coletarErros(form.formState.errors);
 
   // Campos obrigatórios pendentes — pra explicar no botão desabilitado
   // POR QUE ele está desabilitado, em vez da pessoa só descobrir depois
   // de tentar salvar e ver uma lista de erro genérica.
+  //
+  // Revisado em 12/08/2026: as datas previstas SAÍRAM da lista que
+  // trava o botão. Elas são opcionais no banco e na validação, mas
+  // estavam impedindo de salvar qualquer empreendimento antigo que não
+  // as tivesse — inclusive pra corrigir outra coisa. Agora só aparecem
+  // como sugestão.
   const nomeValor = form.watch("nome");
   const clienteValor = form.watch("clienteId");
   const tipoValor = form.watch("tipo");
   const dataInicioValor = form.watch("dataPrevistaInicio");
   const dataEntregaValor = form.watch("dataPrevistaEntrega");
+
+  // Travam o botão — sem eles a validação falha de qualquer jeito, então
+  // é melhor explicar antes do que deixar clicar e nada acontecer.
   const camposPendentes: string[] = [];
   if (!nomeValor?.trim()) camposPendentes.push("nome do empreendimento");
   if (!clienteValor) camposPendentes.push("construtora");
   if (!tipoValor) camposPendentes.push("tipo de empreendimento");
-  if (!dataInicioValor) camposPendentes.push("data prevista de início");
-  if (!dataEntregaValor) camposPendentes.push("data prevista de entrega");
+
+  // Só sugerem — não impedem salvar.
+  const camposSugeridos: string[] = [];
+  if (!dataInicioValor) camposSugeridos.push("data prevista de início");
+  if (!dataEntregaValor) camposSugeridos.push("data prevista de entrega");
+
+  // Conferência da soma de unidades — vira aviso na tela, não bloqueio.
+  const torresValor = form.watch("torres");
+  const tipologiasValor = form.watch("tipologias");
+  const conferenciaUnidades = conferirSomaUnidades({
+    torres: torresValor,
+    tipologias: tipologiasValor,
+  });
 
   // Duração prevista em meses, quando as duas datas existem — item 12
   // do pedido: "calcule a duração prevista, mostre em meses".
@@ -634,17 +702,6 @@ export function EmpreendimentoForm({
             ]}
             placeholder="Usar o padrão do sistema"
           />
-          {criterioSelecionado === "LIVRE" && (
-            <div className="sm:col-span-2 grid grid-cols-1 gap-4 rounded-lg border border-border bg-secondary/20 p-4 sm:grid-cols-3">
-              <p className="sm:col-span-3 text-xs text-muted-foreground">
-                Esse valor por kit é multiplicado pela quantidade TOTAL de unidades do empreendimento inteiro — não
-                varia por tipologia, área ou pontos de teto, e não aplica o multiplicador de Tier.
-              </p>
-              <TextFormField control={form.control} name="precoFixoEletrico" label="Elétrico (R$)" inputMode="decimal" />
-              <TextFormField control={form.control} name="precoFixoHidraulico" label="Hidráulico (R$)" inputMode="decimal" />
-              <TextFormField control={form.control} name="precoFixoQdc" label="QDC (R$)" inputMode="decimal" />
-            </div>
-          )}
           <DateFormField
             control={form.control}
             name="dataPrevistaInicio"
@@ -756,14 +813,51 @@ export function EmpreendimentoForm({
         </div>
 
 
-        {errosValidacao.length > 0 && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
-            <p className="text-sm font-medium text-destructive mb-1">
-              Corrija os seguintes campos antes de salvar:
+        {conferenciaUnidades && !conferenciaUnidades.bate && (
+          <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3">
+            <p className="text-sm font-medium text-warning">A soma das tipologias não fecha</p>
+            <p className="mt-0.5 text-sm text-warning/90">
+              As tipologias somam {conferenciaUnidades.totalTipologias} unidades, e a estrutura tem{" "}
+              {conferenciaUnidades.totalEstrutura}.{" "}
+              <button
+                type="button"
+                onClick={() => setEtapaAtual(2)}
+                className="font-semibold underline underline-offset-2"
+              >
+                Abrir a etapa de tipologias
+              </button>{" "}
+              para ajustar — ou salvar assim mesmo e corrigir depois.
             </p>
-            <ul className="list-disc list-inside text-sm text-destructive/80 space-y-0.5">
-              {errosValidacao.map((msg, i) => (
-                <li key={i}>{msg}</li>
+          </div>
+        )}
+
+        {ultimaEtapa && camposSugeridos.length > 0 && (
+          <div className="rounded-lg border border-border bg-secondary/30 px-4 py-3">
+            <p className="text-sm text-muted-foreground">
+              Ainda em branco (não impede salvar): {camposSugeridos.join(", ")}.
+            </p>
+          </div>
+        )}
+
+        {errosDetalhados.length > 0 && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+            <p className="mb-1.5 text-sm font-medium text-destructive">
+              Corrija antes de salvar:
+            </p>
+            <ul className="space-y-1.5">
+              {errosDetalhados.map((e, i) => (
+                <li key={i} className="text-sm text-destructive/90">
+                  <span className="font-medium">{e.campo}:</span> {e.msg}{" "}
+                  {e.etapa !== etapaAtual && (
+                    <button
+                      type="button"
+                      onClick={() => setEtapaAtual(e.etapa)}
+                      className="font-semibold underline underline-offset-2"
+                    >
+                      ir para {ETAPAS[e.etapa]?.label ?? `etapa ${e.etapa + 1}`}
+                    </button>
+                  )}
+                </li>
               ))}
             </ul>
           </div>
