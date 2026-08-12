@@ -36,6 +36,128 @@ const levantamentoMateriaisRepo = new LevantamentoMateriaisPrismaRepository();
  * movendo de volta para "Em levantamento") antes de uma nova revisão ser
  * gerada.
  */
+/**
+ * Liga/desliga o critério "Livre" pra ESSE orçamento específico —
+ * marcado direto na tela (não no cadastro do Empreendimento). Ao
+ * ligar, recalcula os itens de serviço usando valor fixo × total de
+ * unidades do empreendimento; ao desligar, recalcula usando o critério
+ * normal (área/pontos/tier). Pedido pelo Henrique em 11/08/2026.
+ */
+export async function alternarCriterioLivreOrcamento(
+  orcamentoId: string,
+  ativar: boolean
+): Promise<{ ok: true } | { erro: string }> {
+  try {
+    await exigirPermissao(PERMISSOES.ORCAMENTO_APLICAR_PRECO);
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : "Não autorizado." };
+  }
+
+  const orcamento = await prisma.orcamento.findUnique({
+    where: { id: orcamentoId },
+    select: { empreendimentoId: true, tier: true },
+  });
+  if (!orcamento) return { erro: "Orçamento não encontrado." };
+
+  const empreendimento = await prisma.empreendimento.findUnique({
+    where: { id: orcamento.empreendimentoId },
+    select: {
+      kitEletrico: true,
+      kitHidraulico: true,
+      kitQdc: true,
+      precoFixoEletrico: true,
+      precoFixoHidraulico: true,
+      precoFixoQdc: true,
+    },
+  });
+  if (!empreendimento) return { erro: "Empreendimento não encontrado." };
+
+  const tipologias = await prisma.tipologia.findMany({
+    where: { empreendimentoId: orcamento.empreendimentoId },
+    select: { id: true, nome: true, quantidadeUnidades: true },
+  });
+
+  const kitsContratados = [
+    empreendimento.kitEletrico && "ELETRICO",
+    empreendimento.kitHidraulico && "HIDRAULICO",
+    empreendimento.kitQdc && "QDC",
+  ].filter(Boolean) as KitContratado[];
+
+  let novosItens: ReturnType<typeof calcularItensServico>;
+
+  if (ativar) {
+    const totalUnidades = tipologias.reduce((s, t) => s + t.quantidadeUnidades, 0);
+    const valoresPorKit: Record<string, number | null> = {
+      ELETRICO: empreendimento.precoFixoEletrico != null ? Number(empreendimento.precoFixoEletrico) : null,
+      HIDRAULICO: empreendimento.precoFixoHidraulico != null ? Number(empreendimento.precoFixoHidraulico) : null,
+      QDC: empreendimento.precoFixoQdc != null ? Number(empreendimento.precoFixoQdc) : null,
+    };
+    novosItens = kitsContratados
+      .filter((kit) => valoresPorKit[kit] != null)
+      .map((kit) => {
+        const precoUnitario = valoresPorKit[kit]!;
+        return {
+          tipologiaId: "TODAS",
+          tipologiaNome: "Todas as tipologias (empreendimento inteiro)",
+          kit,
+          quantidade: totalUnidades,
+          precoBase: precoUnitario,
+          multiplicador: 1,
+          precoUnitario,
+          total: parseFloat((precoUnitario * totalUnidades).toFixed(2)),
+          semPreco: false,
+          simulado: false,
+        };
+      });
+  } else {
+    // Desligar volta pro critério ÁREA (simplificação segura — se
+    // precisar de Pontos de Teto específico, gera um novo orçamento).
+    const multiplicadorTier = await repo.buscarMultiplicadorTier(orcamento.tier);
+    const tabelaPreco = await repo.buscarTabelaPreco();
+
+    const quantidadesPorTipologia = new Map(tipologias.map((t) => [t.id, t.quantidadeUnidades]));
+    const kitsProntosPorTipologia = new Map(tipologias.map((t) => [t.id, kitsContratados as KitContratado[]]));
+
+    novosItens = calcularItensServico({
+      tipologias: tipologias.map((t) => ({ ...t, empreendimentoId: orcamento.empreendimentoId }) as never),
+      quantidadesPorTipologia,
+      kitsContratados: kitsContratados as KitContratado[],
+      kitsProntosPorTipologia,
+      tabelaPreco,
+      multiplicadorTier,
+      criterio: "AREA",
+    });
+  }
+
+  const totalServicosHgi = novosItens.filter((i) => !i.simulado).reduce((s, i) => s + i.total, 0);
+
+  await prisma.orcamento.update({
+    where: { id: orcamentoId },
+    data: {
+      criterioLivre: ativar,
+      totalServicosHgi,
+    },
+  });
+  await prisma.itemServicoOrcamento.deleteMany({ where: { orcamentoId } });
+  await prisma.itemServicoOrcamento.createMany({
+    data: novosItens.map((i) => ({
+      orcamentoId,
+      tipologiaId: i.tipologiaId,
+      tipologiaNome: i.tipologiaNome,
+      kit: i.kit,
+      quantidade: i.quantidade,
+      precoBase: i.precoBase,
+      multiplicador: i.multiplicador,
+      precoUnitario: i.precoUnitario,
+      total: i.total,
+      pontos: null,
+    })),
+  });
+
+  revalidatePath(`/empreendimentos/${orcamento.empreendimentoId}/orcamento`);
+  return { ok: true };
+}
+
 export async function criarOrcamento(
   empreendimentoId: string,
   input: {
