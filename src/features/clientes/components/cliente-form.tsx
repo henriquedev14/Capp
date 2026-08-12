@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormSection } from "@/components/form/form-section";
 import { TextFormField } from "@/components/form/text-form-field";
+import { CnpjFormField } from "@/components/form/cnpj-form-field";
 import { EnderecoFields } from "@/components/form/endereco-fields";
 import { TierSelectField } from "@/features/tiers/components/tier-select-field";
 
@@ -107,14 +108,20 @@ export function ClienteForm({ cliente, podeDefinirTier = false }: ClienteFormPro
             label="Nome fantasia"
             placeholder="Ex: MRV"
           />
-          <TextFormField
-            control={form.control}
+          <CnpjFormField
+            form={form}
             name="cnpj"
-            label="CNPJ"
-            placeholder="00.000.000/0000-00"
-            maxLength={18}
-            inputMode="numeric"
             required
+            mapeamento={{
+              razaoSocial: "razaoSocial",
+              nomeFantasia: "nomeFantasia",
+              telefone: "telefone",
+              logradouro: "logradouro",
+              numero: "numero",
+              cidade: "cidade",
+              estado: "estado",
+              cep: "cep",
+            }}
           />
           <TextFormField
             control={form.control}
