@@ -27,7 +27,6 @@ import { JornadaVisual } from "@/features/orcamentacao/components/jornada-visual
 import { ResponsavelPrazoEditor } from "@/features/orcamentacao/components/responsavel-prazo-editor";
 import { podeGerenciarJornada } from "@/features/orcamentacao/actions/jornada-actions";
 import { ValorLivreCard } from "@/features/orcamentacao/components/valor-livre-card";
-import { ToggleCriterioLivre } from "@/features/orcamentacao/components/toggle-criterio-livre";
 import { prisma } from "@/infra/db/prisma/client";
 import { buscarInfoPropostaOrcamento, listarCotacoesDoOrcamento, listarFornecedoresAtivosResumo } from "@/features/orcamentacao/actions/orcamento-actions";
 import { consolidarItensPorMaterial } from "@/core/orcamentacao/use-cases/consolidar-itens-material";
@@ -156,24 +155,23 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
     empreendimento.kitQdc && "QDC",
   ].filter(Boolean) as string[];
 
-  // Critério "Livre" — marcado direto nesse orçamento (não no cadastro
-  // do Empreendimento). Busca simples e isolada pra não depender da
-  // entidade complexa do Orçamento. Pedido pelo Henrique em 11/08/2026.
-  const criterioLivreRow = orcamento
-    ? await prisma.orcamento.findUnique({ where: { id: orcamento.id }, select: { criterioLivre: true } })
-    : null;
-  const criterioLivreAtivo = criterioLivreRow?.criterioLivre ?? false;
+  // Valores do serviço — desde 12/08/2026 é a única forma de precificar
+  // (o preço é sempre negociado antes, então calcular por área/pontos
+  // era teatro). Card sempre visível, sem critério nem checkbox.
+  const tipologiasDoEmp = await prisma.tipologia.findMany({
+    where: { empreendimentoId: params.id },
+    select: { quantidadeUnidades: true },
+  });
+  const totalUnidades = tipologiasDoEmp.reduce((s, t) => s + t.quantidadeUnidades, 0);
 
   return (
     <div className="flex flex-col gap-6">
-      {orcamento && (
-        <div className="rounded-xl border border-border bg-card p-4">
-          <ToggleCriterioLivre orcamentoId={orcamento.id} ativo={criterioLivreAtivo} />
-        </div>
-      )}
-      {criterioLivreAtivo && (
+      {kitsAtivos.length > 0 && (
         <ValorLivreCard
           empreendimentoId={params.id}
+          orcamentoId={orcamento?.id ?? null}
+          totalUnidades={totalUnidades}
+          kitsContratados={kitsAtivos}
           eletrico={empreendimento.precoFixoEletrico ?? null}
           hidraulico={empreendimento.precoFixoHidraulico ?? null}
           qdc={empreendimento.precoFixoQdc ?? null}
