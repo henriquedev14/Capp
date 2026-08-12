@@ -27,6 +27,8 @@ import { JornadaVisual } from "@/features/orcamentacao/components/jornada-visual
 import { ResponsavelPrazoEditor } from "@/features/orcamentacao/components/responsavel-prazo-editor";
 import { podeGerenciarJornada } from "@/features/orcamentacao/actions/jornada-actions";
 import { ValorLivreCard } from "@/features/orcamentacao/components/valor-livre-card";
+import { ToggleCriterioLivre } from "@/features/orcamentacao/components/toggle-criterio-livre";
+import { prisma } from "@/infra/db/prisma/client";
 import { buscarInfoPropostaOrcamento, listarCotacoesDoOrcamento, listarFornecedoresAtivosResumo } from "@/features/orcamentacao/actions/orcamento-actions";
 import { consolidarItensPorMaterial } from "@/core/orcamentacao/use-cases/consolidar-itens-material";
 import { CotacoesUnificadas } from "@/features/cotacoes/components/cotacoes-unificadas";
@@ -154,11 +156,22 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
     empreendimento.kitQdc && "QDC",
   ].filter(Boolean) as string[];
 
-  const criterioAtivo = empreendimento.criterioPrecificacao;
+  // Critério "Livre" — marcado direto nesse orçamento (não no cadastro
+  // do Empreendimento). Busca simples e isolada pra não depender da
+  // entidade complexa do Orçamento. Pedido pelo Henrique em 11/08/2026.
+  const criterioLivreRow = orcamento
+    ? await prisma.orcamento.findUnique({ where: { id: orcamento.id }, select: { criterioLivre: true } })
+    : null;
+  const criterioLivreAtivo = criterioLivreRow?.criterioLivre ?? false;
 
   return (
     <div className="flex flex-col gap-6">
-      {criterioAtivo === "LIVRE" && (
+      {orcamento && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <ToggleCriterioLivre orcamentoId={orcamento.id} ativo={criterioLivreAtivo} />
+        </div>
+      )}
+      {criterioLivreAtivo && (
         <ValorLivreCard
           empreendimentoId={params.id}
           eletrico={empreendimento.precoFixoEletrico ?? null}
