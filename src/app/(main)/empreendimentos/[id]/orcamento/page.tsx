@@ -24,6 +24,7 @@ import { LevantamentoMateriaisPrismaRepository } from "@/infra/db/prisma/reposit
 import { EmpreendimentoPrismaRepository } from "@/infra/db/prisma/repositories/empreendimento-prisma-repository";
 import { UsuarioPrismaRepository } from "@/infra/db/prisma/repositories/usuario-prisma-repository";
 import { JornadaVisual } from "@/features/orcamentacao/components/jornada-visual";
+import { calcularJornadaReal } from "@/core/orcamentacao/use-cases/calcular-jornada-real";
 import { ResponsavelPrazoEditor } from "@/features/orcamentacao/components/responsavel-prazo-editor";
 import { podeGerenciarJornada } from "@/features/orcamentacao/actions/jornada-actions";
 import { ValorLivreCard } from "@/features/orcamentacao/components/valor-livre-card";
@@ -91,16 +92,6 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
   const podeSobrescreverProposta = await ehGestorSenior();
 
   // Jornada, responsáveis disponíveis e permissão de gerenciar — usados no
-  // cabeçalho fixo e na jornada visual. Blindado com try/catch: se `db push`
-  // ainda não rodou nesta VM, cai pro estado vazio sem quebrar a tela.
-  let jornada: Awaited<ReturnType<typeof repo.buscarJornada>> = [];
-  if (orcamento) {
-    try {
-      jornada = await repo.buscarJornada(orcamento.id);
-    } catch (e) {
-      console.error("[orcamento/page] erro ao carregar jornada:", e);
-    }
-  }
   const [todosUsuarios, podeGerenciar] = await Promise.all([
     usuarioRepo.findMany(),
     podeGerenciarJornada(),
@@ -117,32 +108,72 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
   const { cotacoes, erro: erroCotacoes } = orcamento
     ? await listarCotacoesDoOrcamento(orcamento.id)
     : { cotacoes: [], erro: null };
+
+  // cabeçalho fixo e na jornada visual. Blindado com try/catch: se `db push`
+  // ainda não rodou nesta VM, cai pro estado vazio sem quebrar a tela.
+  //
+  // Corrigido em 12/08/2026: a jornada estava presa lendo só a tabela
+  // orcamento_jornada, que na prática só era escrita na Aprovação — a
+  // barra ficava congelada mesmo com Composição e Materiais prontos.
+  // Agora calcula do estado real, igual já era feito na fila de
+  // Engenharia (ver fila-engenharia-unificada.ts).
+  let jornada: Awaited<ReturnType<typeof repo.buscarJornada>> = [];
+  if (orcamento) {
+    try {
+      const jornadaExistente = await repo.buscarJornada(orcamento.id);
+      const propostaRow = await prisma.orcamento.findUnique({
+        where: { id: orcamento.id },
+        select: { propostaGeradaEm: true },
+      });
+      jornada = calcularJornadaReal({
+        jornadaExistente: jornadaExistente as never,
+        // Aproximação: usa a mesma checagem de materiais prontos (já
+        // calculada mais abaixo seria ideal, mas materiaisProntos só
+        // fica disponível depois — então repete o mesmo critério aqui
+        // pra não duplicar a query de levantamentos duas vezes).
+        levantamentosOk: orcamento.itensServico.length > 0,
+        totalServicosHgi: orcamento.totalServicosHgi ?? 0,
+        totalItensMaterial: orcamento.itensMaterial.length,
+        cotacoes: cotacoes.map((c) => ({ status: c.status })),
+        statusOrcamento: orcamento.status as never,
+        propostaGeradaEm: propostaRow?.propostaGeradaEm ? propostaRow.propostaGeradaEm.toISOString() : null,
+      });
+    } catch (e) {
+      console.error("[orcamento/page] erro ao carregar jornada:", e);
+    }
+  }
   const cotacoesDetalhadas =
     cotacoes.length > 0 && orcamento ? await buscarTodasCotacoesDetalhadas(orcamento.id, params.id) : [];
 
   const fornecedoresAtivos = await listarFornecedoresAtivosResumo();
 
-  // Trava da proposta: além do orçamento estar aprovado, toda tipologia
-  // que tem item de serviço do kit Elétrico precisa ter Levantamento de
-  // Materiais VALIDADO — sem isso, a proposta fica bloqueada.
+  // Tipologias do empreendimento — usadas tanto pro total de unidades
+  // (preço manual) quanto pra checagem de materiais logo abaixo.
+  const tipologiasDoEmp = await prisma.tipologia.findMany({
+    where: { empreendimentoId: params.id },
+    select: { id: true, nome: true, quantidadeUnidades: true },
+  });
+  const totalUnidades = tipologiasDoEmp.reduce((s, t) => s + t.quantidadeUnidades, 0);
+
+  // Levantamento de Materiais validado — pré-requisito pra Cotação e
+  // Proposta. Corrigido em 12/08/2026: antes checava via itensServico
+  // do kit Elétrico por tipologia, mas desde que o preço virou manual
+  // (um valor só, sem quebrar por tipologia) o item de serviço nasce
+  // com tipologiaId="TODAS" — isso zerava a checagem e liberava tudo
+  // sem querer. Agora checa direto pelas tipologias do empreendimento
+  // que têm kit Elétrico contratado, independente de como o preço foi
+  // calculado.
   let materiaisProntos = true;
   let tipologiasSemMaterial: string[] = [];
-  if (orcamento) {
-    const tipologiasComEletrico = Array.from(
-      new Set(
-        orcamento.itensServico
-          .filter((i) => i.kit === "ELETRICO" && i.tipologiaId)
-          .map((i) => i.tipologiaId as string)
-      )
-    );
-    if (tipologiasComEletrico.length > 0) {
-      const levantamentosMateriais = await levantamentoMateriaisRepo.buscarTodosPorEmpreendimento(params.id);
-      tipologiasSemMaterial = tipologiasComEletrico
-        .filter((tid) => !levantamentosMateriais.some((l) => l.tipologiaId === tid && l.status === "VALIDADO"))
-        .map((tid) => orcamento.itensServico.find((i) => i.tipologiaId === tid)?.tipologiaNome ?? tid);
-      materiaisProntos = tipologiasSemMaterial.length === 0;
-    }
+  if (orcamento && empreendimento.kitEletrico && tipologiasDoEmp.length > 0) {
+    const levantamentosMateriais = await levantamentoMateriaisRepo.buscarTodosPorEmpreendimento(params.id);
+    tipologiasSemMaterial = tipologiasDoEmp
+      .filter((t) => !levantamentosMateriais.some((l) => l.tipologiaId === t.id && l.status === "VALIDADO"))
+      .map((t) => t.nome);
+    materiaisProntos = tipologiasSemMaterial.length === 0;
   }
+
+
 
   const tier = empreendimento.tier ?? 2;
   const tierOption = getTierOption(tier);
@@ -158,25 +189,10 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
   // Valores do serviço — desde 12/08/2026 é a única forma de precificar
   // (o preço é sempre negociado antes, então calcular por área/pontos
   // era teatro). Card sempre visível, sem critério nem checkbox.
-  const tipologiasDoEmp = await prisma.tipologia.findMany({
-    where: { empreendimentoId: params.id },
-    select: { quantidadeUnidades: true },
-  });
-  const totalUnidades = tipologiasDoEmp.reduce((s, t) => s + t.quantidadeUnidades, 0);
+  // (tipologiasDoEmp e totalUnidades já foram calculados mais acima.)
 
   return (
     <div className="flex flex-col gap-6">
-      {kitsAtivos.length > 0 && (
-        <ValorLivreCard
-          empreendimentoId={params.id}
-          orcamentoId={orcamento?.id ?? null}
-          totalUnidades={totalUnidades}
-          kitsContratados={kitsAtivos}
-          eletrico={empreendimento.precoFixoEletrico ?? null}
-          hidraulico={empreendimento.precoFixoHidraulico ?? null}
-          qdc={empreendimento.precoFixoQdc ?? null}
-        />
-      )}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <Link
           href={`/empreendimentos/${params.id}`}
@@ -209,6 +225,18 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
           tier={tier}
         />
       </div>
+
+      {kitsAtivos.length > 0 && (
+        <ValorLivreCard
+          empreendimentoId={params.id}
+          orcamentoId={orcamento?.id ?? null}
+          totalUnidades={totalUnidades}
+          kitsContratados={kitsAtivos}
+          eletrico={empreendimento.precoFixoEletrico ?? null}
+          hidraulico={empreendimento.precoFixoHidraulico ?? null}
+          qdc={empreendimento.precoFixoQdc ?? null}
+        />
+      )}
 
       {/* Jornada visual — só aparece quando há um orçamento selecionado */}
       {orcamento && (
