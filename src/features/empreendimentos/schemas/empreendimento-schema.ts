@@ -144,32 +144,37 @@ export const empreendimentoSchema = z.object({
 
   // Observações
   observacoes: z.string().optional(),
-})
-  // Regra de negócio: a soma das quantidades de unidades cadastradas nas
-  // tipologias precisa bater exatamente com o total real de unidades do
-  // empreendimento (torres × pavimentos × unidades por pavimento). Evita
-  // que o consolidado do levantamento/orçamentação fique errado por
-  // esquecimento de alguma tipologia ou digitação incorreta.
-  .superRefine((data, ctx) => {
-    const totalUnidadesReal = data.torres.reduce(
-      (acc, t) => acc + t.pavimentos * t.unidadesPorPavimento,
-      0
-    );
-    const totalTipologias = data.tipologias.reduce(
-      (acc, t) => acc + (t.quantidadeUnidades || 0),
-      0
-    );
+});
 
-    // Só valida quando já existe estrutura física definida — evita travar
-    // o cadastro no meio do preenchimento, antes das torres existirem.
-    if (totalUnidadesReal > 0 && totalTipologias !== totalUnidadesReal) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["tipologias"],
-        message: `A soma das unidades por tipologia (${totalTipologias}) precisa ser igual ao total de unidades do empreendimento (${totalUnidadesReal}). Ajuste a quantidade de alguma tipologia.`,
-      });
-    }
-  });
+/**
+ * Confere se a soma das tipologias bate com a estrutura física
+ * (torres × pavimentos × unidades por pavimento).
+ *
+ * IMPORTANTE: isso NÃO é mais uma regra bloqueante. Achado em
+ * 12/08/2026 — como `superRefine`, a regra travava permanentemente
+ * qualquer empreendimento cadastrado antes dela existir, impedindo até
+ * correções sem relação nenhuma com tipologias (mudar o nome, por
+ * exemplo). Pior: o erro caía numa etapa oculta do formulário, então o
+ * botão Salvar parecia simplesmente não responder.
+ *
+ * Agora é uma conferência que a tela usa pra mostrar um aviso visível
+ * — quem edita decide se corrige na hora ou salva e ajusta depois.
+ */
+export function conferirSomaUnidades(data: {
+  torres?: Array<{ pavimentos?: number; unidadesPorPavimento?: number }>;
+  tipologias?: Array<{ quantidadeUnidades?: number }>;
+}): { bate: boolean; totalEstrutura: number; totalTipologias: number } | null {
+  const totalEstrutura = (data.torres ?? []).reduce(
+    (acc, t) => acc + (t.pavimentos || 0) * (t.unidadesPorPavimento || 0),
+    0
+  );
+  const totalTipologias = (data.tipologias ?? []).reduce((acc, t) => acc + (t.quantidadeUnidades || 0), 0);
+
+  // Sem estrutura definida ainda, não há o que conferir.
+  if (totalEstrutura === 0) return null;
+
+  return { bate: totalTipologias === totalEstrutura, totalEstrutura, totalTipologias };
+}
 
 export type EmpreendimentoFormValues = z.infer<typeof empreendimentoSchema>;
 export type TorreFormValues = z.infer<typeof torreSchema>;
