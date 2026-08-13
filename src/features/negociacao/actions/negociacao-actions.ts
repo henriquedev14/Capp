@@ -29,9 +29,20 @@ export interface LinhaHubNegociacao {
   proximaAcaoData: string | null;
 }
 
-export async function buscarHubNegociacoes(): Promise<LinhaHubNegociacao[]> {
+/**
+ * Achado pelo Henrique em 13/08/2026: essa fila não tinha a mesma
+ * restrição já aplicada na Engenharia — Comercial via TODAS as
+ * negociações, não só a própria carteira. Segue o mesmo padrão:
+ * `responsavelComercialUserId` só filtra quando o papel do usuário tem
+ * EMPREENDIMENTO_VER_APENAS_PROPRIOS (decidido pela página, não aqui).
+ */
+export async function buscarHubNegociacoes(responsavelComercialUserId?: string): Promise<LinhaHubNegociacao[]> {
   const empreendimentos = await prisma.empreendimento.findMany({
-    where: { excluidoEm: null, status: "NEGOCIACAO" },
+    where: {
+      excluidoEm: null,
+      status: "NEGOCIACAO",
+      ...(responsavelComercialUserId && { responsavelComercialUserId }),
+    },
     select: {
       id: true,
       nome: true,
@@ -40,7 +51,11 @@ export async function buscarHubNegociacoes(): Promise<LinhaHubNegociacao[]> {
       orcamentos: {
         orderBy: { revisao: "desc" },
         take: 1,
-        select: { totalMateriais: true, totalServicosHgi: true },
+        select: {
+          totalMateriais: true,
+          totalServicosHgi: true,
+          propostaGeradaPor: { select: { nome: true } },
+        },
       },
       interacoesNegociacao: {
         orderBy: { createdAt: "desc" },
@@ -69,7 +84,8 @@ export async function buscarHubNegociacoes(): Promise<LinhaHubNegociacao[]> {
       prioridade,
       valorAtual,
       valorOriginal,
-      responsavelNome: e.responsavelComercialUser?.nome ?? "—",
+      responsavelNome:
+        e.orcamentos[0]?.propostaGeradaPor?.nome ?? e.responsavelComercialUser?.nome ?? "—",
       diasSemInteracao,
       followUpVencido,
       proximaAcao: ultima?.proximaAcao ?? null,
@@ -342,4 +358,54 @@ export async function registrarGanhaEGerarContrato(
   revalidatePath("/negociacao");
 
   return { ok: true, contratoId: contrato.id };
+}
+
+/**
+ * Reverte uma negociação aprovada — volta o status pra EM_REVISAO e
+ * o empreendimento pra NEGOCIACAO. Apaga o Contrato e TODAS as Contas
+ * a Receber que tinham sido geradas automaticamente (decisão do
+ * Henrique em 13/08/2026: "pode apagar todas as que tiver" — não fica
+ * histórico de cobrança de um contrato que não existe mais).
+ */
+export async function reverterAprovacaoNegociacao(
+  empreendimentoId: string
+): Promise<{ ok: true } | { erro: string }> {
+  let sessao;
+  try {
+    sessao = await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : "Não autorizado." };
+  }
+
+  const interacoes = await prisma.interacaoNegociacao.findMany({
+    where: { empreendimentoId },
+    select: { tipo: true, createdAt: true, proximaAcaoData: true },
+  });
+  const status = derivarStatusNegociacao(interacoes);
+  if (status !== "APROVADA") {
+    return { erro: "Essa negociação não está aprovada — nada pra reverter." };
+  }
+
+  await prisma.contaReceber.deleteMany({ where: { empreendimentoId } });
+  await prisma.contrato.deleteMany({ where: { empreendimentoId } });
+
+  await prisma.empreendimento.update({
+    where: { id: empreendimentoId },
+    data: { status: "NEGOCIACAO" },
+  });
+
+  await prisma.interacaoNegociacao.create({
+    data: {
+      empreendimentoId,
+      tipo: "APROVACAO_REVERTIDA",
+      observacoes: "Aprovação revertida — Contrato e Contas a Receber gerados automaticamente foram apagados.",
+      registradoPorId: sessao.user.id,
+    },
+  });
+
+  revalidatePath(`/empreendimentos/${empreendimentoId}/negociacao`);
+  revalidatePath(`/empreendimentos/${empreendimentoId}`);
+  revalidatePath("/negociacao");
+
+  return { ok: true };
 }
