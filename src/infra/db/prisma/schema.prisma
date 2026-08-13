@@ -108,6 +108,7 @@ model Cliente {
   razaoSocial  String  @map("razao_social")
   nomeFantasia String? @map("nome_fantasia")
   cnpj         String  @unique
+  inscricaoEstadual String? @map("inscricao_estadual")
   email        String?
   telefone     String?
   logradouro   String?
@@ -2212,7 +2213,8 @@ model ContaReceber {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  kitLegado KitLegado?
+  kitLegadoComoEntrada KitLegado? @relation("KitLegadoEntrada")
+  kitLegadoComoRemessa KitLegado? @relation("KitLegadoRemessa")
 
   @@index([empresaId])
   @@index([empreendimentoId])
@@ -2384,8 +2386,13 @@ model KitLegado {
   tipologia       Tipologia? @relation(fields: [tipologiaId], references: [id], onDelete: SetNull)
   ordemProducaoId String? @unique @map("ordem_producao_id")
   ordemProducao   OrdemProducao? @relation(fields: [ordemProducaoId], references: [id], onDelete: SetNull)
-  contaReceberId  String? @unique @map("conta_receber_id")
-  contaReceber    ContaReceber? @relation(fields: [contaReceberId], references: [id], onDelete: SetNull)
+  // Duas Contas a Receber por kit — Entrada (20%) e Remessa (restante),
+  // igual ao padrão financeiro real. Recalculadas em conjunto sempre
+  // que o kit é salvo de novo. Desenhado com o Henrique em 13/08/2026.
+  contaReceberId          String? @unique @map("conta_receber_id")
+  contaReceber            ContaReceber? @relation("KitLegadoEntrada", fields: [contaReceberId], references: [id], onDelete: SetNull)
+  contaReceberRemessaId   String? @unique @map("conta_receber_remessa_id")
+  contaReceberRemessa     ContaReceber? @relation("KitLegadoRemessa", fields: [contaReceberRemessaId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
