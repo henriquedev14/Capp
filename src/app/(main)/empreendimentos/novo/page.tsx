@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { EmpreendimentoForm } from "@/features/empreendimentos/components/empreendimento-form";
+import { SeletorTipoCadastro } from "@/features/empreendimentos/components/seletor-tipo-cadastro";
 import { usuariosParaOpcoes } from "@/features/empreendimentos/lib/usuarios-para-opcoes";
 import { ClientePrismaRepository } from "@/infra/db/prisma/repositories/cliente-prisma-repository";
 import { UsuarioPrismaRepository } from "@/infra/db/prisma/repositories/usuario-prisma-repository";
@@ -43,11 +44,13 @@ export default async function NovoEmpreendimentoPage() {
         description="Cadastre as informações principais para iniciar o acompanhamento deste empreendimento."
       />
 
-      <EmpreendimentoForm
-        clientesAtivos={opcoesClientes}
-        usuariosAtivos={usuariosParaOpcoes(usuarios)}
-        podeDefinirTier={podeDefinirTier}
-      />
+      <SeletorTipoCadastro clientesAtivos={opcoesClientes}>
+        <EmpreendimentoForm
+          clientesAtivos={opcoesClientes}
+          usuariosAtivos={usuariosParaOpcoes(usuarios)}
+          podeDefinirTier={podeDefinirTier}
+        />
+      </SeletorTipoCadastro>
     </div>
   );
 }
