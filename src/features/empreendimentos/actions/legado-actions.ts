@@ -20,7 +20,9 @@ export interface KitLegadoView {
   quantidadeAprovada: number; // valor real, vindo da Ordem de Produção
   valorContrato: number;
   valorFaturadoInicial: number;
-  saldoAReceber: number; // valor real, vindo da Conta a Receber pendente
+  valorEntrada: number; // 20% do contrato
+  valorPorKit: number; // (contrato - entrada) / quantidadeTotal
+  saldoAReceber: number; // valor real, vindo das Contas a Receber (entrada + remessa)
 }
 
 const LABEL_BANCADA_FINAL = "Finalização";
@@ -75,13 +77,26 @@ export async function salvarKitsLegado(
   for (const k of kits) {
     const existente = await prisma.kitLegado.findUnique({
       where: { empreendimentoId_kit: { empreendimentoId, kit: k.kit } },
-      select: { id: true, tipologiaId: true, ordemProducaoId: true, contaReceberId: true },
+      select: { id: true, tipologiaId: true, ordemProducaoId: true, contaReceberId: true, contaReceberRemessaId: true },
     });
 
-    const saldoAReceber = k.valorContrato - k.valorFaturado;
+    // Padrão financeiro real: 20% de entrada, 80% dividido pela
+    // quantidade de unidades desse kit ("valor por kit"). O que já foi
+    // faturado abate primeiro da entrada, depois do restante. Pedido
+    // pelo Henrique em 13/08/2026.
+    const valorEntradaTotal = Math.round(k.valorContrato * 0.2 * 100) / 100;
+    const valorRemessaTotal = k.valorContrato - valorEntradaTotal;
+    const valorPorKit = k.quantidadeTotal > 0 ? valorRemessaTotal / k.quantidadeTotal : 0;
+
+    const faturadoNaEntrada = Math.min(k.valorFaturado, valorEntradaTotal);
+    const faturadoNaRemessa = Math.max(0, k.valorFaturado - valorEntradaTotal);
+    const saldoEntrada = valorEntradaTotal - faturadoNaEntrada;
+    const saldoRemessa = valorRemessaTotal - faturadoNaRemessa;
+
+    const obsRemessa = `Saldo do contrato legado (kit ${LABEL_KIT[k.kit]}) — valor por kit: R$ ${valorPorKit.toFixed(2)} (${k.quantidadeTotal} un.).`;
 
     if (existente) {
-      // Atualiza os 3 registros de verdade, sem duplicar.
+      // Atualiza os 4 registros de verdade, sem duplicar.
       if (existente.tipologiaId) {
         await prisma.tipologia.update({
           where: { id: existente.tipologiaId },
@@ -99,17 +114,22 @@ export async function salvarKitsLegado(
         });
       }
       if (existente.contaReceberId) {
-        if (saldoAReceber <= 0) {
-          await prisma.contaReceber.update({
-            where: { id: existente.contaReceberId },
-            data: { valor: 0, recebido: true, recebidoEm: new Date() },
-          });
-        } else {
-          await prisma.contaReceber.update({
-            where: { id: existente.contaReceberId },
-            data: { valor: saldoAReceber },
-          });
-        }
+        await prisma.contaReceber.update({
+          where: { id: existente.contaReceberId },
+          data:
+            saldoEntrada <= 0
+              ? { valor: valorEntradaTotal, recebido: true, recebidoEm: new Date() }
+              : { valor: saldoEntrada, recebido: false, recebidoEm: null },
+        });
+      }
+      if (existente.contaReceberRemessaId) {
+        await prisma.contaReceber.update({
+          where: { id: existente.contaReceberRemessaId },
+          data:
+            saldoRemessa <= 0
+              ? { valor: valorRemessaTotal, recebido: true, recebidoEm: new Date(), observacoes: obsRemessa }
+              : { valor: saldoRemessa, recebido: false, recebidoEm: null, observacoes: obsRemessa },
+        });
       }
       await prisma.kitLegado.update({
         where: { id: existente.id },
@@ -123,7 +143,7 @@ export async function salvarKitsLegado(
       continue;
     }
 
-    // Cria os 3 registros de verdade + o KitLegado que amarra tudo.
+    // Cria os 4 registros de verdade + o KitLegado que amarra tudo.
     const tipologia = await prisma.tipologia.create({
       data: {
         empreendimentoId,
@@ -144,18 +164,27 @@ export async function salvarKitsLegado(
       },
     });
 
-    const contaReceber =
-      saldoAReceber > 0
-        ? await prisma.contaReceber.create({
-            data: {
-              empreendimentoId,
-              tipo: "ENTRADA",
-              valor: saldoAReceber,
-              recebido: false,
-              observacoes: `Saldo do contrato legado (kit ${LABEL_KIT[k.kit]}) — valor total R$ ${k.valorContrato.toFixed(2)}, já faturado R$ ${k.valorFaturado.toFixed(2)} antes do cadastro no sistema.`,
-            },
-          })
-        : null;
+    const contaEntrada = await prisma.contaReceber.create({
+      data: {
+        empreendimentoId,
+        tipo: "ENTRADA",
+        valor: saldoEntrada > 0 ? saldoEntrada : valorEntradaTotal,
+        recebido: saldoEntrada <= 0,
+        recebidoEm: saldoEntrada <= 0 ? new Date() : null,
+        observacoes: `Entrada (20%) do contrato legado — kit ${LABEL_KIT[k.kit]}.`,
+      },
+    });
+
+    const contaRemessa = await prisma.contaReceber.create({
+      data: {
+        empreendimentoId,
+        tipo: "REMESSA",
+        valor: saldoRemessa > 0 ? saldoRemessa : valorRemessaTotal,
+        recebido: saldoRemessa <= 0,
+        recebidoEm: saldoRemessa <= 0 ? new Date() : null,
+        observacoes: obsRemessa,
+      },
+    });
 
     await prisma.kitLegado.create({
       data: {
@@ -167,7 +196,8 @@ export async function salvarKitsLegado(
         valorFaturadoInicial: k.valorFaturado,
         tipologiaId: tipologia.id,
         ordemProducaoId: ordemProducao.id,
-        contaReceberId: contaReceber?.id ?? null,
+        contaReceberId: contaEntrada.id,
+        contaReceberRemessaId: contaRemessa.id,
       },
     });
   }
@@ -201,19 +231,29 @@ export async function buscarKitsLegado(empreendimentoId: string): Promise<KitLeg
     include: {
       ordemProducao: { select: { quantidadeAprovada: true } },
       contaReceber: { select: { valor: true, recebido: true } },
+      contaReceberRemessa: { select: { valor: true, recebido: true } },
     },
     orderBy: { kit: "asc" },
   });
 
-  return kits.map((k) => ({
-    id: k.id,
-    kit: k.kit,
-    quantidadeTotal: k.quantidadeTotal,
-    quantidadeAprovada: k.ordemProducao?.quantidadeAprovada ?? k.quantidadeEntregueInicial,
-    valorContrato: Number(k.valorContrato),
-    valorFaturadoInicial: Number(k.valorFaturadoInicial),
-    saldoAReceber: k.contaReceber && !k.contaReceber.recebido ? Number(k.contaReceber.valor) : 0,
-  }));
+  return kits.map((k) => {
+    const saldoEntrada = k.contaReceber && !k.contaReceber.recebido ? Number(k.contaReceber.valor) : 0;
+    const saldoRemessa = k.contaReceberRemessa && !k.contaReceberRemessa.recebido ? Number(k.contaReceberRemessa.valor) : 0;
+    return {
+      id: k.id,
+      kit: k.kit,
+      quantidadeTotal: k.quantidadeTotal,
+      quantidadeAprovada: k.ordemProducao?.quantidadeAprovada ?? k.quantidadeEntregueInicial,
+      valorContrato: Number(k.valorContrato),
+      valorFaturadoInicial: Number(k.valorFaturadoInicial),
+      valorEntrada: Math.round(Number(k.valorContrato) * 0.2 * 100) / 100,
+      valorPorKit:
+        k.quantidadeTotal > 0
+          ? Math.round(((Number(k.valorContrato) - Number(k.valorContrato) * 0.2) / k.quantidadeTotal) * 100) / 100
+          : 0,
+      saldoAReceber: saldoEntrada + saldoRemessa,
+    };
+  });
 }
 
 const LABEL_KIT: Record<string, string> = { ELETRICO: "Elétrico", HIDRAULICO: "Hidráulico", QDC: "QDC" };
