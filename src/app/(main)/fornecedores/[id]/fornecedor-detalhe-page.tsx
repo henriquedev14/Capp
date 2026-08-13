@@ -80,7 +80,7 @@ export default async function FornecedorDetalhePage({
     nome: string;
     vigenciaInicio: string;
     vigenciaFim: string;
-    itens: { id: string; descricao: string; marca: string; unidade: string; valorUnitario: number; prazoEntrega: string | null }[];
+    itens: { id: string; descricao: string; marca: string; unidade: string; valorUnitario: number; prazoEntrega: string | null; atualizadoEm: string }[];
   } | null = null;
   try {
     const tabela = await prisma.tabelaPrecoFornecedor.findFirst({
@@ -101,6 +101,7 @@ export default async function FornecedorDetalhePage({
           unidade: i.unidade,
           valorUnitario: Number(i.valorUnitario),
           prazoEntrega: i.prazoEntrega,
+          atualizadoEm: i.updatedAt.toISOString(),
         })),
       };
     }
