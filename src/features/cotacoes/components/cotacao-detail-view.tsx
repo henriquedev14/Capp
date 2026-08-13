@@ -20,6 +20,7 @@ import {
   deletarCotacao,
 } from "@/features/cotacoes/actions/cotacao-actions";
 import { criarPedidoCompra } from "@/features/suprimentos/actions/pedido-compra-actions";
+import { SincronizarTabelaPrecoButton } from "@/features/cotacoes/components/sincronizar-tabela-preco-button";
 
 export interface CotacaoDetalhe {
   id: string;
@@ -218,6 +219,7 @@ export function CotacaoDetailView({ cotacao }: { cotacao: CotacaoDetalhe }) {
       {/* Barra de ações */}
       <div className="flex flex-wrap items-center gap-2">
         <BotoesFluxoStatus status={cotacao.status} onMudar={handleMudarStatus} />
+        <SincronizarTabelaPrecoButton cotacaoId={cotacao.id} />
         <span className="flex-1" />
         <Button
           variant="outline"
