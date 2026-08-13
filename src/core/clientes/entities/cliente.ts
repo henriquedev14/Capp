@@ -22,6 +22,7 @@ export interface Cliente {
   razaoSocial: string;
   nomeFantasia?: string | null;
   cnpj: string;
+  inscricaoEstadual?: string | null;
   email?: string | null;
   telefone?: string | null;
   logradouro?: string | null;
