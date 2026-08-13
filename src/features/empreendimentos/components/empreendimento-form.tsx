@@ -813,7 +813,7 @@ export function EmpreendimentoForm({
         </div>
 
 
-        {conferenciaUnidades && !conferenciaUnidades.bate && (
+        {ultimaEtapa && conferenciaUnidades && !conferenciaUnidades.bate && (
           <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3">
             <p className="text-sm font-medium text-warning">A soma das tipologias não fecha</p>
             <p className="mt-0.5 text-sm text-warning/90">
