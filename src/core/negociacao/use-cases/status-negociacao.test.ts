@@ -27,8 +27,8 @@ describe("derivarStatusNegociacao", () => {
     expect(derivarStatusNegociacao([interacao("PERDIDA", 1)])).toBe("RECUSADA");
   });
 
-  it("última interação RETORNO_ENGENHARIA reflete isso", () => {
-    expect(derivarStatusNegociacao([interacao("RETORNO_ENGENHARIA", 1)])).toBe("RETORNOU_ENGENHARIA");
+  it("última interação RETORNO_ENGENHARIA volta pra AGUARDANDO_CLIENTE", () => {
+    expect(derivarStatusNegociacao([interacao("RETORNO_ENGENHARIA", 1)])).toBe("AGUARDANDO_CLIENTE");
   });
 
   it("última interação CONTRAPROPOSTA vira Em Revisão", () => {
