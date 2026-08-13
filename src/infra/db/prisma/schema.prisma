@@ -314,6 +314,17 @@ model Empreendimento {
   precoFixoHidraulico Decimal? @map("preco_fixo_hidraulico") @db.Decimal(10, 2)
   precoFixoQdc        Decimal? @map("preco_fixo_qdc") @db.Decimal(10, 2)
 
+  // Modo Legado — pra inserir obras que já estavam em andamento antes
+  // do sistema existir, sem forçar o fluxo completo (levantamento,
+  // orçamento, suprimentos) que elas nunca tiveram. Pedido pelo
+  // Henrique em 12/08/2026: "burla algumas etapas que são travas no
+  // processo convencional" — quando true, a fila de Produção ignora a
+  // checagem de material disponível em Suprimentos só pra esse
+  // empreendimento. Temporário por natureza — ele mesmo disse que vai
+  // desativar depois que os legados forem regularizados.
+  origemLegado Boolean @default(false) @map("origem_legado")
+  kitsLegado   KitLegado[]
+
   registrosProducao RegistroProducao[]
   movimentacoesEstoque MovimentacaoEstoque[]
   estoquePorObra EstoqueEmpreendimentoMaterial[]
@@ -661,6 +672,7 @@ model Tipologia {
   registrosProducao RegistroProducao[]
   ordensProducao OrdemProducao[]
   precosFixos PrecoFixoTipologia[]
+  kitLegado KitLegado?
   marcosOperacionais MarcoOperacional[]
   levantamentosHidraulicos LevantamentoHidraulico[]
   levantamentosMateriais LevantamentoMateriais[]
@@ -2200,6 +2212,8 @@ model ContaReceber {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  kitLegado KitLegado?
+
   @@index([empresaId])
   @@index([empreendimentoId])
   @@index([recebido, dataPrevista])
@@ -2338,6 +2352,48 @@ enum TurnoProducao {
 // Tipologia libera materiais pra aquela bancada — não precisa ninguém
 // criar manualmente. Desenhado em 10/08/2026 com o Henrique, baseado no
 // terminal_producao_hgi.html que ele mandou como referência.
+// Um kit contratado dentro de um empreendimento em Modo Legado — pode
+// ter mais de um (ex: Elétrico E Hidráulico juntos). Cada um gera,
+// automaticamente na criação, uma Tipologia "Legado" + uma Ordem de
+// Produção (já com o que foi entregue até aqui) + uma Conta a Receber
+// (com o valor do contrato) — assim os números entram nos painéis de
+// verdade (Vida da Produção, Financeiro), em vez de ficar isolado
+// só num card. Desenhado com o Henrique em 12-13/08/2026.
+model KitLegado {
+  id String @id @default(cuid())
+
+  empreendimentoId String @map("empreendimento_id")
+  empreendimento   Empreendimento @relation(fields: [empreendimentoId], references: [id], onDelete: Cascade)
+
+  kit String // "ELETRICO" | "HIDRAULICO" | "QDC"
+
+  quantidadeTotal Int @map("quantidade_total")
+  valorContrato   Decimal @map("valor_contrato") @db.Decimal(12, 2)
+
+  // Só na criação — a partir daqui, quem manda de verdade é a Ordem
+  // de Produção (quantidadeAprovada) e a Conta a Receber (recebido).
+  // Esses 2 aqui ficam como "o que foi digitado no cadastro", pra
+  // referência, mas o card "Vida Financeira" sempre lê dos registros
+  // de verdade, não desses campos.
+  quantidadeEntregueInicial Int     @default(0) @map("quantidade_entregue_inicial")
+  valorFaturadoInicial      Decimal @default(0) @map("valor_faturado_inicial") @db.Decimal(12, 2)
+
+  // Ligações com os registros de verdade criados automaticamente —
+  // é a partir deles (não desses campos aqui) que os painéis contam.
+  tipologiaId     String? @unique @map("tipologia_id")
+  tipologia       Tipologia? @relation(fields: [tipologiaId], references: [id], onDelete: SetNull)
+  ordemProducaoId String? @unique @map("ordem_producao_id")
+  ordemProducao   OrdemProducao? @relation(fields: [ordemProducaoId], references: [id], onDelete: SetNull)
+  contaReceberId  String? @unique @map("conta_receber_id")
+  contaReceber    ContaReceber? @relation(fields: [contaReceberId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([empreendimentoId, kit])
+  @@map("kits_legado")
+}
+
 model OrdemProducao {
   id     String @id @default(cuid())
   numero String @unique // "OP-000123", sequencial
@@ -2366,6 +2422,7 @@ model OrdemProducao {
   finalizadaEm DateTime? @map("finalizada_em")
 
   pausas PausaOrdemProducao[]
+  kitLegado KitLegado?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
