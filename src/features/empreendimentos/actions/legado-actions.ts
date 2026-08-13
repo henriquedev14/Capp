@@ -223,3 +223,61 @@ async function proximoNumeroOp(): Promise<string> {
   const proximo = ultima ? parseInt(ultima.numero.slice(3), 10) + 1 : 1;
   return `OP-${String(proximo).padStart(6, "0")}`;
 }
+
+/**
+ * Criação SIMPLIFICADA de empreendimento em Modo Legado — pra quando
+ * não tem nada além do básico (sem torres, sem tipologias detalhadas,
+ * sem planilha de material, sem levantamento). Cria o empreendimento
+ * com o mínimo necessário e já ativa o Legado com os kits informados,
+ * tudo numa ação só. Pedido pelo Henrique em 13/08/2026: "desde o
+ * começo já mostre a opção do legado".
+ */
+export async function criarEmpreendimentoLegado(input: {
+  nome: string;
+  clienteId: string;
+  cidade: string;
+  estado: string;
+  endereco: string;
+  tipo: string;
+  construtora: string;
+  responsavelComercial: string;
+  kits: KitLegadoInput[];
+}): Promise<{ id: string } | { erro: string }> {
+  try {
+    await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : "Não autorizado." };
+  }
+
+  if (!input.nome.trim()) return { erro: "Nome é obrigatório." };
+  if (!input.clienteId) return { erro: "Escolha a construtora/cliente." };
+  if (input.kits.length === 0) return { erro: "Informe pelo menos 1 kit." };
+
+  const { gerarCodigoEmpreendimento } = await import("@/infra/db/codigos");
+  const codigo = await gerarCodigoEmpreendimento();
+
+  const empreendimento = await prisma.empreendimento.create({
+    data: {
+      codigo,
+      nome: input.nome.trim(),
+      clienteId: input.clienteId,
+      cidade: input.cidade.trim(),
+      estado: input.estado.trim().toUpperCase(),
+      endereco: input.endereco.trim(),
+      tipo: input.tipo as never,
+      construtora: input.construtora.trim() || input.nome.trim(),
+      responsavelComercial: input.responsavelComercial.trim() || "—",
+      status: "CONTRATADO",
+      origemLegado: true,
+    },
+  });
+
+  const resultado = await salvarKitsLegado(empreendimento.id, input.kits);
+  if ("erro" in resultado) {
+    // Empreendimento já foi criado — não desfaz, só avisa. É mais
+    // seguro corrigir os kits depois do que perder o cadastro todo.
+    return { erro: `Empreendimento criado, mas houve erro nos kits: ${resultado.erro}` };
+  }
+
+  return { id: empreendimento.id };
+}
