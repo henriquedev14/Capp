@@ -6,6 +6,9 @@ import { ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { EmpreendimentoForm } from "@/features/empreendimentos/components/empreendimento-form";
+import { ModoLegadoCard } from "@/features/empreendimentos/components/modo-legado-card";
+import { buscarKitsLegado } from "@/features/empreendimentos/actions/legado-actions";
+import { prisma } from "@/infra/db/prisma/client";
 import { usuariosParaOpcoes } from "@/features/empreendimentos/lib/usuarios-para-opcoes";
 import { EmpreendimentoPrismaRepository } from "@/infra/db/prisma/repositories/empreendimento-prisma-repository";
 import { ClientePrismaRepository } from "@/infra/db/prisma/repositories/cliente-prisma-repository";
@@ -36,6 +39,13 @@ export default async function EditarEmpreendimentoPage({
 
   if (!empreendimento) notFound();
 
+  // Modo Legado — busca isolada, sem mexer na entidade genérica do
+  // Empreendimento (mesmo padrão seguro já usado na tela de Orçamento).
+  const [legadoInfo, kitsLegado] = await Promise.all([
+    prisma.empreendimento.findUnique({ where: { id: params.id }, select: { origemLegado: true } }),
+    buscarKitsLegado(params.id),
+  ]);
+
   const opcoesClientes = clientesAtivos.map((c) => ({
     value: c.id,
     label: c.nomeFantasia ?? c.razaoSocial,
@@ -65,6 +75,13 @@ export default async function EditarEmpreendimentoPage({
           tipologiasExistentes={tipologiasExistentes}
           podeDefinirTier={podeDefinirTier}
         />
+        <div className="mt-6">
+          <ModoLegadoCard
+            empreendimentoId={empreendimento.id}
+            ativoInicial={legadoInfo?.origemLegado ?? false}
+            kitsIniciais={kitsLegado}
+          />
+        </div>
       </div>
     </div>
   );
