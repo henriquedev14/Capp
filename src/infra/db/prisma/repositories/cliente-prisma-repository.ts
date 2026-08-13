@@ -69,6 +69,7 @@ export class ClientePrismaRepository implements ClienteRepository {
         razaoSocial: data.razaoSocial,
         nomeFantasia: data.nomeFantasia,
         cnpj: data.cnpj,
+        inscricaoEstadual: data.inscricaoEstadual,
         email: data.email,
         telefone: data.telefone,
         logradouro: data.logradouro,
@@ -115,6 +116,7 @@ function toDomain(r: {
   razaoSocial: string;
   nomeFantasia: string | null;
   cnpj: string;
+  inscricaoEstadual: string | null;
   email: string | null;
   telefone: string | null;
   logradouro: string | null;
@@ -143,6 +145,7 @@ function toDomain(r: {
     razaoSocial: r.razaoSocial,
     nomeFantasia: r.nomeFantasia,
     cnpj: r.cnpj,
+    inscricaoEstadual: r.inscricaoEstadual,
     email: r.email,
     telefone: r.telefone,
     logradouro: r.logradouro,
