@@ -179,6 +179,15 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
   const tierOption = getTierOption(tier);
   const temPontosTeto = orcamento?.itensServico.some((i) => i.pontos != null) ?? false;
 
+  // Total de Materiais calculado em tempo real, direto dos itens —
+  // corrigido em 12/08/2026: o campo orcamento.totalMateriais só era
+  // gravado no momento da CRIAÇÃO do orçamento. A função que deveria
+  // recalcular depois (recalcularTotalMateriais) nunca era chamada em
+  // lugar nenhum — 4 pontos diferentes do código adicionam/alteram
+  // itens de material sem nunca atualizar esse campo. Em vez de caçar
+  // os 4 lugares (risco de esquecer um quinto), calcula direto.
+  const totalMateriaisReal = orcamento?.itensMaterial.reduce((s, i) => s + (i.total ?? 0), 0) ?? 0;
+
   // Kits contratados
   const kitsAtivos = [
     empreendimento.kitEletrico && "ELETRICO",
@@ -433,16 +442,13 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
                     <div className="flex flex-col rounded-lg bg-secondary/50 px-4 py-3">
                       <span className="text-xs text-muted-foreground">Materiais</span>
                       <span className="mt-1 text-lg font-semibold tabular-nums">
-                        {formatBRL(orcamento.totalMateriais)}
+                        {formatBRL(totalMateriaisReal)}
                       </span>
                     </div>
                     <div className="flex flex-col rounded-lg bg-primary/8 border border-primary/20 px-4 py-3 sm:col-span-1 col-span-2">
                       <span className="text-xs text-primary font-medium">Total geral</span>
                       <span className="mt-1 text-lg font-bold text-primary tabular-nums">
-                        {formatBRL(
-                          (orcamento.totalServicosHgi ?? 0) +
-                            (orcamento.totalMateriais ?? 0)
-                        )}
+                        {formatBRL((orcamento.totalServicosHgi ?? 0) + totalMateriaisReal)}
                       </span>
                     </div>
                   </div>
@@ -559,7 +565,7 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
               ) : (
                 <CotacoesUnificadas
                   cotacoes={cotacoesDetalhadas}
-                  totalMateriais={orcamento?.totalMateriais ?? 0}
+                  totalMateriais={totalMateriaisReal}
                   aplicarTabelaPrecoSlot={
                     orcamento && (
                       <AplicarTabelaPrecoButton
