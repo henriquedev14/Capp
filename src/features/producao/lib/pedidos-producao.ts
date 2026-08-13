@@ -32,6 +32,7 @@ export async function listarPedidosLiberadosParaProducao(): Promise<PedidoProduc
       codigo: true,
       nome: true,
       status: true,
+      origemLegado: true,
       cliente: { select: { razaoSocial: true, nomeFantasia: true } },
       tipologias: { select: { id: true, nome: true, quantidadeUnidades: true } },
     },
@@ -58,15 +59,26 @@ export async function listarPedidosLiberadosParaProducao(): Promise<PedidoProduc
       // Situação dos materiais — reaproveita a mesma checagem usada pra
       // liberar o início de produção, então nunca diverge entre o que
       // essa tela mostra e o que realmente bloqueia/libera depois.
-      const disponibilidade = await verificarDisponibilidadeParaProducao(emp.id, tipologia.id);
+      //
+      // Exceção: empreendimentos em Modo Legado (obra de antes do
+      // sistema existir) nunca vão ter Levantamento de Materiais
+      // cadastrado — não faz sentido pra dado histórico. Sem essa
+      // exceção, a checagem sempre dava "SEM_LEVANTAMENTO" e a
+      // tipologia nunca aparecia como pronta. Pedido pelo Henrique em
+      // 12-13/08/2026: "ignorar a parte de suprimentos" só pra esses.
       let situacaoMateriais: PedidoProducao["situacaoMateriais"];
       let itensFaltando = 0;
-      if ("erro" in disponibilidade) {
-        situacaoMateriais = "SEM_LEVANTAMENTO";
+      if (emp.origemLegado) {
+        situacaoMateriais = "OK";
       } else {
-        itensFaltando = disponibilidade.itens.filter((i) => i.suficiente === false).length;
-        const temAvulsoParaConferir = disponibilidade.itens.some((i) => i.suficiente === null);
-        situacaoMateriais = itensFaltando > 0 ? "FALTANDO" : temAvulsoParaConferir ? "AVULSO_CONFERIR" : "OK";
+        const disponibilidade = await verificarDisponibilidadeParaProducao(emp.id, tipologia.id);
+        if ("erro" in disponibilidade) {
+          situacaoMateriais = "SEM_LEVANTAMENTO";
+        } else {
+          itensFaltando = disponibilidade.itens.filter((i) => i.suficiente === false).length;
+          const temAvulsoParaConferir = disponibilidade.itens.some((i) => i.suficiente === null);
+          situacaoMateriais = itensFaltando > 0 ? "FALTANDO" : temAvulsoParaConferir ? "AVULSO_CONFERIR" : "OK";
+        }
       }
 
       resultado.push({
