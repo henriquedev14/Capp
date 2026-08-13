@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "itens_tabela_preco" ADD COLUMN "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
