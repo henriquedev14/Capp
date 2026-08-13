@@ -6,6 +6,15 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { criarEmpreendimentoLegado, type KitLegadoInput } from "@/features/empreendimentos/actions/legado-actions";
 
 const LABEL_KIT: Record<string, string> = { ELETRICO: "Elétrico", HIDRAULICO: "Hidráulico", QDC: "QDC" };
+
+function aplicarMascaraCnpj(valor: string): string {
+  const d = valor.replace(/\D/g, "").slice(0, 14);
+  if (d.length <= 2) return d;
+  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
+  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
+  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
 const KITS_DISPONIVEIS = ["ELETRICO", "HIDRAULICO", "QDC"] as const;
 const TIPOS = [
   { value: "RESIDENCIAL_VERTICAL", label: "Residencial Vertical" },
@@ -38,6 +47,9 @@ export function CadastroLegadoForm({ clientesAtivos }: { clientesAtivos: Array<{
   const router = useRouter();
   const [nome, setNome] = React.useState("");
   const [clienteId, setClienteId] = React.useState("");
+  const [cnpjConstrutora, setCnpjConstrutora] = React.useState("");
+  const [buscandoCnpj, setBuscandoCnpj] = React.useState(false);
+  const [cnpjMsg, setCnpjMsg] = React.useState<string | null>(null);
   const [cidade, setCidade] = React.useState("");
   const [estado, setEstado] = React.useState("");
   const [endereco, setEndereco] = React.useState("");
@@ -53,6 +65,30 @@ export function CadastroLegadoForm({ clientesAtivos }: { clientesAtivos: Array<{
   function parseNum(v: string): number {
     const n = parseFloat(v.replace(/\./g, "").replace(",", "."));
     return isNaN(n) ? 0 : n;
+  }
+
+  async function buscarCnpjConstrutora(mascarado: string) {
+    const digitos = mascarado.replace(/\D/g, "");
+    if (digitos.length !== 14) return;
+    setBuscandoCnpj(true);
+    setCnpjMsg(null);
+    try {
+      const resp = await fetch(`/api/cnpj/${digitos}`);
+      const dados = await resp.json();
+      if (!resp.ok) {
+        setCnpjMsg(dados.erro ?? "Não foi possível consultar.");
+        return;
+      }
+      if (dados.razaoSocial) setConstrutora(dados.razaoSocial);
+      if (dados.logradouro) setEndereco(`${dados.logradouro}${dados.numero ? `, ${dados.numero}` : ""}`);
+      if (dados.cidade) setCidade(dados.cidade);
+      if (dados.estado) setEstado(dados.estado);
+      setCnpjMsg(`Encontrado: ${dados.razaoSocial ?? "dados preenchidos"}`);
+    } catch {
+      setCnpjMsg("Erro de conexão ao consultar.");
+    } finally {
+      setBuscandoCnpj(false);
+    }
   }
 
   function atualizarLinha(i: number, campo: keyof LinhaKit, valor: string) {
@@ -152,6 +188,24 @@ export function CadastroLegadoForm({ clientesAtivos }: { clientesAtivos: Array<{
               <label className={labelCls}>UF</label>
               <input value={estado} onChange={(e) => setEstado(e.target.value)} maxLength={2} className={inputCls} />
             </div>
+          </div>
+          <div>
+            <label className={labelCls}>
+              CNPJ da construtora (opcional — preenche os dados sozinho ao completar)
+            </label>
+            <input
+              value={cnpjConstrutora}
+              onChange={(e) => {
+                const mascarado = aplicarMascaraCnpj(e.target.value);
+                setCnpjConstrutora(mascarado);
+                if (mascarado.replace(/\D/g, "").length === 14) buscarCnpjConstrutora(mascarado);
+              }}
+              placeholder="00.000.000/0000-00"
+              inputMode="numeric"
+              className={inputCls}
+            />
+            {buscandoCnpj && <p className="mt-1 text-[11px] text-muted-foreground">Consultando...</p>}
+            {!buscandoCnpj && cnpjMsg && <p className="mt-1 text-[11px] text-muted-foreground">{cnpjMsg}</p>}
           </div>
           <div>
             <label className={labelCls}>Construtora executora (opcional)</label>

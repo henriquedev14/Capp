@@ -13,6 +13,8 @@ interface Kit {
   quantidadeAprovada: number;
   valorContrato: number;
   valorFaturadoInicial: number;
+  valorEntrada: number;
+  valorPorKit: number;
   saldoAReceber: number;
 }
 
@@ -74,8 +76,8 @@ export function VidaFinanceiraCard({ empreendimentoId, kits }: { empreendimentoI
                   <div className="h-full rounded-full bg-warning" style={{ width: `${pctFaturado}%` }} />
                 </div>
                 <p className="mt-1.5 text-[11px] text-muted-foreground">
-                  Contrato: {formatBRL(k.valorContrato)} · Por kit:{" "}
-                  {formatBRL(k.quantidadeTotal > 0 ? k.valorContrato / k.quantidadeTotal : 0)}
+                  Contrato: {formatBRL(k.valorContrato)} · Entrada (20%): {formatBRL(k.valorEntrada)} · Valor por
+                  kit: {formatBRL(k.valorPorKit)}
                 </p>
               </div>
             </div>
