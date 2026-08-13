@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/infra/db/prisma/client";
 import { exigirPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
+import { sincronizarProdutoFornecedor } from "@/features/fornecedores/lib/sincronizar-produto-fornecedor";
 
 export interface PreviewSincronizacao {
   fornecedorNome: string;
@@ -142,8 +143,12 @@ export async function sincronizarTabelaPrecoFornecedor(
       });
     }
     itensAtualizados++;
+    if (item.materialEletricoId) {
+      await sincronizarProdutoFornecedor(cotacao.fornecedorId, item.materialEletricoId, Number(item.precoUnitario));
+    }
   }
 
   revalidatePath(`/fornecedores/${cotacao.fornecedorId}/tabelas-de-preco`);
+  revalidatePath(`/fornecedores/${cotacao.fornecedorId}`);
   return { ok: true, itensAtualizados };
 }
