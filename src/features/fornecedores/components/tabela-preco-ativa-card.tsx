@@ -12,6 +12,11 @@ interface Item {
   unidade: string;
   valorUnitario: number;
   prazoEntrega: string | null;
+  atualizadoEm: string;
+}
+
+function formatDataHora(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 function formatBRL(v: number): string {
@@ -48,13 +53,16 @@ export function TabelaPrecoAtivaCard({
     ? itens.filter((i) => i.descricao.toLowerCase().includes(busca.toLowerCase()))
     : itens;
 
+  const ultimaAtualizacao = itens.reduce<string | null>((max, i) => (!max || i.atualizadoEm > max ? i.atualizadoEm : max), null);
+
   return (
     <div className="rounded-xl border border-border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
         <div>
           <p className="text-sm font-semibold text-foreground">Tabela de Preços Ativa — {nome}</p>
           <p className="text-xs text-muted-foreground">
-            Vigência {formatData(vigenciaInicio)} – {formatData(vigenciaFim)} · {itens.length} item(ns) · clique num
+            Vigência {formatData(vigenciaInicio)} – {formatData(vigenciaFim)} · {itens.length} item(ns)
+            {ultimaAtualizacao && <> · última atualização em {formatDataHora(ultimaAtualizacao)}</>} · clique num
             valor pra editar
           </p>
         </div>
@@ -73,6 +81,7 @@ export function TabelaPrecoAtivaCard({
               <th className="px-4 py-2 text-left font-medium">Descrição</th>
               <th className="px-2 py-2 text-left font-medium">Marca</th>
               <th className="px-2 py-2 text-left font-medium">Prazo</th>
+              <th className="px-2 py-2 text-left font-medium">Atualizado em</th>
               <th className="px-4 py-2 text-right font-medium">Valor Unit.</th>
             </tr>
           </thead>
@@ -82,6 +91,7 @@ export function TabelaPrecoAtivaCard({
                 <td className="px-4 py-2">{item.descricao}</td>
                 <td className="px-2 py-2 text-muted-foreground">{item.marca}</td>
                 <td className="px-2 py-2 text-muted-foreground">{item.prazoEntrega ?? "—"}</td>
+                <td className="px-2 py-2 text-muted-foreground">{formatDataHora(item.atualizadoEm)}</td>
                 <td className="px-4 py-2 text-right">
                   <ValorEditavel itemId={item.id} fornecedorId={fornecedorId} valorAtual={item.valorUnitario} />
                 </td>
@@ -89,7 +99,7 @@ export function TabelaPrecoAtivaCard({
             ))}
             {itensFiltrados.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">
                   Nenhum item encontrado.
                 </td>
               </tr>
@@ -110,6 +120,14 @@ function ValorEditavel({ itemId, fornecedorId, valorAtual }: { itemId: string; f
   async function salvar() {
     const num = parseFloat(valor.replace(/\./g, "").replace(",", "."));
     if (isNaN(num) || num <= 0 || num === valorAtual) {
+      setValor(String(valorAtual).replace(".", ","));
+      setEditando(false);
+      return;
+    }
+    const confirmou = window.confirm(
+      "Essa é a tabela vigente do fornecedor — o valor será atualizado pra qualquer uso futuro. Confirma a alteração?"
+    );
+    if (!confirmou) {
       setValor(String(valorAtual).replace(".", ","));
       setEditando(false);
       return;
