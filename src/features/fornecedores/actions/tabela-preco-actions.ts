@@ -6,6 +6,7 @@ import { prisma } from "@/infra/db/prisma/client";
 import { exigirPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 import { importarTabelaPrecoPadrao } from "@/features/fornecedores/lib/importar-tabela-preco-padrao";
+import { sincronizarProdutoFornecedor } from "@/features/fornecedores/lib/sincronizar-produto-fornecedor";
 
 interface Resultado {
   erro?: string;
@@ -141,6 +142,16 @@ export async function importarTabelaPreco(input: {
   });
 
   revalidatePath(`/fornecedores/${input.fornecedorId}`);
+
+  // Sincroniza com "Produtos e Preços" — a lista que já existe na
+  // página principal do fornecedor. Assim o que foi importado aparece
+  // junto, sem tela separada.
+  for (const l of input.linhas) {
+    if (l.materialEletricoId) {
+      await sincronizarProdutoFornecedor(input.fornecedorId, l.materialEletricoId, l.valorUnitario);
+    }
+  }
+
   return { ok: true, tabelaId: tabela.id };
 }
 
@@ -239,10 +250,15 @@ export async function atualizarValorItemTabelaPreco(
     return { erro: "Valor inválido." };
   }
 
-  await prisma.itemTabelaPreco.update({
+  const item = await prisma.itemTabelaPreco.update({
     where: { id: itemId },
     data: { valorUnitario: novoValor },
+    select: { materialEletricoId: true },
   });
+
+  if (item.materialEletricoId) {
+    await sincronizarProdutoFornecedor(fornecedorId, item.materialEletricoId, novoValor);
+  }
 
   revalidatePath(`/fornecedores/${fornecedorId}`);
   revalidatePath(`/fornecedores/${fornecedorId}/tabelas-de-preco`);
