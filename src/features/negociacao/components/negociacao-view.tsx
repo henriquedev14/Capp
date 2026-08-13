@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Phone, MessageSquare, CheckCircle2, XCircle, RotateCcw, Loader2, History } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { registrarInteracao } from "@/features/negociacao/actions/negociacao-actions";
+import { registrarInteracao, reverterAprovacaoNegociacao } from "@/features/negociacao/actions/negociacao-actions";
 import { ModalConfirmarContrato } from "@/features/negociacao/components/modal-confirmar-contrato";
 import type { CotacaoDetalhe } from "@/features/cotacoes/components/cotacao-detail-view";
 import type { InteracaoTimeline } from "@/features/negociacao/actions/negociacao-actions";
@@ -65,6 +65,25 @@ export function NegociacaoView({
   followUpVencido,
 }: Props) {
   const router = useRouter();
+  const [revertendo, setRevertendo] = React.useState(false);
+
+  async function handleReverterAprovacao() {
+    if (
+      !window.confirm(
+        "Reverter a aprovação? O Contrato e as Contas a Receber gerados automaticamente serão apagados. Essa ação não pode ser desfeita."
+      )
+    ) {
+      return;
+    }
+    setRevertendo(true);
+    try {
+      const r = await reverterAprovacaoNegociacao(empreendimentoId);
+      if ("erro" in r) alert(r.erro);
+      else router.refresh();
+    } finally {
+      setRevertendo(false);
+    }
+  }
   const [formAberto, setFormAberto] = React.useState<FormAberto>(null);
   const [modalContratoAberto, setModalContratoAberto] = React.useState(false);
   const [valorNegociado, setValorNegociado] = React.useState(valorAtual);
@@ -169,6 +188,24 @@ export function NegociacaoView({
                 <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
                 Retornar p/ Engenharia
               </Button>
+            </div>
+          )}
+
+          {status === "APROVADA" && (
+            <div className="mt-5">
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-warning/40 text-warning"
+                onClick={handleReverterAprovacao}
+                disabled={revertendo}
+              >
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                {revertendo ? "Revertendo..." : "Reverter aprovação"}
+              </Button>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Apaga o Contrato e as Contas a Receber gerados automaticamente, e volta a negociação pra revisão.
+              </p>
             </div>
           )}
 
