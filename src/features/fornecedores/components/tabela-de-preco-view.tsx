@@ -14,6 +14,7 @@ import {
   buscarTabelaPrecoComItens,
   excluirTabelaPreco,
   atualizarStatusTabelaPreco,
+  atualizarValorItemTabelaPreco,
 } from "@/features/fornecedores/actions/tabela-preco-actions";
 
 interface LinhaValidada {
@@ -396,7 +397,13 @@ export function TabelaDePrecoView({ fornecedorId, tabelasIniciais }: Props) {
                       <td className="px-3 py-2">{item.descricao}</td>
                       <td className="px-2 py-2 text-muted-foreground">{item.marca}</td>
                       <td className="px-2 py-2 text-muted-foreground">{item.prazoEntrega ?? "—"}</td>
-                      <td className="px-2 py-2 text-right tabular-nums">{formatBRL(item.valorUnitario)}</td>
+                      <td className="px-2 py-2 text-right">
+                        <ValorItemEditavel
+                          itemId={item.id}
+                          fornecedorId={fornecedorId}
+                          valorAtual={item.valorUnitario}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -406,5 +413,76 @@ export function TabelaDePrecoView({ fornecedorId, tabelasIniciais }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Célula de valor editável — clica, digita, sai do campo e salva
+ * sozinho. Pedido pelo Henrique em 12/08/2026, junto com poder ver os
+ * itens importados sem precisar procurar.
+ */
+function ValorItemEditavel({
+  itemId,
+  fornecedorId,
+  valorAtual,
+}: {
+  itemId: string;
+  fornecedorId: string;
+  valorAtual: number;
+}) {
+  const router = useRouter();
+  const [editando, setEditando] = React.useState(false);
+  const [valor, setValor] = React.useState(String(valorAtual).replace(".", ","));
+  const [salvando, setSalvando] = React.useState(false);
+
+  async function salvar() {
+    const num = parseFloat(valor.replace(/\./g, "").replace(",", "."));
+    if (isNaN(num) || num <= 0) {
+      setValor(String(valorAtual).replace(".", ","));
+      setEditando(false);
+      return;
+    }
+    if (num === valorAtual) {
+      setEditando(false);
+      return;
+    }
+    setSalvando(true);
+    try {
+      await atualizarValorItemTabelaPreco(itemId, fornecedorId, num);
+      router.refresh();
+    } finally {
+      setSalvando(false);
+      setEditando(false);
+    }
+  }
+
+  if (editando) {
+    return (
+      <input
+        autoFocus
+        value={valor}
+        onChange={(e) => setValor(e.target.value)}
+        onBlur={salvar}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") {
+            setValor(String(valorAtual).replace(".", ","));
+            setEditando(false);
+          }
+        }}
+        disabled={salvando}
+        className="h-7 w-24 rounded border border-primary/40 bg-background px-2 text-right text-sm tabular-nums outline-none"
+      />
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setEditando(true)}
+      className="tabular-nums text-foreground hover:text-primary hover:underline"
+      title="Clique pra editar"
+    >
+      {formatBRL(valorAtual)}
+    </button>
   );
 }
