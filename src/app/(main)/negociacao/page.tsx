@@ -1,7 +1,9 @@
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
 import { PageHeader } from "@/components/layout/page-header";
+import { authOptions } from "@/infra/auth/auth-options.full";
 import { temPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 import { buscarHubNegociacoes } from "@/features/negociacao/actions/negociacao-actions";
@@ -16,7 +18,12 @@ export default async function NegociacaoHubPage() {
   const podeVer = await temPermissao(PERMISSOES.ORCAMENTO_VER);
   if (!podeVer) redirect("/painel");
 
-  const linhas = await buscarHubNegociacoes();
+  // Comercial só vê a própria carteira — achado pelo Henrique em
+  // 13/08/2026, mesma restrição que já existia na Engenharia.
+  const session = await getServerSession(authOptions);
+  const restringirAosProprios = await temPermissao(PERMISSOES.EMPREENDIMENTO_VER_APENAS_PROPRIOS);
+
+  const linhas = await buscarHubNegociacoes(restringirAosProprios ? session?.user?.id : undefined);
 
   return (
     <div className="flex flex-col gap-6">
