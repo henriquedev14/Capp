@@ -35,6 +35,7 @@ export function ClienteForm({ cliente, podeDefinirTier = false }: ClienteFormPro
       razaoSocial: cliente?.razaoSocial ?? "",
       nomeFantasia: cliente?.nomeFantasia ?? "",
       cnpj: cliente?.cnpj ?? "",
+      inscricaoEstadual: cliente?.inscricaoEstadual ?? "",
       email: cliente?.email ?? "",
       telefone: cliente?.telefone ?? "",
       logradouro: cliente?.logradouro ?? "",
@@ -122,6 +123,12 @@ export function ClienteForm({ cliente, podeDefinirTier = false }: ClienteFormPro
               estado: "estado",
               cep: "cep",
             }}
+          />
+          <TextFormField
+            control={form.control}
+            name="inscricaoEstadual"
+            label="Inscrição Estadual"
+            placeholder="Opcional"
           />
           <TextFormField
             control={form.control}
