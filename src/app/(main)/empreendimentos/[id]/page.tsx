@@ -18,6 +18,7 @@ import {
   Lock,
   Eye,
   AlertTriangle,
+  Wallet,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -522,6 +523,15 @@ export default async function EmpreendimentoDetalhePage({
                 return { label: "Em andamento", cor: "warning" as const };
               return undefined;
             })()}
+            statusEmpreendimento={empreendimento.status}
+            fasesLiberadas={FASES_PRODUCAO_LIBERADAS}
+            fasesConsulta={FASES_PRODUCAO_CONSULTA}
+          />
+          <ModuloComGate
+            icon={Wallet}
+            titulo="Financeiro"
+            descricao="Contas a Receber e Contrato desse empreendimento"
+            href={`/empreendimentos/${empreendimento.id}/financeiro`}
             statusEmpreendimento={empreendimento.status}
             fasesLiberadas={FASES_PRODUCAO_LIBERADAS}
             fasesConsulta={FASES_PRODUCAO_CONSULTA}
