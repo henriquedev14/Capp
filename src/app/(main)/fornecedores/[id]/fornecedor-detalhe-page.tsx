@@ -23,6 +23,7 @@ import { TipoBadge } from "@/features/fornecedores/components/tipo-badge";
 import { GerenciarContatosFornecedor } from "@/features/fornecedores/components/gerenciar-contatos-fornecedor";
 import { AtivarInativarFornecedorButton } from "@/features/fornecedores/components/ativar-inativar-fornecedor-button";
 import { ProdutosFornecedorManager } from "@/features/fornecedores/components/produtos-fornecedor-manager";
+import { TabelaPrecoAtivaCard } from "@/features/fornecedores/components/tabela-preco-ativa-card";
 import { FornecedorPrismaRepository } from "@/infra/db/prisma/repositories/fornecedor-prisma-repository";
 import { prisma } from "@/infra/db/prisma/client";
 import { cn } from "@/lib/utils";
@@ -69,6 +70,44 @@ export default async function FornecedorDetalhePage({
     };
   }[] = [];
   let erroProdutos: string | null = null;
+
+  // Tabela de Preços ATIVA — mostrada direto aqui na página principal,
+  // com os itens editáveis. Antes só aparecia numa sub-página
+  // separada, escondida, sem edição individual (só re-importar tudo
+  // de novo). Pedido pelo Henrique em 12/08/2026.
+  let tabelaAtivaComItens: {
+    id: string;
+    nome: string;
+    vigenciaInicio: string;
+    vigenciaFim: string;
+    itens: { id: string; descricao: string; marca: string; unidade: string; valorUnitario: number; prazoEntrega: string | null }[];
+  } | null = null;
+  try {
+    const tabela = await prisma.tabelaPrecoFornecedor.findFirst({
+      where: { fornecedorId: params.id, status: "ATIVA" },
+      include: { itens: { orderBy: { descricao: "asc" } } },
+      orderBy: { dataImportacao: "desc" },
+    });
+    if (tabela) {
+      tabelaAtivaComItens = {
+        id: tabela.id,
+        nome: tabela.nome,
+        vigenciaInicio: tabela.vigenciaInicio.toISOString(),
+        vigenciaFim: tabela.vigenciaFim.toISOString(),
+        itens: tabela.itens.map((i) => ({
+          id: i.id,
+          descricao: i.descricao,
+          marca: i.marca,
+          unidade: i.unidade,
+          valorUnitario: Number(i.valorUnitario),
+          prazoEntrega: i.prazoEntrega,
+        })),
+      };
+    }
+  } catch (e) {
+    console.error("[fornecedor/page] erro ao carregar tabela de preços ativa:", e);
+  }
+
   try {
     const produtos = await prisma.produtoFornecedor.findMany({
       where: { fornecedorId: params.id },
@@ -340,6 +379,16 @@ export default async function FornecedorDetalhePage({
           )}
         </CardContent>
       </Card>
+
+      {tabelaAtivaComItens && (
+        <TabelaPrecoAtivaCard
+          fornecedorId={fornecedor.id}
+          nome={tabelaAtivaComItens.nome}
+          vigenciaInicio={tabelaAtivaComItens.vigenciaInicio}
+          vigenciaFim={tabelaAtivaComItens.vigenciaFim}
+          itens={tabelaAtivaComItens.itens}
+        />
+      )}
     </div>
   );
 }
