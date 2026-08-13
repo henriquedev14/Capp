@@ -221,3 +221,30 @@ export async function atualizarStatusTabelaPreco(
   revalidatePath(`/fornecedores/${fornecedorId}`);
   return { ok: true };
 }
+
+/**
+ * Edita o valor de UM item já importado, sem precisar re-importar a
+ * planilha inteira. Pedido pelo Henrique em 12/08/2026: os itens
+ * importados ficavam visíveis só dentro de um modal, sem poder editar
+ * — qualquer ajuste de preço exigia subir a planilha de novo.
+ */
+export async function atualizarValorItemTabelaPreco(
+  itemId: string,
+  fornecedorId: string,
+  novoValor: number
+): Promise<Resultado> {
+  await exigirPermissao(PERMISSOES.FORNECEDOR_GERENCIAR_PRECOS);
+
+  if (!Number.isFinite(novoValor) || novoValor <= 0) {
+    return { erro: "Valor inválido." };
+  }
+
+  await prisma.itemTabelaPreco.update({
+    where: { id: itemId },
+    data: { valorUnitario: novoValor },
+  });
+
+  revalidatePath(`/fornecedores/${fornecedorId}`);
+  revalidatePath(`/fornecedores/${fornecedorId}/tabelas-de-preco`);
+  return { ok: true };
+}
