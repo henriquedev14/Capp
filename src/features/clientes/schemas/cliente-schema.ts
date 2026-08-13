@@ -58,6 +58,7 @@ export const clienteSchema = z.object({
   razaoSocial: z.string().min(3, "Informe a razão social"),
   nomeFantasia: z.string().optional(),
   cnpj: cnpjSchema,
+  inscricaoEstadual: z.string().optional(),
   email: z.string().email("E-mail inválido").optional().or(z.literal("")),
   telefone: telefoneSchema,
   logradouro: z.string().optional(),
