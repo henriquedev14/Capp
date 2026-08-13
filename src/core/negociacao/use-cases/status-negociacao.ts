@@ -33,6 +33,11 @@ export function derivarStatusNegociacao(interacoes: InteracaoParaStatus[]): Stat
       return "RETORNOU_ENGENHARIA";
     case "CONTRAPROPOSTA":
       return "EM_REVISAO";
+    // Reverter uma aprovação volta a negociação pra EM_REVISAO — não
+    // pro zero (AGUARDANDO_CLIENTE), já que a conversa com o cliente
+    // já estava adiantada. Pedido pelo Henrique em 13/08/2026.
+    case "APROVACAO_REVERTIDA":
+      return "EM_REVISAO";
     default:
       return "AGUARDANDO_CLIENTE";
   }
