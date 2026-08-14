@@ -15,6 +15,7 @@ export function KpiCard({
   tone = "default",
   icon: Icon,
   href,
+  onClick,
 }: {
   label: string;
   value: string | number;
@@ -23,6 +24,8 @@ export function KpiCard({
   tone?: "default" | "success" | "warning" | "danger" | "primary";
   icon?: React.ComponentType<{ className?: string }>;
   href?: string;
+  /** Abre o drill-down padrão em vez de navegar — usar em vez de `href` quando o KPI tem drill-down configurado. */
+  onClick?: () => void;
 }) {
   const toneClasses = {
     default: "border-border",
@@ -55,7 +58,8 @@ export function KpiCard({
         "before:absolute before:inset-y-0 before:left-0 before:w-1",
         toneClasses,
         acentoLateral,
-        href && "transition-shadow hover:shadow-card-md cursor-pointer"
+        href && "transition-shadow hover:shadow-card-md cursor-pointer",
+        onClick && "transition-shadow hover:shadow-card-md cursor-pointer"
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -73,6 +77,14 @@ export function KpiCard({
       )}
     </div>
   );
+
+  if (onClick) {
+    return (
+      <button onClick={onClick} className="block w-full text-left">
+        {conteudo}
+      </button>
+    );
+  }
 
   return href ? (
     <Link href={href} className="block">
