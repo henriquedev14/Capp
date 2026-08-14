@@ -20,6 +20,31 @@ export function VidaFinanceiraView({ dados }: { dados: VidaFinanceira }) {
 
   return (
     <div className="flex flex-col gap-6">
+      {dados.origemLegado && dados.legado && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <div className="rounded-lg border border-border bg-card p-3.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Contratado</p>
+            <p className="mt-1 text-base font-bold tabular-nums text-foreground">{formatBRL(dados.totalContratado)}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-3.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Faturado (histórico)</p>
+            <p className="mt-1 text-base font-bold tabular-nums text-foreground">{formatBRL(dados.legado.faturadoHistoricoReal)}</p>
+          </div>
+          <div className="rounded-lg border border-success/30 bg-success/5 p-3.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-success">Recebido</p>
+            <p className="mt-1 text-base font-bold tabular-nums text-success">{formatBRL(dados.totalRecebido)}</p>
+          </div>
+          <div className="rounded-lg border border-warning/30 bg-warning/5 p-3.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-warning">A faturar</p>
+            <p className="mt-1 text-base font-bold tabular-nums text-warning">{formatBRL(dados.legado.saldoAFaturar)}</p>
+          </div>
+          <div className="rounded-lg border border-warning/30 bg-warning/5 p-3.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-warning">A receber</p>
+            <p className="mt-1 text-base font-bold tabular-nums text-warning">{formatBRL(dados.saldoAReceber)}</p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Valor total</p>
@@ -42,6 +67,14 @@ export function VidaFinanceiraView({ dados }: { dados: VidaFinanceira }) {
           <p className="mt-1.5 text-2xl font-bold tabular-nums text-warning">{formatBRL(dados.saldoAReceber)}</p>
         </div>
       </div>
+
+      {dados.origemLegado && dados.legado && dados.legado.previstoAReceberPosErp > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Títulos gerados desde a implantação (previsão, não necessariamente já faturado):{" "}
+          <span className="font-medium text-foreground">{formatBRL(dados.legado.previstoAReceberPosErp)}</span>
+        </p>
+      )}
+
 
       <div className="rounded-xl border border-border bg-card">
         <div className="border-b border-border px-5 py-3.5">
