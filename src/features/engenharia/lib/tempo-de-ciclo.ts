@@ -1,24 +1,5 @@
 import { prisma } from "@/infra/db/prisma/client";
-
-/**
- * Conta dias ÚTEIS entre duas datas (exclui sábado e domingo) — a
- * operação não roda no fim de semana, então "5 dias parado" de
- * sexta pra segunda não deveria contar como atraso real.
- */
-function diasUteisEntre(inicio: Date, fim: Date): number {
-  let dias = 0;
-  const atual = new Date(inicio);
-  atual.setHours(0, 0, 0, 0);
-  const fimSemHora = new Date(fim);
-  fimSemHora.setHours(0, 0, 0, 0);
-
-  while (atual < fimSemHora) {
-    atual.setDate(atual.getDate() + 1);
-    const diaSemana = atual.getDay(); // 0 = domingo, 6 = sábado
-    if (diaSemana !== 0 && diaSemana !== 6) dias++;
-  }
-  return Math.max(0, dias);
-}
+import { diasUteisEntre } from "@/core/analytics/calendario-operacional";
 
 export interface LinhaTempoLevantamento {
   empreendimentoId: string;
