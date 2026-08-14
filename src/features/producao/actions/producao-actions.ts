@@ -16,6 +16,7 @@ import {
   calcularComprimentoReal,
   calcularComprimentoEletroduto,
 } from "@/core/empreendimentos/entities/levantamento-eletrico";
+import { contarDiasUteis } from "@/core/analytics/calendario-operacional";
 
 function revalidar() {
   revalidatePath("/producao");
@@ -90,6 +91,28 @@ export async function atualizarMetaProducaoDiaria(valor: number): Promise<{ ok: 
     where: { id: "default" },
     update: { metaProducaoDiariaUH: valor },
     create: { id: "default", metaProducaoDiariaUH: valor },
+  });
+  revalidar();
+  return { ok: true };
+}
+
+
+export async function buscarMetaKitsFinalizadosDia(): Promise<number> {
+  const config = await prisma.configuracaoSistema.findUnique({ where: { id: "default" } });
+  return Number(config?.metaKitsFinalizadosDia ?? 50);
+}
+
+export async function atualizarMetaKitsFinalizadosDia(valor: number): Promise<{ ok: true } | { erro: string }> {
+  try {
+    await exigirPermissao(PERMISSOES.PRODUCAO_GERENCIAR_CADASTRO);
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : "Não autorizado." };
+  }
+  if (valor <= 0) return { erro: "A meta precisa ser maior que zero." };
+  await prisma.configuracaoSistema.upsert({
+    where: { id: "default" },
+    update: { metaKitsFinalizadosDia: valor },
+    create: { id: "default", metaKitsFinalizadosDia: valor },
   });
   revalidar();
   return { ok: true };
@@ -454,9 +477,9 @@ export async function calcularProdutividadePorOperador(
     buscarMetaProducaoDiaria(),
   ]);
 
-  // Meta do período = meta diária × quantos dias o período cobre — pra
-  // comparar de forma justa um "hoje" (1 dia) contra uma "semana" (7 dias).
-  const dias = Math.max(1, Math.round((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
+  // Meta usa calendário operacional centralizado (segunda a sexta).
+  // Dias corridos inflavam artificialmente a meta em fins de semana.
+  const dias = contarDiasUteis(inicio, fim);
   const metaPeriodoUH = metaDiaria * dias;
 
   const chaves = new Map<string, ProdutividadeLinha>();
@@ -594,16 +617,19 @@ export interface KitsFinalizados {
 }
 
 export async function contarKitsFinalizados(inicio: Date, fim: Date): Promise<KitsFinalizados> {
-  const bancadaFinalizacao = await prisma.bancada.findUnique({ where: { nome: "Finalização" } });
-  if (!bancadaFinalizacao) return { quantidade: 0, meta: 50, percentual: 0 };
+  const [bancadaFinalizacao, metaDiariaKits] = await Promise.all([
+    prisma.bancada.findUnique({ where: { nome: "Finalização" } }),
+    buscarMetaKitsFinalizadosDia(),
+  ]);
+  if (!bancadaFinalizacao) return { quantidade: 0, meta: 0, percentual: 0 };
 
   const soma = await prisma.registroProducao.aggregate({
     where: { bancadaId: bancadaFinalizacao.id, createdAt: { gte: inicio, lt: fim } },
     _sum: { unidadesConcluidas: true },
   });
 
-  const dias = Math.max(1, Math.round((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)));
-  const meta = 50 * dias;
+  const dias = contarDiasUteis(inicio, fim);
+  const meta = metaDiariaKits * dias;
   const quantidade = soma._sum.unidadesConcluidas ?? 0;
 
   return { quantidade, meta, percentual: meta > 0 ? quantidade / meta : 0 };
