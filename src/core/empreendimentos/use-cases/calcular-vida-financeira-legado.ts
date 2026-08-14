@@ -30,7 +30,6 @@ export interface VidaFinanceiraLegado {
   faturadoHistoricoReal: number;
   previstoAReceberPosErp: number;
   recebidoTotal: number;
-  saldoAFaturar: number;
   saldoAReceber: number;
 }
 
@@ -45,7 +44,6 @@ export function calcularVidaFinanceiraLegado(dados: DadosVidaFinanceiraLegado): 
     faturadoHistoricoReal: dados.faturadoHistorico ?? 0,
     previstoAReceberPosErp,
     recebidoTotal,
-    saldoAFaturar: valorContratado - (dados.faturadoHistorico ?? 0),
     saldoAReceber: valorContratado - recebidoTotal,
   };
 }
