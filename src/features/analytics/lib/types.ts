@@ -22,10 +22,22 @@ export interface RiscoAnalytics {
   href: string;
 }
 
+export interface EngenhariaPessoaDisciplinaResumo {
+  disciplina: "ELETRICA" | "HIDRAULICA" | "MATERIAIS";
+  wip: number;
+  backlogPontos: number;
+  entreguePontos: number;
+}
+
+// UMA LINHA POR PESSOA — não por pessoa×disciplina. Achado pelo
+// Henrique em 14/08/2026: a tabela repetia a mesma pessoa em várias
+// linhas quando atuava em mais de uma disciplina. `disciplinas` lista
+// todas em que a pessoa atuou; `porDisciplina` é o detalhe pro drawer.
 export interface EngenhariaPessoaAnalytics {
   usuarioId: string;
   nome: string;
-  disciplina: "ELETRICA" | "HIDRAULICA" | "MATERIAIS";
+  disciplinas: Array<"ELETRICA" | "HIDRAULICA" | "MATERIAIS">;
+  porDisciplina: EngenhariaPessoaDisciplinaResumo[];
   wip: number;
   backlogPontos: number;
   entreguePontos: number;
@@ -87,6 +99,7 @@ export interface AnalyticsData {
   };
   engenharia: {
     backlog: number;
+    entregue30dPontos: number;
     validados30d: number;
     foraSla: number;
     complexidadeBacklog: number;
