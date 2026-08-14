@@ -33,8 +33,8 @@ import { ExcluirEmpreendimentoButton } from "@/features/empreendimentos/componen
 import { MenuAcoesSecundarias } from "@/components/ui/menu-acoes-secundarias";
 import { JornadaEmpreendimento } from "@/features/empreendimentos/components/jornada-empreendimento";
 import { calcularStatusProducaoEmpreendimento } from "@/features/producao/lib/gestao-producao";
-import { VidaFinanceiraCard } from "@/features/empreendimentos/components/vida-financeira-card";
 import { buscarKitsLegado } from "@/features/empreendimentos/actions/legado-actions";
+import { PipelineLegadoView } from "@/features/empreendimentos/components/pipeline-legado-view";
 import { TIPOS_EMPREENDIMENTO, TIPOS_ESTRUTURA } from "@/features/empreendimentos/constants";
 import { EmpreendimentoPrismaRepository } from "@/infra/db/prisma/repositories/empreendimento-prisma-repository";
 import { UsuarioPrismaRepository } from "@/infra/db/prisma/repositories/usuario-prisma-repository";
@@ -184,6 +184,8 @@ export default async function EmpreendimentoDetalhePage({
         <ArrowLeft className="h-4 w-4" />
         Voltar para Empreendimentos
       </Link>
+
+      {kitsLegado.length > 0 && <PipelineLegadoView />}
 
       {/* Cabeçalho com status em destaque */}
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -537,11 +539,6 @@ export default async function EmpreendimentoDetalhePage({
             fasesConsulta={FASES_PRODUCAO_CONSULTA}
           />
         </div>
-        {kitsLegado.length > 0 && (
-          <div className="mt-6">
-            <VidaFinanceiraCard empreendimentoId={empreendimento.id} kits={kitsLegado} />
-          </div>
-        )}
       </div>
     </div>
   );
