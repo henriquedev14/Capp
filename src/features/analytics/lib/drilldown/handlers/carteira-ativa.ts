@@ -16,7 +16,7 @@ export const carteiraAtivaHandler: DrilldownHandler = {
   formatoValor: "numero",
   async buscar(filtros: DrilldownFiltros, pagina, tamanhoPagina) {
     const where = {
-      status: { notIn: ["CONCLUIDO", "ARQUIVADO"] as const },
+      status: { notIn: ["CONCLUIDO", "ARQUIVADO"] as ("CONCLUIDO" | "ARQUIVADO")[] },
       excluidoEm: null,
       ...(filtros.clienteId && { clienteId: filtros.clienteId }),
       ...(filtros.empreendimentoId && { id: filtros.empreendimentoId }),
