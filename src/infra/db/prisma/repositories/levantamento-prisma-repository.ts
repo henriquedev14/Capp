@@ -1,4 +1,5 @@
 import { prisma } from "@/infra/db/prisma/client";
+import { garantirControleEngenharia, registrarRetrabalhoEngenharia } from "@/features/engenharia/lib/controle-produtividade";
 import { CIRCUITOS_PADRAO } from "@/core/empreendimentos/entities/circuitos-padrao";
 import type {
   LevantamentoEletrico,
@@ -168,7 +169,10 @@ export class LevantamentoPrismaRepository {
     usuarioId?: string
   ): Promise<LevantamentoEletrico> {
     const existente = await this.buscarPorTipologia(empreendimentoId, tipologiaId);
-    if (existente) return existente;
+    if (existente) {
+      await garantirControleEngenharia({ tipo: "ELETRICA", referenciaId: existente.id, empreendimentoId, tipologiaId, executorId: existente.criadoPorId });
+      return existente;
+    }
 
     // Inicia catálogo padrão se ainda não existe
     const totalCatalogo = await prisma.circuitoCatalogo.count({ where: { empreendimentoId } });
@@ -183,6 +187,8 @@ export class LevantamentoPrismaRepository {
         pecas: { include: PECA_INCLUDE, orderBy: { numero: "asc" } },
       },
     });
+
+    await garantirControleEngenharia({ tipo: "ELETRICA", referenciaId: r.id, empreendimentoId, tipologiaId, executorId: usuarioId ?? null });
 
     return {
       id: r.id,
@@ -286,6 +292,10 @@ export class LevantamentoPrismaRepository {
       where: { id },
       data: { status: "VALIDADO", validadoEm: new Date(), validadoPorId: usuarioId },
     });
+    await garantirControleEngenharia({
+      tipo: "ELETRICA", referenciaId: levantamento.id, empreendimentoId: levantamento.empreendimentoId,
+      tipologiaId: levantamento.tipologiaId, executorId: levantamento.criadoPorId,
+    });
     await prisma.marcoOperacional.create({
       data: {
         empreendimentoId: levantamento.empreendimentoId,
@@ -296,9 +306,21 @@ export class LevantamentoPrismaRepository {
   }
 
   async voltarParaRascunho(id: string): Promise<void> {
-    await prisma.levantamentoEletrico.update({
+    const anterior = await prisma.levantamentoEletrico.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    const levantamento = await prisma.levantamentoEletrico.update({
       where: { id },
       data: { status: "RASCUNHO", validadoEm: null },
     });
+    // Retrabalho só existe quando algo que já estava VALIDADO volta para edição.
+    // Chamadas idempotentes em um RASCUNHO não podem inflar o indicador.
+    if (anterior?.status === "VALIDADO") {
+      await registrarRetrabalhoEngenharia({
+        tipo: "ELETRICA", referenciaId: levantamento.id, empreendimentoId: levantamento.empreendimentoId,
+        tipologiaId: levantamento.tipologiaId, executorId: levantamento.criadoPorId,
+      });
+    }
   }
 }

@@ -1,4 +1,5 @@
 import { prisma } from "@/infra/db/prisma/client";
+import { garantirControleEngenharia, registrarRetrabalhoEngenharia } from "@/features/engenharia/lib/controle-produtividade";
 import type {
   LevantamentoMateriais,
   ItemLevantamentoMaterial,
@@ -151,12 +152,16 @@ export class LevantamentoMateriaisPrismaRepository {
 
   async criarOuBuscar(empreendimentoId: string, tipologiaId: string, usuarioId?: string): Promise<LevantamentoMateriais> {
     const existente = await this.buscar(empreendimentoId, tipologiaId);
-    if (existente) return existente;
+    if (existente) {
+      await garantirControleEngenharia({ tipo: "MATERIAIS", referenciaId: existente.id, empreendimentoId, tipologiaId, executorId: existente.criadoPorId });
+      return existente;
+    }
 
     const r = await prisma.levantamentoMateriais.create({
       data: { empreendimentoId, tipologiaId, criadoPorId: usuarioId },
       include: { tipologia: { select: { nome: true } }, ...ITENS_INCLUDE },
     });
+    await garantirControleEngenharia({ tipo: "MATERIAIS", referenciaId: r.id, empreendimentoId, tipologiaId, executorId: usuarioId ?? null });
     return {
       id: r.id,
       empreendimentoId: r.empreendimentoId,
@@ -229,6 +234,10 @@ export class LevantamentoMateriaisPrismaRepository {
       where: { id },
       data: { status: "VALIDADO", validadoEm: new Date(), validadoPorId: usuarioId },
     });
+    await garantirControleEngenharia({
+      tipo: "MATERIAIS", referenciaId: levantamento.id, empreendimentoId: levantamento.empreendimentoId,
+      tipologiaId: levantamento.tipologiaId, executorId: levantamento.criadoPorId,
+    });
     await prisma.marcoOperacional.create({
       data: {
         empreendimentoId: levantamento.empreendimentoId,
@@ -239,6 +248,21 @@ export class LevantamentoMateriaisPrismaRepository {
   }
 
   async voltarParaRascunho(id: string): Promise<void> {
-    await prisma.levantamentoMateriais.update({ where: { id }, data: { status: "RASCUNHO", validadoEm: null } });
+    const anterior = await prisma.levantamentoMateriais.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    const levantamento = await prisma.levantamentoMateriais.update({
+      where: { id },
+      data: { status: "RASCUNHO", validadoEm: null },
+    });
+    // Retrabalho só existe quando algo que já estava VALIDADO volta para edição.
+    // Chamadas idempotentes em um RASCUNHO não podem inflar o indicador.
+    if (anterior?.status === "VALIDADO") {
+      await registrarRetrabalhoEngenharia({
+        tipo: "MATERIAIS", referenciaId: levantamento.id, empreendimentoId: levantamento.empreendimentoId,
+        tipologiaId: levantamento.tipologiaId, executorId: levantamento.criadoPorId,
+      });
+    }
   }
 }

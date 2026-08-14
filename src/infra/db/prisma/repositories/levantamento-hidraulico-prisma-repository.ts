@@ -1,4 +1,5 @@
 import { prisma } from "@/infra/db/prisma/client";
+import { garantirControleEngenharia, registrarRetrabalhoEngenharia } from "@/features/engenharia/lib/controle-produtividade";
 import type {
   LevantamentoHidraulico,
   ItemLevantamentoHidraulico,
@@ -85,12 +86,16 @@ export class LevantamentoHidraulicoPrismaRepository {
     usuarioId?: string
   ): Promise<LevantamentoHidraulico> {
     const existente = await this.buscar(empreendimentoId, tipologiaId, subtipo);
-    if (existente) return existente;
+    if (existente) {
+      await garantirControleEngenharia({ tipo: "HIDRAULICA", referenciaId: existente.id, empreendimentoId, tipologiaId, executorId: existente.criadoPorId });
+      return existente;
+    }
 
     const r = await prisma.levantamentoHidraulico.create({
       data: { empreendimentoId, tipologiaId, subtipo, criadoPorId: usuarioId },
       include: { tipologia: { select: { nome: true } }, ...ITENS_INCLUDE },
     });
+    await garantirControleEngenharia({ tipo: "HIDRAULICA", referenciaId: r.id, empreendimentoId, tipologiaId, executorId: usuarioId ?? null });
     return toDomain(r);
   }
 
@@ -123,6 +128,10 @@ export class LevantamentoHidraulicoPrismaRepository {
       where: { id },
       data: { status: "VALIDADO", validadoEm: new Date(), validadoPorId: usuarioId },
     });
+    await garantirControleEngenharia({
+      tipo: "HIDRAULICA", referenciaId: levantamento.id, empreendimentoId: levantamento.empreendimentoId,
+      tipologiaId: levantamento.tipologiaId, executorId: levantamento.criadoPorId,
+    });
     await prisma.marcoOperacional.create({
       data: {
         empreendimentoId: levantamento.empreendimentoId,
@@ -133,6 +142,21 @@ export class LevantamentoHidraulicoPrismaRepository {
   }
 
   async voltarParaRascunho(id: string): Promise<void> {
-    await prisma.levantamentoHidraulico.update({ where: { id }, data: { status: "RASCUNHO", validadoEm: null } });
+    const anterior = await prisma.levantamentoHidraulico.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    const levantamento = await prisma.levantamentoHidraulico.update({
+      where: { id },
+      data: { status: "RASCUNHO", validadoEm: null },
+    });
+    // Retrabalho só existe quando algo que já estava VALIDADO volta para edição.
+    // Chamadas idempotentes em um RASCUNHO não podem inflar o indicador.
+    if (anterior?.status === "VALIDADO") {
+      await registrarRetrabalhoEngenharia({
+        tipo: "HIDRAULICA", referenciaId: levantamento.id, empreendimentoId: levantamento.empreendimentoId,
+        tipologiaId: levantamento.tipologiaId, executorId: levantamento.criadoPorId,
+      });
+    }
   }
 }
