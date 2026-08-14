@@ -821,7 +821,7 @@ export async function carregarAnalyticsData(): Promise<AnalyticsData> {
       emElaboracao: orcamentos.filter((o) => ["EM_LEVANTAMENTO", "ORCAMENTO_DEVOLVIDO"].includes(o.status)).length,
       aguardandoGestor: aguardandoGestor.length,
       devolvidos30d: devolvidos30,
-      aprovados30d,
+      aprovados30d: aprovados30,
       valorAguardandoGestor: aguardandoGestor.reduce((s, o) => s + n(o.totalServicosHgi) + n(o.totalMateriais), 0),
       tempoMedioFilaGestorDias: media(filaGestorDias),
     },
