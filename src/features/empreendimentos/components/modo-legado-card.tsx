@@ -3,7 +3,13 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, AlertTriangle, Plus, Trash2 } from "lucide-react";
-import { salvarKitsLegado, desativarModoLegado, type KitLegadoInput } from "@/features/empreendimentos/actions/legado-actions";
+import {
+  salvarKitsLegado,
+  desativarModoLegado,
+  calcularValorUnitarioBaseContratoLegado,
+  type KitLegadoInput,
+  type BaselineFinanceiroInput,
+} from "@/features/empreendimentos/actions/legado-actions";
 
 const LABEL_KIT: Record<string, string> = { ELETRICO: "Elétrico", HIDRAULICO: "Hidráulico", QDC: "QDC" };
 const KITS_DISPONIVEIS = ["ELETRICO", "HIDRAULICO", "QDC"] as const;
@@ -14,37 +20,47 @@ function formatBRL(v: number) {
 
 interface LinhaKit {
   kit: "ELETRICO" | "HIDRAULICO" | "QDC";
-  quantidadeTotal: string;
-  quantidadeEntregue: string;
-  valorContrato: string;
-  valorFaturado: string;
+  quantidadeContratada: string;
+  quantidadeEntregueHistorico: string;
 }
 
 interface Props {
   empreendimentoId: string;
   ativoInicial: boolean;
-  kitsIniciais: Array<{ kit: string; quantidadeTotal: number; quantidadeAprovada: number; valorContrato: number; valorFaturadoInicial: number }>;
+  baselineInicial: { valorContratado: number | null; faturadoHistorico: number | null; recebidoHistorico: number | null; quantidadeBaseUnidades: number | null };
+  kitsIniciais: Array<{ kit: string; quantidadeContratada: number; quantidadeEntregueHistorico: number }>;
 }
 
 /**
- * Modo Legado — ativa direto no cadastro do empreendimento. Pra obras
- * que já estavam em andamento antes do ConstruApp existir: pula
- * levantamento, orçamento e suprimentos, e entra direto com os
- * números que já existiam. Desenhado com o Henrique em 12-13/08/2026.
+ * Modo Legado — ativa direto no cadastro do empreendimento. Modelagem
+ * final revisada com o Henrique em 13/08/2026: financeiro fica no
+ * empreendimento (baseline único), não repartido por kit.
  */
-export function ModoLegadoCard({ empreendimentoId, ativoInicial, kitsIniciais }: Props) {
+export function ModoLegadoCard({ empreendimentoId, ativoInicial, baselineInicial, kitsIniciais }: Props) {
   const router = useRouter();
   const [ativo, setAtivo] = React.useState(ativoInicial);
+
+  const [valorContratado, setValorContratado] = React.useState(
+    baselineInicial.valorContratado != null ? String(baselineInicial.valorContratado).replace(".", ",") : ""
+  );
+  const [faturadoHistorico, setFaturadoHistorico] = React.useState(
+    baselineInicial.faturadoHistorico != null ? String(baselineInicial.faturadoHistorico).replace(".", ",") : ""
+  );
+  const [recebidoHistorico, setRecebidoHistorico] = React.useState(
+    baselineInicial.recebidoHistorico != null ? String(baselineInicial.recebidoHistorico).replace(".", ",") : ""
+  );
+  const [quantidadeBaseUnidades, setQuantidadeBaseUnidades] = React.useState(
+    baselineInicial.quantidadeBaseUnidades != null ? String(baselineInicial.quantidadeBaseUnidades) : ""
+  );
+
   const [linhas, setLinhas] = React.useState<LinhaKit[]>(
     kitsIniciais.length > 0
       ? kitsIniciais.map((k) => ({
           kit: k.kit as LinhaKit["kit"],
-          quantidadeTotal: String(k.quantidadeTotal),
-          quantidadeEntregue: String(k.quantidadeAprovada),
-          valorContrato: String(k.valorContrato).replace(".", ","),
-          valorFaturado: String(k.valorFaturadoInicial).replace(".", ","),
+          quantidadeContratada: String(k.quantidadeContratada),
+          quantidadeEntregueHistorico: String(k.quantidadeEntregueHistorico),
         }))
-      : [{ kit: "ELETRICO", quantidadeTotal: "", quantidadeEntregue: "", valorContrato: "", valorFaturado: "" }]
+      : [{ kit: "ELETRICO", quantidadeContratada: "", quantidadeEntregueHistorico: "" }]
   );
   const [salvando, setSalvando] = React.useState(false);
   const [erro, setErro] = React.useState<string | null>(null);
@@ -59,28 +75,37 @@ export function ModoLegadoCard({ empreendimentoId, ativoInicial, kitsIniciais }:
   }
 
   function adicionarLinha() {
-    const kitsUsados = linhas.map((l) => l.kit);
-    const proximoKit = KITS_DISPONIVEIS.find((k) => !kitsUsados.includes(k));
-    if (!proximoKit) return;
-    setLinhas((prev) => [...prev, { kit: proximoKit, quantidadeTotal: "", quantidadeEntregue: "", valorContrato: "", valorFaturado: "" }]);
+    const usados = linhas.map((l) => l.kit);
+    const proximo = KITS_DISPONIVEIS.find((k) => !usados.includes(k));
+    if (!proximo) return;
+    setLinhas((prev) => [...prev, { kit: proximo, quantidadeContratada: "", quantidadeEntregueHistorico: "" }]);
   }
 
   function removerLinha(i: number) {
     setLinhas((prev) => prev.filter((_, idx) => idx !== i));
   }
 
+  const valorUnitario = calcularValorUnitarioBaseContratoLegado(
+    parseNum(valorContratado),
+    parseNum(quantidadeBaseUnidades)
+  );
+
   async function handleAtivar() {
     setErro(null);
+    const baseline: BaselineFinanceiroInput = {
+      valorContratado: parseNum(valorContratado),
+      faturadoHistorico: parseNum(faturadoHistorico),
+      recebidoHistorico: parseNum(recebidoHistorico),
+      quantidadeBaseUnidades: parseNum(quantidadeBaseUnidades),
+    };
     const kits: KitLegadoInput[] = linhas.map((l) => ({
       kit: l.kit,
-      quantidadeTotal: parseNum(l.quantidadeTotal),
-      quantidadeEntregue: parseNum(l.quantidadeEntregue),
-      valorContrato: parseNum(l.valorContrato),
-      valorFaturado: parseNum(l.valorFaturado),
+      quantidadeContratada: parseNum(l.quantidadeContratada),
+      quantidadeEntregueHistorico: parseNum(l.quantidadeEntregueHistorico),
     }));
     setSalvando(true);
     try {
-      const r = await salvarKitsLegado(empreendimentoId, kits);
+      const r = await salvarKitsLegado(empreendimentoId, baseline, kits);
       if ("erro" in r) {
         setErro(r.erro);
         return;
@@ -125,10 +150,36 @@ export function ModoLegadoCard({ empreendimentoId, ativoInicial, kitsIniciais }:
 
       <div className="px-5 py-4">
         <p className="mb-4 text-xs text-muted-foreground">
-          Pra obras que já estavam em andamento antes do sistema existir — pula levantamento, orçamento e
-          suprimentos. Cria a Ordem de Produção e a Conta a Receber direto, com os números que já existiam.
+          Pra obras que já estavam em andamento antes do sistema existir — entra direto em Produção.
         </p>
 
+        <p className="mb-2 text-xs font-semibold text-foreground">Contrato</p>
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <label className="text-[11px] text-muted-foreground">Valor total (R$)</label>
+            <input value={valorContratado} onChange={(e) => setValorContratado(e.target.value)} inputMode="decimal" className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" />
+          </div>
+          <div>
+            <label className="text-[11px] text-muted-foreground">Qtd. base de unidades</label>
+            <input value={quantidadeBaseUnidades} onChange={(e) => setQuantidadeBaseUnidades(e.target.value)} inputMode="numeric" className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" />
+          </div>
+          <div>
+            <label className="text-[11px] text-muted-foreground">Faturado histórico (R$)</label>
+            <input value={faturadoHistorico} onChange={(e) => setFaturadoHistorico(e.target.value)} inputMode="decimal" className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" />
+          </div>
+          <div>
+            <label className="text-[11px] text-muted-foreground">Recebido histórico (R$)</label>
+            <input value={recebidoHistorico} onChange={(e) => setRecebidoHistorico(e.target.value)} inputMode="decimal" className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" />
+          </div>
+        </div>
+        {valorUnitario != null && (
+          <p className="mb-4 text-xs text-muted-foreground">
+            Valor estimado por unidade-base: <span className="font-medium text-foreground">{formatBRL(valorUnitario)}</span>{" "}
+            (80% do contrato ÷ quantidade-base — não é o valor de cada kit separado)
+          </p>
+        )}
+
+        <p className="mb-2 text-xs font-semibold text-foreground">Kits contratados</p>
         {linhas.map((linha, i) => (
           <div key={i} className="mb-3 rounded-lg border border-border p-3">
             <div className="mb-2 flex items-center justify-between">
@@ -149,59 +200,21 @@ export function ModoLegadoCard({ empreendimentoId, ativoInicial, kitsIniciais }:
                 </button>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[11px] text-muted-foreground">Qtd. total</label>
-                <input
-                  value={linha.quantidadeTotal}
-                  onChange={(e) => atualizarLinha(i, "quantidadeTotal", e.target.value)}
-                  inputMode="numeric"
-                  className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-                />
+                <label className="text-[11px] text-muted-foreground">Qtd. contratada</label>
+                <input value={linha.quantidadeContratada} onChange={(e) => atualizarLinha(i, "quantidadeContratada", e.target.value)} inputMode="numeric" className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs" />
               </div>
               <div>
-                <label className="text-[11px] text-muted-foreground">Já entregues</label>
-                <input
-                  value={linha.quantidadeEntregue}
-                  onChange={(e) => atualizarLinha(i, "quantidadeEntregue", e.target.value)}
-                  inputMode="numeric"
-                  className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-muted-foreground">Contrato (R$)</label>
-                <input
-                  value={linha.valorContrato}
-                  onChange={(e) => atualizarLinha(i, "valorContrato", e.target.value)}
-                  inputMode="decimal"
-                  className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-muted-foreground">Já faturado (R$)</label>
-                <input
-                  value={linha.valorFaturado}
-                  onChange={(e) => atualizarLinha(i, "valorFaturado", e.target.value)}
-                  inputMode="decimal"
-                  className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-                />
+                <label className="text-[11px] text-muted-foreground">Já entregues (histórico)</label>
+                <input value={linha.quantidadeEntregueHistorico} onChange={(e) => atualizarLinha(i, "quantidadeEntregueHistorico", e.target.value)} inputMode="numeric" className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs" />
               </div>
             </div>
-            {parseNum(linha.quantidadeTotal) > 0 && parseNum(linha.valorContrato) > 0 && (
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Valor por kit: {formatBRL(parseNum(linha.valorContrato) / parseNum(linha.quantidadeTotal))} · Faltam
-                produzir: {parseNum(linha.quantidadeTotal) - parseNum(linha.quantidadeEntregue)} · Falta faturar:{" "}
-                {formatBRL(parseNum(linha.valorContrato) - parseNum(linha.valorFaturado))}
-              </p>
-            )}
           </div>
         ))}
 
         {linhas.length < KITS_DISPONIVEIS.length && (
-          <button
-            onClick={adicionarLinha}
-            className="mb-3 flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-          >
+          <button onClick={adicionarLinha} className="mb-3 flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
             <Plus className="h-3.5 w-3.5" />
             Adicionar outro kit
           </button>

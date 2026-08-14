@@ -3,18 +3,14 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
-import { criarEmpreendimentoLegado, type KitLegadoInput } from "@/features/empreendimentos/actions/legado-actions";
+import {
+  criarEmpreendimentoLegado,
+  calcularValorUnitarioBaseContratoLegado,
+  type KitLegadoInput,
+  type BaselineFinanceiroInput,
+} from "@/features/empreendimentos/actions/legado-actions";
 
 const LABEL_KIT: Record<string, string> = { ELETRICO: "Elétrico", HIDRAULICO: "Hidráulico", QDC: "QDC" };
-
-function aplicarMascaraCnpj(valor: string): string {
-  const d = valor.replace(/\D/g, "").slice(0, 14);
-  if (d.length <= 2) return d;
-  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
-  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
-  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
-}
 const KITS_DISPONIVEIS = ["ELETRICO", "HIDRAULICO", "QDC"] as const;
 const TIPOS = [
   { value: "RESIDENCIAL_VERTICAL", label: "Residencial Vertical" },
@@ -29,19 +25,25 @@ function formatBRL(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function aplicarMascaraCnpj(valor: string): string {
+  const d = valor.replace(/\D/g, "").slice(0, 14);
+  if (d.length <= 2) return d;
+  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
+  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
+  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
+
 interface LinhaKit {
   kit: "ELETRICO" | "HIDRAULICO" | "QDC";
-  quantidadeTotal: string;
-  quantidadeEntregue: string;
-  valorContrato: string;
-  valorFaturado: string;
+  quantidadeContratada: string;
+  quantidadeEntregueHistorico: string;
 }
 
 /**
- * Cadastro simplificado de empreendimento Legado — usado quando não
- * tem nada além do básico: sem torres, sem tipologias detalhadas, sem
- * planilha de material, sem levantamento. Cria tudo numa ação só.
- * Pedido pelo Henrique em 13/08/2026.
+ * Cadastro simplificado de empreendimento Legado. Modelagem final
+ * revisada com o Henrique em 13/08/2026: financeiro é um baseline
+ * único do empreendimento (não por kit).
  */
 export function CadastroLegadoForm({ clientesAtivos }: { clientesAtivos: Array<{ value: string; label: string }> }) {
   const router = useRouter();
@@ -56,8 +58,14 @@ export function CadastroLegadoForm({ clientesAtivos }: { clientesAtivos: Array<{
   const [tipo, setTipo] = React.useState("RESIDENCIAL_VERTICAL");
   const [construtora, setConstrutora] = React.useState("");
   const [responsavelComercial, setResponsavelComercial] = React.useState("");
+
+  const [valorContratado, setValorContratado] = React.useState("");
+  const [quantidadeBaseUnidades, setQuantidadeBaseUnidades] = React.useState("");
+  const [faturadoHistorico, setFaturadoHistorico] = React.useState("");
+  const [recebidoHistorico, setRecebidoHistorico] = React.useState("");
+
   const [linhas, setLinhas] = React.useState<LinhaKit[]>([
-    { kit: "ELETRICO", quantidadeTotal: "", quantidadeEntregue: "", valorContrato: "", valorFaturado: "" },
+    { kit: "ELETRICO", quantidadeContratada: "", quantidadeEntregueHistorico: "" },
   ]);
   const [salvando, setSalvando] = React.useState(false);
   const [erro, setErro] = React.useState<string | null>(null);
@@ -65,6 +73,21 @@ export function CadastroLegadoForm({ clientesAtivos }: { clientesAtivos: Array<{
   function parseNum(v: string): number {
     const n = parseFloat(v.replace(/\./g, "").replace(",", "."));
     return isNaN(n) ? 0 : n;
+  }
+
+  function atualizarLinha(i: number, campo: keyof LinhaKit, valor: string) {
+    setLinhas((prev) => prev.map((l, idx) => (idx === i ? { ...l, [campo]: valor } : l)));
+  }
+
+  function adicionarLinha() {
+    const usados = linhas.map((l) => l.kit);
+    const proximo = KITS_DISPONIVEIS.find((k) => !usados.includes(k));
+    if (!proximo) return;
+    setLinhas((prev) => [...prev, { kit: proximo, quantidadeContratada: "", quantidadeEntregueHistorico: "" }]);
+  }
+
+  function removerLinha(i: number) {
+    setLinhas((prev) => prev.filter((_, idx) => idx !== i));
   }
 
   async function buscarCnpjConstrutora(mascarado: string) {
@@ -91,32 +114,26 @@ export function CadastroLegadoForm({ clientesAtivos }: { clientesAtivos: Array<{
     }
   }
 
-  function atualizarLinha(i: number, campo: keyof LinhaKit, valor: string) {
-    setLinhas((prev) => prev.map((l, idx) => (idx === i ? { ...l, [campo]: valor } : l)));
-  }
-
-  function adicionarLinha() {
-    const usados = linhas.map((l) => l.kit);
-    const proximo = KITS_DISPONIVEIS.find((k) => !usados.includes(k));
-    if (!proximo) return;
-    setLinhas((prev) => [...prev, { kit: proximo, quantidadeTotal: "", quantidadeEntregue: "", valorContrato: "", valorFaturado: "" }]);
-  }
-
-  function removerLinha(i: number) {
-    setLinhas((prev) => prev.filter((_, idx) => idx !== i));
-  }
+  const valorUnitario = calcularValorUnitarioBaseContratoLegado(
+    parseNum(valorContratado),
+    parseNum(quantidadeBaseUnidades)
+  );
 
   async function handleCriar() {
     setErro(null);
     if (!nome.trim()) return setErro("Preencha o nome do empreendimento.");
     if (!clienteId) return setErro("Escolha a construtora.");
 
+    const baseline: BaselineFinanceiroInput = {
+      valorContratado: parseNum(valorContratado),
+      faturadoHistorico: parseNum(faturadoHistorico),
+      recebidoHistorico: parseNum(recebidoHistorico),
+      quantidadeBaseUnidades: parseNum(quantidadeBaseUnidades),
+    };
     const kits: KitLegadoInput[] = linhas.map((l) => ({
       kit: l.kit,
-      quantidadeTotal: parseNum(l.quantidadeTotal),
-      quantidadeEntregue: parseNum(l.quantidadeEntregue),
-      valorContrato: parseNum(l.valorContrato),
-      valorFaturado: parseNum(l.valorFaturado),
+      quantidadeContratada: parseNum(l.quantidadeContratada),
+      quantidadeEntregueHistorico: parseNum(l.quantidadeEntregueHistorico),
     }));
 
     setSalvando(true);
@@ -130,6 +147,7 @@ export function CadastroLegadoForm({ clientesAtivos }: { clientesAtivos: Array<{
         tipo,
         construtora,
         responsavelComercial,
+        baseline,
         kits,
       });
       if ("erro" in r) {
@@ -219,6 +237,34 @@ export function CadastroLegadoForm({ clientesAtivos }: { clientesAtivos: Array<{
       </div>
 
       <div className="rounded-xl border border-warning/40 bg-card p-5">
+        <p className="mb-4 text-sm font-semibold text-foreground">Contrato</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <label className={labelCls}>Valor total (R$)</label>
+            <input value={valorContratado} onChange={(e) => setValorContratado(e.target.value)} inputMode="decimal" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Qtd. base de unidades</label>
+            <input value={quantidadeBaseUnidades} onChange={(e) => setQuantidadeBaseUnidades(e.target.value)} inputMode="numeric" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Faturado histórico (R$)</label>
+            <input value={faturadoHistorico} onChange={(e) => setFaturadoHistorico(e.target.value)} inputMode="decimal" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Recebido histórico (R$)</label>
+            <input value={recebidoHistorico} onChange={(e) => setRecebidoHistorico(e.target.value)} inputMode="decimal" className={inputCls} />
+          </div>
+        </div>
+        {valorUnitario != null && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Valor estimado por unidade-base: <span className="font-medium text-foreground">{formatBRL(valorUnitario)}</span>{" "}
+            (80% do contrato ÷ quantidade-base — não é o valor de cada kit separado)
+          </p>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-warning/40 bg-card p-5">
         <p className="mb-1 text-sm font-semibold text-foreground">Kits contratados</p>
         <p className="mb-4 text-xs text-muted-foreground">
           Sem torres, sem tipologias, sem planilha — só os números que você já tem.
@@ -244,31 +290,16 @@ export function CadastroLegadoForm({ clientesAtivos }: { clientesAtivos: Array<{
                 </button>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[11px] text-muted-foreground">Qtd. total</label>
-                <input value={linha.quantidadeTotal} onChange={(e) => atualizarLinha(i, "quantidadeTotal", e.target.value)} inputMode="numeric" className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs" />
+                <label className="text-[11px] text-muted-foreground">Qtd. contratada</label>
+                <input value={linha.quantidadeContratada} onChange={(e) => atualizarLinha(i, "quantidadeContratada", e.target.value)} inputMode="numeric" className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs" />
               </div>
               <div>
-                <label className="text-[11px] text-muted-foreground">Já entregues</label>
-                <input value={linha.quantidadeEntregue} onChange={(e) => atualizarLinha(i, "quantidadeEntregue", e.target.value)} inputMode="numeric" className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs" />
-              </div>
-              <div>
-                <label className="text-[11px] text-muted-foreground">Contrato (R$)</label>
-                <input value={linha.valorContrato} onChange={(e) => atualizarLinha(i, "valorContrato", e.target.value)} inputMode="decimal" className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs" />
-              </div>
-              <div>
-                <label className="text-[11px] text-muted-foreground">Já faturado (R$)</label>
-                <input value={linha.valorFaturado} onChange={(e) => atualizarLinha(i, "valorFaturado", e.target.value)} inputMode="decimal" className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs" />
+                <label className="text-[11px] text-muted-foreground">Já entregues (histórico)</label>
+                <input value={linha.quantidadeEntregueHistorico} onChange={(e) => atualizarLinha(i, "quantidadeEntregueHistorico", e.target.value)} inputMode="numeric" className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs" />
               </div>
             </div>
-            {parseNum(linha.quantidadeTotal) > 0 && parseNum(linha.valorContrato) > 0 && (
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Valor por kit: {formatBRL(parseNum(linha.valorContrato) / parseNum(linha.quantidadeTotal))} · Faltam
-                produzir: {parseNum(linha.quantidadeTotal) - parseNum(linha.quantidadeEntregue)} · Falta faturar:{" "}
-                {formatBRL(parseNum(linha.valorContrato) - parseNum(linha.valorFaturado))}
-              </p>
-            )}
           </div>
         ))}
 
