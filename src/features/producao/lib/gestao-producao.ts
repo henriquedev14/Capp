@@ -381,11 +381,43 @@ export async function calcularStatusProducaoEmpreendimento(
   empreendimentoId: string
 ): Promise<ResumoProducaoEmpreendimento> {
   const tipologias = await prisma.tipologia.findMany({
-    where: { empreendimentoId },
+    // Tipologias técnicas (ex: "Legado — Kit") nunca contam nos
+    // indicadores clássicos — existem só pra satisfazer a estrutura
+    // interna do sistema. Achado pelo Henrique em 13/08/2026.
+    where: { empreendimentoId, tecnica: false },
     select: { id: true, quantidadeUnidades: true, statusProducao: true },
   });
 
   if (tipologias.length === 0) {
+    // Legado nunca tem tipologia "real" (só a técnica, já filtrada
+    // acima) — usa a fonte certa (KitLegado + OrdemProducao) em vez de
+    // cair em "SEM_TIPOLOGIA". Achado pelo Henrique em 13/08/2026:
+    // antes disso o card resumido sempre aparecia vazio pro Legado.
+    const emp = await prisma.empreendimento.findUnique({
+      where: { id: empreendimentoId },
+      select: { origemLegado: true },
+    });
+    if (emp?.origemLegado) {
+      const kits = await prisma.kitLegado.findMany({
+        where: { empreendimentoId },
+        include: { ordemProducao: { select: { quantidadeAprovada: true } } },
+      });
+      if (kits.length > 0) {
+        const totalContratado = kits.reduce((s, k) => s + k.quantidadeContratada, 0);
+        const totalEntregue = kits.reduce(
+          (s, k) => s + k.quantidadeEntregueHistorico + (k.ordemProducao?.quantidadeAprovada ?? 0),
+          0
+        );
+        const progressoMedio = totalContratado > 0 ? Math.min(100, Math.round((totalEntregue / totalContratado) * 100)) : 0;
+        return {
+          status: progressoMedio >= 100 ? "CONCLUIDA" : "EM_ANDAMENTO",
+          progressoMedio,
+          totalTipologias: kits.length,
+          tipologiasConcluidas: kits.filter((k) => k.quantidadeEntregueHistorico + (k.ordemProducao?.quantidadeAprovada ?? 0) >= k.quantidadeContratada).length,
+          tipologiasEmStandby: 0,
+        };
+      }
+    }
     return { status: "SEM_TIPOLOGIA", progressoMedio: 0, totalTipologias: 0, tipologiasConcluidas: 0, tipologiasEmStandby: 0 };
   }
 
