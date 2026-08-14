@@ -3,6 +3,8 @@ import { valorNegociacaoHandler } from "@/features/analytics/lib/drilldown/handl
 import { semInteracao7dHandler } from "@/features/analytics/lib/drilldown/handlers/sem-interacao-7d";
 import { followupsVencidosHandler } from "@/features/analytics/lib/drilldown/handlers/followups-vencidos";
 import { pedidosAtrasadosHandler } from "@/features/analytics/lib/drilldown/handlers/pedidos-atrasados";
+import { opsAtrasadasHandler } from "@/features/analytics/lib/drilldown/handlers/ops-atrasadas";
+import { financeiroVencidoHandler } from "@/features/analytics/lib/drilldown/handlers/financeiro-vencido";
 import type { DrilldownHandler } from "@/features/analytics/lib/drilldown/types";
 
 /**
@@ -16,6 +18,8 @@ export const DRILLDOWN_HANDLERS: Record<string, DrilldownHandler> = {
   "sem-interacao-7d": semInteracao7dHandler,
   "followups-vencidos": followupsVencidosHandler,
   "pedidos-atrasados": pedidosAtrasadosHandler,
+  "ops-atrasadas": opsAtrasadasHandler,
+  "financeiro-vencido": financeiroVencidoHandler,
 };
 
 export type MetricKey = keyof typeof DRILLDOWN_HANDLERS;
