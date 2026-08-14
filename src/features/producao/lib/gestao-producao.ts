@@ -404,16 +404,16 @@ export async function calcularStatusProducaoEmpreendimento(
       });
       if (kits.length > 0) {
         const totalContratado = kits.reduce((s, k) => s + k.quantidadeContratada, 0);
-        const totalEntregue = kits.reduce(
-          (s, k) => s + k.quantidadeEntregueHistorico + (k.ordemProducao?.quantidadeAprovada ?? 0),
+        const totalProduzido = kits.reduce(
+          (s, k) => s + Math.max(k.quantidadeProduzidaHistorico ?? 0, k.quantidadeEntregueHistorico) + (k.ordemProducao?.quantidadeAprovada ?? 0),
           0
         );
-        const progressoMedio = totalContratado > 0 ? Math.min(100, Math.round((totalEntregue / totalContratado) * 100)) : 0;
+        const progressoMedio = totalContratado > 0 ? Math.min(100, Math.round((totalProduzido / totalContratado) * 100)) : 0;
         return {
           status: progressoMedio >= 100 ? "CONCLUIDA" : "EM_ANDAMENTO",
           progressoMedio,
           totalTipologias: kits.length,
-          tipologiasConcluidas: kits.filter((k) => k.quantidadeEntregueHistorico + (k.ordemProducao?.quantidadeAprovada ?? 0) >= k.quantidadeContratada).length,
+          tipologiasConcluidas: kits.filter((k) => Math.max(k.quantidadeProduzidaHistorico ?? 0, k.quantidadeEntregueHistorico) + (k.ordemProducao?.quantidadeAprovada ?? 0) >= k.quantidadeContratada).length,
           tipologiasEmStandby: 0,
         };
       }
