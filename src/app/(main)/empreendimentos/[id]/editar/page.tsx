@@ -42,7 +42,16 @@ export default async function EditarEmpreendimentoPage({
   // Modo Legado — busca isolada, sem mexer na entidade genérica do
   // Empreendimento (mesmo padrão seguro já usado na tela de Orçamento).
   const [legadoInfo, kitsLegado] = await Promise.all([
-    prisma.empreendimento.findUnique({ where: { id: params.id }, select: { origemLegado: true } }),
+    prisma.empreendimento.findUnique({
+      where: { id: params.id },
+      select: {
+        origemLegado: true,
+        legadoValorContratado: true,
+        legadoFaturadoHistorico: true,
+        legadoRecebidoHistorico: true,
+        legadoQuantidadeBaseUnidades: true,
+      },
+    }),
     buscarKitsLegado(params.id),
   ]);
 
@@ -79,6 +88,12 @@ export default async function EditarEmpreendimentoPage({
           <ModoLegadoCard
             empreendimentoId={empreendimento.id}
             ativoInicial={legadoInfo?.origemLegado ?? false}
+            baselineInicial={{
+              valorContratado: legadoInfo?.legadoValorContratado ? Number(legadoInfo.legadoValorContratado) : null,
+              faturadoHistorico: legadoInfo?.legadoFaturadoHistorico ? Number(legadoInfo.legadoFaturadoHistorico) : null,
+              recebidoHistorico: legadoInfo?.legadoRecebidoHistorico ? Number(legadoInfo.legadoRecebidoHistorico) : null,
+              quantidadeBaseUnidades: legadoInfo?.legadoQuantidadeBaseUnidades ?? null,
+            }}
             kitsIniciais={kitsLegado}
           />
         </div>
