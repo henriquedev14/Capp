@@ -24,7 +24,11 @@ export async function buscarSaudeGeralEEngenharia(inicio: Date, fim: Date) {
   const orcamentosParados = dashboard.paradosSemAtualizacao.length + dashboard.empreendimentosParadosSemOrcamento.length;
   const cotacoesParadas = dashboard.cotacoesSemResposta.length;
 
-  const metaTotal = produtividadeProducao.reduce((s, p) => s + p.metaPeriodoUH, 0);
+  const metaPorOperador = new Map<string, number>();
+  for (const p of produtividadeProducao) {
+    metaPorOperador.set(p.operadorId, Math.max(metaPorOperador.get(p.operadorId) ?? 0, p.metaPeriodoUH));
+  }
+  const metaTotal = Array.from(metaPorOperador.values()).reduce((s, v) => s + v, 0);
   const realizadoTotal = produtividadeProducao.reduce((s, p) => s + p.quantidadeUH, 0);
   const percentualProducao = metaTotal > 0 ? Math.round((realizadoTotal / metaTotal) * 100) : 0;
 
@@ -35,14 +39,16 @@ export async function buscarSaudeGeralEEngenharia(inicio: Date, fim: Date) {
     percentualProducao,
     realizadoTotal: Math.round(realizadoTotal),
     metaTotal: Math.round(metaTotal),
+    engenhariaPerformance: dashboard.analytics.engenharia,
   };
 }
 
 const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Busca os dados brutos de produtividade por pessoa, pros 3 papéis
- * cobertos hoje (Comercial, Engenharia, Orçamentista) — Produção já tem
+ * Busca os dados brutos de volume por pessoa, para os papéis
+ * cobertos aqui (Comercial e Orçamentista). Engenharia saiu deste quadrante
+ * porque agora usa produtividade ponderada por complexidade/disciplinas; Produção tem
  * tela própria (calcularProdutividadePorOperador), não entra aqui.
  *
  * "Na mão" = carga ativa agora. "Parado" = sem atualização há mais de
@@ -98,70 +104,9 @@ export async function buscarProdutividadePorPessoa(
     });
   }
 
-  // ---------- Engenharia (Levantamentos) ----------
-  const [eletricosRascunho, hidraulicosRascunho, materiaisRascunho] = await Promise.all([
-    prisma.levantamentoEletrico.findMany({
-      where: { status: "RASCUNHO", criadoPorId: { not: null } },
-      select: { criadoPorId: true, criadoPor: { select: { nome: true } }, updatedAt: true },
-    }),
-    prisma.levantamentoHidraulico.findMany({
-      where: { status: "RASCUNHO", criadoPorId: { not: null } },
-      select: { criadoPorId: true, criadoPor: { select: { nome: true } }, updatedAt: true },
-    }),
-    prisma.levantamentoMateriais.findMany({
-      where: { status: "RASCUNHO", criadoPorId: { not: null } },
-      select: { criadoPorId: true, criadoPor: { select: { nome: true } }, updatedAt: true },
-    }),
-  ]);
-  const [eletricosValidados, hidraulicosValidados, materiaisValidados] = await Promise.all([
-    prisma.levantamentoEletrico.groupBy({
-      by: ["validadoPorId"],
-      where: { validadoPorId: { not: null }, validadoEm: { gte: inicioPeriodo, lte: fimPeriodo } },
-      _count: true,
-    }),
-    prisma.levantamentoHidraulico.groupBy({
-      by: ["validadoPorId"],
-      where: { validadoPorId: { not: null }, validadoEm: { gte: inicioPeriodo, lte: fimPeriodo } },
-      _count: true,
-    }),
-    prisma.levantamentoMateriais.groupBy({
-      by: ["validadoPorId"],
-      where: { validadoPorId: { not: null }, validadoEm: { gte: inicioPeriodo, lte: fimPeriodo } },
-      _count: true,
-    }),
-  ]);
-
-  const engenhariaPorUsuario = new Map<string, { nome: string; carga: number; parados: number }>();
-  for (const lev of [...eletricosRascunho, ...hidraulicosRascunho, ...materiaisRascunho]) {
-    const id = lev.criadoPorId!;
-    const atual = engenhariaPorUsuario.get(id) ?? { nome: lev.criadoPor!.nome, carga: 0, parados: 0 };
-    atual.carga++;
-    if (lev.updatedAt < seteDiasAtras) atual.parados++;
-    engenhariaPorUsuario.set(id, atual);
-  }
-  const validadosPorUsuario = new Map<string, number>();
-  for (const grupo of [...eletricosValidados, ...hidraulicosValidados, ...materiaisValidados]) {
-    const id = grupo.validadoPorId!;
-    validadosPorUsuario.set(id, (validadosPorUsuario.get(id) ?? 0) + grupo._count);
-  }
-  // Alguém pode ter validado no período sem ter nada em rascunho hoje —
-  // garante que essa pessoa também apareça, só sem carga/parado.
-  for (const id of validadosPorUsuario.keys()) {
-    if (!engenhariaPorUsuario.has(id)) {
-      const usuario = await prisma.usuario.findUnique({ where: { id }, select: { nome: true } });
-      if (usuario) engenhariaPorUsuario.set(id, { nome: usuario.nome, carga: 0, parados: 0 });
-    }
-  }
-  for (const [id, dados] of engenhariaPorUsuario) {
-    resultado.push({
-      usuarioId: id,
-      nome: dados.nome,
-      papel: "ENGENHARIA",
-      cargaAtual: dados.carga,
-      itensParados: dados.parados,
-      produzidoNoPeriodo: validadosPorUsuario.get(id) ?? 0,
-    });
-  }
+  // Engenharia saiu deste quadrante genérico: quantidade bruta de levantamentos
+  // não é uma métrica justa entre disciplinas/complexidades. A visão ponderada
+  // vive em dashboard.analytics.engenharia / EngenhariaPerformance.
 
   // ---------- Orçamentista ----------
   const orcamentosAbertos = await prisma.orcamento.findMany({
