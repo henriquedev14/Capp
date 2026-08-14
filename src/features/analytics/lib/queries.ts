@@ -538,26 +538,40 @@ export async function carregarAnalyticsData(): Promise<AnalyticsData> {
     });
   }
 
+  // Uma linha por PESSOA (não por pessoa×disciplina) — achado pelo
+  // Henrique em 14/08/2026. Chave do Map muda de `executor|disciplina`
+  // pra só `executor`; o detalhe por disciplina fica em `porDisciplina`
+  // dentro de cada pessoa, pro drawer expandir sem poluir a tabela.
   const porPessoaMap = new Map<
     string,
-    EngenhariaPessoaAnalytics & { leads: number[]; prazos: boolean[]; qualidades: boolean[] }
+    {
+      usuarioId: string;
+      nome: string;
+      disciplinas: Set<"ELETRICA" | "HIDRAULICA" | "MATERIAIS">;
+      porDisciplina: Map<string, { wip: number; backlogPontos: number; entreguePontos: number }>;
+      wip: number;
+      backlogPontos: number;
+      entreguePontos: number;
+      pacotesEntregues: number;
+      retrabalhosObservados: number;
+      bloqueadoHoras: number;
+      pacotesBloqueados: number;
+      leads: number[];
+      prazos: boolean[];
+      qualidades: boolean[];
+    }
   >();
   for (const p of pacotes) {
     if (!p.executorId) continue;
-    const chave = `${p.executorId}|${p.disciplina}`;
-    const atual = porPessoaMap.get(chave) ?? {
+    const atual = porPessoaMap.get(p.executorId) ?? {
       usuarioId: p.executorId,
       nome: p.executorNome,
-      disciplina: p.disciplina,
+      disciplinas: new Set<"ELETRICA" | "HIDRAULICA" | "MATERIAIS">(),
+      porDisciplina: new Map<string, { wip: number; backlogPontos: number; entreguePontos: number }>(),
       wip: 0,
       backlogPontos: 0,
       entreguePontos: 0,
       pacotesEntregues: 0,
-      leadTimeMedioDias: null,
-      noPrazoPct: null,
-      qualidadePct: null,
-      qualidadeAmostras: 0,
-      qualidadeConfiabilidade: "INDISPONIVEL" as const,
       retrabalhosObservados: 0,
       bloqueadoHoras: 0,
       pacotesBloqueados: 0,
@@ -566,6 +580,9 @@ export async function carregarAnalyticsData(): Promise<AnalyticsData> {
       qualidades: [],
     };
 
+    atual.disciplinas.add(p.disciplina);
+    const disc = atual.porDisciplina.get(p.disciplina) ?? { wip: 0, backlogPontos: 0, entreguePontos: 0 };
+
     atual.retrabalhosObservados += p.retrabalhosObservados;
     atual.bloqueadoHoras = (atual.bloqueadoHoras ?? 0) + p.bloqueadoHoras;
     if (p.bloqueado) atual.pacotesBloqueados++;
@@ -573,6 +590,7 @@ export async function carregarAnalyticsData(): Promise<AnalyticsData> {
     if (p.status === "VALIDADO" && p.validadoEm && p.validadoEm >= inicio30d) {
       atual.entreguePontos += p.complexidade;
       atual.pacotesEntregues++;
+      disc.entreguePontos += p.complexidade;
       atual.leads.push(p.leadTimeDiasUteis);
       if (p.dentroSla != null) atual.prazos.push(p.dentroSla);
       // Qualidade só entra na amostra quando a validação ocorreu depois da
@@ -583,13 +601,23 @@ export async function carregarAnalyticsData(): Promise<AnalyticsData> {
     } else if (p.status !== "VALIDADO") {
       atual.wip++;
       atual.backlogPontos += p.complexidade;
+      disc.wip++;
+      disc.backlogPontos += p.complexidade;
     }
-    porPessoaMap.set(chave, atual);
+    atual.porDisciplina.set(p.disciplina, disc);
+    porPessoaMap.set(p.executorId, atual);
   }
 
   const porPessoa = Array.from(porPessoaMap.values())
-    .map(({ leads, prazos, qualidades, ...p }) => ({
+    .map(({ leads, prazos, qualidades, disciplinas, porDisciplina, ...p }) => ({
       ...p,
+      disciplinas: Array.from(disciplinas),
+      porDisciplina: Array.from(porDisciplina.entries()).map(([disciplina, v]) => ({
+        disciplina: disciplina as "ELETRICA" | "HIDRAULICA" | "MATERIAIS",
+        wip: v.wip,
+        backlogPontos: Math.round(v.backlogPontos),
+        entreguePontos: Math.round(v.entreguePontos),
+      })),
       leadTimeMedioDias: media(leads),
       noPrazoPct: prazos.length ? arred((prazos.filter(Boolean).length / prazos.length) * 100) : null,
       qualidadePct: qualidades.length ? arred((qualidades.filter(Boolean).length / qualidades.length) * 100) : null,
@@ -801,6 +829,7 @@ export async function carregarAnalyticsData(): Promise<AnalyticsData> {
     },
     engenharia: {
       backlog: backlogEng.length,
+      entregue30dPontos: Math.round(porPessoa.reduce((s, p) => s + p.entreguePontos, 0)),
       validados30d: validados30.length,
       foraSla: foraSlaEng,
       complexidadeBacklog: Math.round(backlogEng.reduce((s, p) => s + p.complexidade, 0)),
@@ -821,7 +850,7 @@ export async function carregarAnalyticsData(): Promise<AnalyticsData> {
       emElaboracao: orcamentos.filter((o) => ["EM_LEVANTAMENTO", "ORCAMENTO_DEVOLVIDO"].includes(o.status)).length,
       aguardandoGestor: aguardandoGestor.length,
       devolvidos30d: devolvidos30,
-      aprovados30d: aprovados30,
+      aprovados30d,
       valorAguardandoGestor: aguardandoGestor.reduce((s, o) => s + n(o.totalServicosHgi) + n(o.totalMateriais), 0),
       tempoMedioFilaGestorDias: media(filaGestorDias),
     },
