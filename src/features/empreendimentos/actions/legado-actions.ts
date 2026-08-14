@@ -27,8 +27,10 @@ export interface KitLegadoView {
   quantidadeEntregueHistorico: number;
   quantidadeProduzidaHistorico: number | null;
   quantidadeProduzidaPosErp: number; // real, vindo da Ordem de Produção
-  totalEntregue: number; // histórico + pós-ERP
-  saldoRestante: number;
+  entreguePosErp: number;
+  totalEntregue: number; // histórico + expedição pós-ERP
+  totalProduzido: number; // histórico conhecido/mínimo + produção pós-ERP
+  saldoRestante: number; // saldo a produzir
 }
 
 const LABEL_KIT: Record<string, string> = { ELETRICO: "Elétrico", HIDRAULICO: "Hidráulico", QDC: "QDC" };
@@ -182,15 +184,31 @@ export async function desativarModoLegado(empreendimentoId: string): Promise<{ o
 }
 
 export async function buscarKitsLegado(empreendimentoId: string): Promise<KitLegadoView[]> {
-  const kits = await prisma.kitLegado.findMany({
-    where: { empreendimentoId },
-    include: { ordemProducao: { select: { quantidadeAprovada: true } } },
-    orderBy: { kit: "asc" },
-  });
+  const [kits, itensEntregues] = await Promise.all([
+    prisma.kitLegado.findMany({
+      where: { empreendimentoId },
+      include: { ordemProducao: { select: { quantidadeAprovada: true } } },
+      orderBy: { kit: "asc" },
+    }),
+    prisma.itemRemessa.findMany({
+      where: { remessa: { empreendimentoId, deletedAt: null, status: "ENTREGUE" } },
+      select: { tipoKit: true, quantidadeExpedida: true },
+    }),
+  ]);
+  const entreguePorKit = new Map<string, number>();
+  for (const item of itensEntregues) {
+    entreguePorKit.set(item.tipoKit, (entreguePorKit.get(item.tipoKit) ?? 0) + item.quantidadeExpedida);
+  }
 
   return kits.map((k) => {
     const produzidoPosErp = k.ordemProducao?.quantidadeAprovada ?? 0;
-    const totalEntregue = k.quantidadeEntregueHistorico + produzidoPosErp;
+    // Se a quantidade produzida antes do ERP não foi informada, o mínimo
+    // tecnicamente certo é o que já tinha sido entregue (não existe entrega
+    // sem produção). Nunca usa produção pós-ERP como proxy de entrega.
+    const produzidoHistoricoBase = Math.max(k.quantidadeProduzidaHistorico ?? 0, k.quantidadeEntregueHistorico);
+    const totalProduzido = produzidoHistoricoBase + produzidoPosErp;
+    const entreguePosErp = entreguePorKit.get(k.kit) ?? 0;
+    const totalEntregue = k.quantidadeEntregueHistorico + entreguePosErp;
     return {
       id: k.id,
       kit: k.kit,
@@ -198,8 +216,10 @@ export async function buscarKitsLegado(empreendimentoId: string): Promise<KitLeg
       quantidadeEntregueHistorico: k.quantidadeEntregueHistorico,
       quantidadeProduzidaHistorico: k.quantidadeProduzidaHistorico,
       quantidadeProduzidaPosErp: produzidoPosErp,
+      entreguePosErp,
       totalEntregue,
-      saldoRestante: Math.max(0, k.quantidadeContratada - totalEntregue),
+      totalProduzido,
+      saldoRestante: Math.max(0, k.quantidadeContratada - totalProduzido),
     };
   });
 }

@@ -19,6 +19,7 @@ const LABEL_KIT: Record<string, string> = { ELETRICO: "Elétrico", HIDRAULICO: "
  */
 export async function criarRemessaLegado(input: {
   empreendimentoId: string;
+  empresaId: string;
   kit: "ELETRICO" | "HIDRAULICO" | "QDC";
   quantidade: number;
   dataEntregaPrevista?: string;
@@ -56,11 +57,12 @@ export async function criarRemessaLegado(input: {
     return { erro: `Kit ${LABEL_KIT[input.kit]} não está cadastrado nesse empreendimento.` };
   }
 
-  // Pega a primeira empresa do grupo ativa como padrão — Legado não
-  // tem contrato formal ligado a uma empresa específica ainda; o
-  // financeiro pode reatribuir depois se precisar.
-  const empresa = await prisma.empresaGrupo.findFirst({ where: { ativo: true }, select: { id: true } });
-  if (!empresa) return { erro: "Nenhuma empresa do grupo ativa cadastrada — configuração incompleta." };
+  // Legado não possui Contrato formal de onde herdar a empresa. A empresa
+  // precisa ser informada explicitamente: escolher a "primeira ativa"
+  // contaminava Analytics financeiro/logístico por empresa do grupo.
+  if (!input.empresaId) return { erro: "Escolha a empresa do grupo responsável pela remessa." };
+  const empresa = await prisma.empresaGrupo.findFirst({ where: { id: input.empresaId, ativo: true }, select: { id: true } });
+  if (!empresa) return { erro: "Empresa do grupo inválida ou inativa." };
 
   const enderecoEntrega = [empreendimento.endereco, empreendimento.cidade, empreendimento.estado]
     .filter(Boolean)
@@ -90,8 +92,9 @@ export async function criarRemessaLegado(input: {
 }
 
 /**
- * "Entregue após ERP" — soma dos itens de Remessa Legado já
- * despachados/concluídos, por kit. Fonte de verdade separada de
+ * "Entregue após ERP" — soma somente remessas formalmente marcadas como
+ * ENTREGUE. Expedido/Em trânsito continuam sendo logística, não entrega.
+ * Fonte de verdade separada de
  * Produzido (OrdemProducao) e de Histórico (KitLegado).
  */
 export async function buscarEntreguePosErpPorKit(empreendimentoId: string): Promise<Record<string, number>> {
@@ -99,15 +102,15 @@ export async function buscarEntreguePosErpPorKit(empreendimentoId: string): Prom
     where: {
       remessa: {
         empreendimentoId,
-        status: { in: ["TOTALMENTE_EXPEDIDA", "EM_TRANSITO", "ENTREGUE", "PARCIALMENTE_EXPEDIDA"] as never },
+        status: "ENTREGUE",
       },
     },
-    select: { tipoKit: true, quantidadePrevista: true },
+    select: { tipoKit: true, quantidadeExpedida: true },
   });
 
   const resultado: Record<string, number> = {};
   for (const item of itens) {
-    resultado[item.tipoKit] = (resultado[item.tipoKit] ?? 0) + item.quantidadePrevista;
+    resultado[item.tipoKit] = (resultado[item.tipoKit] ?? 0) + item.quantidadeExpedida;
   }
   return resultado;
 }
