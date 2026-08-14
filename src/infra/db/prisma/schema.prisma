@@ -326,6 +326,20 @@ model Empreendimento {
   origemLegado Boolean @default(false) @map("origem_legado")
   kitsLegado   KitLegado[]
 
+  // Baseline do Legado — a posição financeira/operacional no momento
+  // em que a obra entrou no sistema, digitada uma vez no cadastro.
+  // NUNCA vira Conta a Receber automaticamente; é só o ponto de
+  // partida pros cálculos de "faturado total"/"recebido total"
+  // (histórico + movimentações reais feitas depois no ERP).
+  // Modelagem revisada com o Henrique em 13/08/2026.
+  legadoValorContratado         Decimal? @map("legado_valor_contratado") @db.Decimal(12, 2)
+  legadoFaturadoHistorico       Decimal? @default(0) @map("legado_faturado_historico") @db.Decimal(12, 2)
+  legadoRecebidoHistorico       Decimal? @default(0) @map("legado_recebido_historico") @db.Decimal(12, 2)
+  // Quantidade de unidades/apartamentos que o contrato atende — usada
+  // SÓ pro cálculo do valor unitário do kit. Independe de quantos
+  // tipos de kit existem (Elétrico + QDC não dobra essa base).
+  legadoQuantidadeBaseUnidades  Int?     @map("legado_quantidade_base_unidades")
+
   registrosProducao RegistroProducao[]
   movimentacoesEstoque MovimentacaoEstoque[]
   estoquePorObra EstoqueEmpreendimentoMaterial[]
@@ -660,6 +674,16 @@ model Tipologia {
   // número toda vez que uma proposta é gerada.
   quantidadeUnidades Int @default(1) @map("quantidade_unidades")
   descricao      String?  @db.Text
+
+  // Tipologia técnica — criada só pra satisfazer estrutura interna
+  // (ex: a Tipologia "Legado — Kit" do Modo Legado, que existe só
+  // porque Ordem de Produção exige uma). NUNCA conta nos indicadores
+  // (Vida da Produção clássica, "X de Y tipologias concluídas", fila
+  // de risco) — senão volta o problema de mostrar "0 de 1 tipologia"
+  // pra algo que não é uma tipologia real do empreendimento. Achado
+  // pelo Henrique em 13/08/2026.
+  tecnica Boolean @default(false)
+
 
   // Status de produção — permite colocar em stand-by (ex: obra parada
   // por decisão comercial/financeira) sem mexer no status geral do
@@ -2213,8 +2237,10 @@ model ContaReceber {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  kitLegadoComoEntrada KitLegado? @relation("KitLegadoEntrada")
-  kitLegadoComoRemessa KitLegado? @relation("KitLegadoRemessa")
+  // Relação com KitLegado removida em 13/08/2026 — o financeiro do
+  // Legado não gera mais Conta a Receber automaticamente (ver
+  // modelagem revisada). Contas a Receber pro Legado agora nascem só
+  // do fluxo financeiro normal, como qualquer outro empreendimento.
 
   @@index([empresaId])
   @@index([empreendimentoId])
@@ -2369,30 +2395,31 @@ model KitLegado {
 
   kit String // "ELETRICO" | "HIDRAULICO" | "QDC"
 
-  quantidadeTotal Int @map("quantidade_total")
-  valorContrato   Decimal @map("valor_contrato") @db.Decimal(12, 2)
+  // Baseline operacional — a posição no momento em que a obra entrou
+  // no sistema. Fonte de verdade pra "contratado" e "histórico".
+  // Modelagem revisada com o Henrique em 13/08/2026: financeiro NÃO
+  // fica mais aqui (foi pro Empreendimento — um recebimento pode
+  // cobrir vários kits ao mesmo tempo, não faz sentido ratear por kit
+  // sem informação real de como o contrato foi dividido).
+  quantidadeContratada         Int  @map("quantidade_contratada")
+  quantidadeEntregueHistorico  Int  @default(0) @map("quantidade_entregue_historico")
+  quantidadeProduzidaHistorico Int? @map("quantidade_produzida_historico")
 
-  // Só na criação — a partir daqui, quem manda de verdade é a Ordem
-  // de Produção (quantidadeAprovada) e a Conta a Receber (recebido).
-  // Esses 2 aqui ficam como "o que foi digitado no cadastro", pra
-  // referência, mas o card "Vida Financeira" sempre lê dos registros
-  // de verdade, não desses campos.
-  quantidadeEntregueInicial Int     @default(0) @map("quantidade_entregue_inicial")
-  valorFaturadoInicial      Decimal @default(0) @map("valor_faturado_inicial") @db.Decimal(12, 2)
+  // Só preenchido se o contrato realmente foi dividido por tipo de
+  // kit — não é a fonte usada pro cálculo de valor unitário (isso
+  // vem de Empreendimento.legadoValorContratado, ver
+  // calcularValorUnitarioKitLegado).
+  valorContratoEspecifico Decimal? @map("valor_contrato_especifico") @db.Decimal(12, 2)
 
-  // Ligações com os registros de verdade criados automaticamente —
-  // é a partir deles (não desses campos aqui) que os painéis contam.
+  // Ligações com os registros de verdade — Tipologia é técnica
+  // (Tipologia.tecnica = true), só existe pra satisfazer a estrutura
+  // interna (Ordem de Produção exige uma). Ordem de Produção nasce
+  // ZERADA — produção nova registrada no Terminal cresce a partir daí,
+  // sem misturar com o histórico acima.
   tipologiaId     String? @unique @map("tipologia_id")
   tipologia       Tipologia? @relation(fields: [tipologiaId], references: [id], onDelete: SetNull)
   ordemProducaoId String? @unique @map("ordem_producao_id")
   ordemProducao   OrdemProducao? @relation(fields: [ordemProducaoId], references: [id], onDelete: SetNull)
-  // Duas Contas a Receber por kit — Entrada (20%) e Remessa (restante),
-  // igual ao padrão financeiro real. Recalculadas em conjunto sempre
-  // que o kit é salvo de novo. Desenhado com o Henrique em 13/08/2026.
-  contaReceberId          String? @unique @map("conta_receber_id")
-  contaReceber            ContaReceber? @relation("KitLegadoEntrada", fields: [contaReceberId], references: [id], onDelete: SetNull)
-  contaReceberRemessaId   String? @unique @map("conta_receber_remessa_id")
-  contaReceberRemessa     ContaReceber? @relation("KitLegadoRemessa", fields: [contaReceberRemessaId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
