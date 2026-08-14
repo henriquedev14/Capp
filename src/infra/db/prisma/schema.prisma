@@ -817,6 +817,7 @@ model Usuario {
   carregamentosCriados        Carregamento[] @relation("CarregamentosCriados")
   carregamentosLiberados      Carregamento[] @relation("CarregamentosLiberados")
   expedicaoHistoricoRegistrado ExpedicaoHistorico[]
+  controlesEngenhariaExecutados EngenhariaControle[] @relation("EngenhariaControleExecutor")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -979,6 +980,77 @@ model TabelaPrecoBase {
 // Configuração única e global do sistema — hoje só guarda o critério de
 // precificação ativo, mas serve como lugar natural pra outras chaves
 // globais que surgirem depois. Sempre uma linha só (id fixo "default").
+
+// ============================================================================
+// ANALYTICS / PRODUTIVIDADE DE ENGENHARIA
+// ----------------------------------------------------------------------------
+// Complementa os levantamentos existentes sem duplicar o conteúdo técnico.
+// A própria linha de Levantamento (Elétrico/Hidráulico/Materiais) continua
+// sendo o pacote de trabalho e fonte de criação/validação. Este controle
+// guarda apenas informação gerencial que não existia: executor explícito,
+// prazo, bloqueio e retrabalho observado a partir da implantação deste
+// Analytics. Assim não inventamos histórico anterior ao instrumento.
+model EngenhariaControle {
+  id String @id @default(cuid())
+
+  // "ELETRICA" | "HIDRAULICA" | "MATERIAIS". referenciaId é o id do
+  // respectivo Levantamento. Mantemos referência polimórfica de propósito:
+  // evita criar três tabelas iguais só para métricas gerenciais.
+  referenciaTipo String @map("referencia_tipo")
+  referenciaId   String @map("referencia_id")
+
+  empreendimentoId String @map("empreendimento_id")
+  tipologiaId      String? @map("tipologia_id")
+
+  // Sobrescreve criadoPorId apenas quando a coordenação atribui o pacote a
+  // outra pessoa. Se nulo, Analytics usa o criador do levantamento.
+  executorId String? @map("executor_id")
+  executor   Usuario? @relation("EngenhariaControleExecutor", fields: [executorId], references: [id], onDelete: SetNull)
+
+  prazo DateTime?
+
+  // Bloqueio explícito. minutosBloqueados acumula apenas períodos que o
+  // usuário marcou como bloqueados; não é timesheet e não tenta adivinhar
+  // tempo ativo. Um bloqueio aberto usa bloqueadoEm até o instante atual.
+  bloqueadoEm        DateTime? @map("bloqueado_em")
+  motivoBloqueio     String?   @map("motivo_bloqueio") @db.Text
+  minutosBloqueados  Int       @default(0) @map("minutos_bloqueados")
+
+  // Incrementado quando um levantamento já validado volta para RASCUNHO.
+  // Só é confiável para pacotes instrumentados daqui para frente.
+  retrabalhos Int @default(0)
+
+  eventos EngenhariaControleEvento[]
+
+  instrumentadoEm DateTime @default(now()) @map("instrumentado_em")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([referenciaTipo, referenciaId])
+  @@index([empreendimentoId])
+  @@index([executorId])
+  @@index([bloqueadoEm])
+  @@map("engenharia_controles")
+}
+
+model EngenhariaControleEvento {
+  id String @id @default(cuid())
+
+  controleId String @map("controle_id")
+  controle   EngenhariaControle @relation(fields: [controleId], references: [id], onDelete: Cascade)
+
+  // BLOQUEIO | RETOMADA | RETRABALHO | ATRIBUICAO | PRAZO
+  tipo String
+  motivo String? @db.Text
+  meta String? @db.Text
+  registradoPorId String? @map("registrado_por_id")
+  ocorridoEm DateTime @default(now()) @map("ocorrido_em")
+
+  @@index([controleId, ocorridoEm])
+  @@index([tipo, ocorridoEm])
+  @@map("engenharia_controle_eventos")
+}
+
 model ConfiguracaoSistema {
   id                   String               @id @default("default")
   criterioPrecificacao CriterioPrecificacao @default(AREA)
@@ -1011,6 +1083,10 @@ model ConfiguracaoSistema {
   // cada uma (ver model Bancada) que converte produção bruta pra essa
   // moeda comum.
   metaProducaoDiariaUH Decimal @default(50) @db.Decimal(10, 2)
+  // Meta física da fábrica (kits completos na bancada Finalização).
+  // É deliberadamente separada da meta em U.H. por operador/bancada: são
+  // grandezas diferentes e não devem compartilhar o mesmo número por acaso.
+  metaKitsFinalizadosDia Decimal @default(50) @map("meta_kits_finalizados_dia") @db.Decimal(10, 2)
 
   // Metas de tempo por área (em dias) — pra transformar o "Desempenho
   // das Áreas" do dashboard de Diretoria em status de verdade
@@ -2383,10 +2459,9 @@ enum TurnoProducao {
 // Um kit contratado dentro de um empreendimento em Modo Legado — pode
 // ter mais de um (ex: Elétrico E Hidráulico juntos). Cada um gera,
 // automaticamente na criação, uma Tipologia "Legado" + uma Ordem de
-// Produção (já com o que foi entregue até aqui) + uma Conta a Receber
-// (com o valor do contrato) — assim os números entram nos painéis de
-// verdade (Vida da Produção, Financeiro), em vez de ficar isolado
-// só num card. Desenhado com o Henrique em 12-13/08/2026.
+// Produção ZERADA. O baseline histórico permanece no KitLegado e o
+// financeiro histórico no Empreendimento; não são criadas movimentações
+// artificiais para reconstruir o passado. Revisado em 13-14/08/2026.
 model KitLegado {
   id String @id @default(cuid())
 
