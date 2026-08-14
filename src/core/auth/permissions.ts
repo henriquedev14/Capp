@@ -64,6 +64,12 @@ export const PERMISSOES = {
   // de proposta por tipologia acima) — quem decide se o orçamento como um
   // todo pode seguir para geração de proposta.
   ORCAMENTO_APROVAR: "orcamento:aprovar",
+  // Agir na Negociação (registrar contato, contraproposta, marcar
+  // Ganha/Perdida, reverter aprovação, retornar pra Engenharia) — antes
+  // reutilizava EMPREENDIMENTO_EDITAR, que é ampla demais e mistura
+  // "editar cadastro" com "agir na negociação". Achado pelo Henrique
+  // em 14/08/2026.
+  NEGOCIACAO_GERENCIAR: "negociacao:gerenciar",
   // Atribuir responsável e prazo, e editar a jornada/etapas do orçamento.
   ORCAMENTO_GERENCIAR_JORNADA: "orcamento:gerenciar_jornada",
   // Aplicar preço de Tabela de Preços/Cotação num item do Orçamento —
@@ -164,6 +170,7 @@ export const DESCRICOES_PERMISSOES: Record<PermissaoChave, string> = {
   [PERMISSOES.RESPONSABILIDADE_ORCAMENTACAO]: "Assumir/concluir a etapa de Orçamentação de um empreendimento",
   [PERMISSOES.EMPREENDIMENTO_APROVAR_PROPOSTA]: "Dar aval para gerar a proposta comercial (restrito a Diretor e Coordenador)",
   [PERMISSOES.ORCAMENTO_APROVAR]: "Aprovar ou devolver um orçamento enviado para aprovação",
+  [PERMISSOES.NEGOCIACAO_GERENCIAR]: "Agir na Negociação — registrar contato, contraproposta, marcar Ganha/Perdida, reverter aprovação",
   [PERMISSOES.ORCAMENTO_GERENCIAR_JORNADA]: "Atribuir responsável, prazo e gerenciar etapas do orçamento",
   [PERMISSOES.ORCAMENTO_APLICAR_PRECO]: "Aplicar preço de fornecedor (Tabela de Preços/Cotação) num item do orçamento",
   [PERMISSOES.ORCAMENTO_VER]: "Ver a fila de orçamentos (tela principal de Orçamentação)",
