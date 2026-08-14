@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiCard, formatBRLCompacto } from "@/features/dashboard/components/kpi";
 import { PipelineExecutivoChart, BarrasSimples, FluxoExpedicaoChart } from "@/features/analytics/components/analytics-charts";
 import { AnalyticsDrilldownDrawer } from "@/features/analytics/components/analytics-drilldown-drawer";
+import { EngenhariaAba } from "@/features/analytics/components/engenharia-aba";
 import type { DashboardData } from "@/features/dashboard/lib/queries";
 import { cn } from "@/lib/utils";
 
@@ -99,27 +100,9 @@ export function ViewDiretor({ data }: { data: DashboardData; metasPorArea?: unkn
         <Secao titulo="Pipeline por etapa" descricao="Aging usa a entrada real na etapa quando existe evento de timeline; não usa data de edição como fechamento."><PipelineExecutivoChart dados={a.pipeline} /></Secao>
       </>}
 
-      {aba === "engenharia" && <>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-          <KpiCard label="Backlog" value={a.engenharia.backlog} hint={`${a.engenharia.complexidadeBacklog} pts ponderados`} icon={Wrench} tone="primary" />
-          <KpiCard label="Validados · 30 dias" value={a.engenharia.validados30d} hint="pacotes, não empreendimentos" icon={PackageCheck} tone="success" />
-          <KpiCard label="Bloqueados" value={a.engenharia.bloqueados} hint="bloqueio explícito" icon={AlertTriangle} tone={a.engenharia.bloqueados ? "danger" : "success"} />
-          <KpiCard label="Fora do SLA" value={a.engenharia.foraSla} hint="dias úteis" icon={Clock3} tone={a.engenharia.foraSla ? "warning" : "success"} />
-          <KpiCard label="Lead time médio" value={a.engenharia.leadTimeMedioDias == null ? "—" : `${a.engenharia.leadTimeMedioDias}d`} hint={`n=${a.engenharia.amostrasLeadTime}`} icon={Clock3} />
-          <KpiCard label="First Pass Yield" value={a.engenharia.firstPassYieldPct == null ? "—" : `${a.engenharia.firstPassYieldPct}%`} hint={`n=${a.engenharia.firstPassYieldAmostras} pós-instrumentação`} icon={Gauge} />
-        </div>
-        <div className="grid gap-4 xl:grid-cols-[1.25fr_1fr]">
-          <Secao titulo="Carga ponderada por engenheiro" descricao="Executor explícito prevalece; validador não recebe crédito pelo trabalho executado.">
-            <div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="border-b text-muted-foreground"><th className="py-2 text-left">Pessoa</th><th className="text-left">Disciplina</th><th className="text-right">WIP</th><th className="text-right">Backlog pts</th><th className="text-right">Entregue pts</th><th className="text-right">Bloq.</th><th className="text-right">Qualidade</th><th className="text-right">SLA</th></tr></thead><tbody className="divide-y divide-border/60">{a.engenharia.porPessoa.map((p) => <tr key={`${p.usuarioId}-${p.disciplina}`}><td className="py-2 font-medium">{p.nome}</td><td>{p.disciplina}</td><td className="text-right">{p.wip}</td><td className="text-right font-semibold">{p.backlogPontos}</td><td className="text-right font-semibold">{p.entreguePontos}</td><td className="text-right">{p.pacotesBloqueados}</td><td className="text-right">{p.qualidadePct == null ? "—" : `${p.qualidadePct}%`}</td><td className="text-right">{p.noPrazoPct == null ? "—" : `${p.noPrazoPct}%`}</td></tr>)}</tbody></table>{a.engenharia.porPessoa.length === 0 ? <p className="py-8 text-center text-muted-foreground">Sem pacotes atribuídos ainda.</p> : null}</div>
-          </Secao>
-          <Secao titulo="Capacidade observada × backlog" descricao="Ritmo ponderado dos últimos 30 dias frente à carga atual; não é previsão futura.">
-            <div className="space-y-2">{a.engenharia.capacidadePorDisciplina.map((d)=><div key={d.disciplina} className="rounded-md border border-border p-3"><div className="flex items-center justify-between"><span className="text-xs font-semibold">{d.disciplina}</span><span className="text-[10px] text-muted-foreground">{d.pacotesEntregues30d} pacotes</span></div><div className="mt-2 grid grid-cols-2 gap-2"><div><p className="text-[10px] text-muted-foreground">Ritmo 30d</p><p className="text-lg font-bold">{d.capacidadeObservada30dPontos} pts</p></div><div><p className="text-[10px] text-muted-foreground">Backlog</p><p className="text-lg font-bold">{d.backlogAtualPontos} pts</p></div></div><p className="mt-1 text-[11px] text-muted-foreground">Cobertura: {d.coberturaBacklogMeses == null ? "sem base" : `${d.coberturaBacklogMeses} mês(es)`}</p></div>)}</div>
-          </Secao>
-        </div>
-        <Secao titulo="Pacotes críticos em aberto" descricao="Bloqueios e violações de SLA vêm antes da complexidade. A pontuação é heurística v1 e deve ser calibrada com histórico real.">
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">{a.engenharia.pacotesCriticos.slice(0, 12).map((p) => <Link key={p.id} href={`/empreendimentos/${p.empreendimentoId}`} className="rounded-md border border-border p-2.5 hover:bg-secondary/30"><div className="flex items-center justify-between gap-2"><span className="truncate text-xs font-semibold">{p.empreendimentoNome} · {p.tipologia}</span><Pill tone={p.bloqueado || p.complexidade >= 80 ? "danger" : p.complexidade >= 60 ? "warning" : "default"}>{p.bloqueado ? "BLOQ." : `${p.complexidade}/100`}</Pill></div><p className="mt-1 text-[11px] text-muted-foreground">{p.disciplina} · {p.escopo} · {p.executorNome} · {p.leadTimeDiasUteis}d úteis</p>{p.bloqueado ? <p className="mt-1 text-[11px] text-warning">{p.motivoBloqueio} · {p.bloqueadoHoras}h</p> : null}</Link>)}</div>
-        </Secao>
-      </>}
+      {aba === "engenharia" && (
+        <EngenhariaAba a={a} setDrilldownAberto={setDrilldownAberto} />
+      )}
 
       {aba === "negociacao" && <>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><KpiCard label="Valor aberto" value={formatBRLCompacto(a.negociacao.valorAberto)} hint={`${a.negociacao.abertas} negociações`} icon={Banknote} tone="primary" onClick={() => setDrilldownAberto("valor-negociacao")} /><KpiCard label="Follow-ups vencidos" value={a.negociacao.followupsVencidos} hint="próxima ação atrasada" icon={Clock3} tone={a.negociacao.followupsVencidos ? "danger" : "success"} onClick={() => setDrilldownAberto("followups-vencidos")} /><KpiCard label="Sem interação > 7d" value={a.negociacao.semInteracao7d} hint="carteira parada" icon={AlertTriangle} tone={a.negociacao.semInteracao7d ? "warning" : "success"} onClick={() => setDrilldownAberto("sem-interacao-7d")} /><KpiCard label="Desconto médio" value={a.negociacao.descontoMedioPct == null ? "—" : `${a.negociacao.descontoMedioPct}%`} hint="sobre valor original disponível" icon={TrendingUp}/></div>
