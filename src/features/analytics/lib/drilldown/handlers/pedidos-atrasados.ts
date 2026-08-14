@@ -1,4 +1,5 @@
 import { prisma } from "@/infra/db/prisma/client";
+import type { Prisma } from "@/generated/prisma";
 import type { DrilldownHandler, DrilldownFiltros } from "@/features/analytics/lib/drilldown/types";
 
 function n(v: unknown): number {
@@ -17,8 +18,8 @@ export const pedidosAtrasadosHandler: DrilldownHandler = {
   async buscar(filtros: DrilldownFiltros, pagina, tamanhoPagina) {
     const agora = new Date();
 
-    const where = {
-      status: { notIn: ["ENTREGUE_COMPLETO", "CANCELADO"] as ("AGUARDANDO_CONFIRMACAO" | "CONFIRMADO" | "EM_TRANSITO" | "ENTREGUE_PARCIAL")[] },
+    const where: Prisma.PedidoCompraWhereInput = {
+      status: { notIn: ["ENTREGUE_COMPLETO", "CANCELADO"] },
       dataPrevistaEntrega: { lt: agora, not: null },
       ...(filtros.empreendimentoId && { empreendimentoId: filtros.empreendimentoId }),
     };
