@@ -20,6 +20,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiCard, formatBRLCompacto } from "@/features/dashboard/components/kpi";
 import { PipelineExecutivoChart, BarrasSimples, FluxoExpedicaoChart } from "@/features/analytics/components/analytics-charts";
+import { AnalyticsDrilldownDrawer } from "@/features/analytics/components/analytics-drilldown-drawer";
 import type { DashboardData } from "@/features/dashboard/lib/queries";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,7 @@ function Pill({ children, tone = "default" }: { children: React.ReactNode; tone?
 export function ViewDiretor({ data }: { data: DashboardData; metasPorArea?: unknown }) {
   const a = data.analytics;
   const [aba, setAba] = React.useState<Aba>("executivo");
+  const [drilldownAberto, setDrilldownAberto] = React.useState<string | null>(null);
 
   return (
     <div className="flex flex-col gap-5">
@@ -66,7 +68,7 @@ export function ViewDiretor({ data }: { data: DashboardData; metasPorArea?: unkn
 
       {aba === "executivo" && <>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiCard label="Carteira ativa" value={a.carteira.ativos} hint={`${a.carteira.legadosAtivos} legado(s)`} icon={Building2} tone="primary" />
+          <KpiCard label="Carteira ativa" value={a.carteira.ativos} hint={`${a.carteira.legadosAtivos} legado(s)`} icon={Building2} tone="primary" onClick={() => setDrilldownAberto("carteira-ativa")} />
           <KpiCard label="Valor da carteira" value={formatBRLCompacto(a.carteira.valorCarteira)} hint={`${a.carteira.clientesAtivos} clientes ativos`} icon={BriefcaseBusiness} />
           <KpiCard label="Em produção" value={formatBRLCompacto(a.carteira.valorEmProducao)} hint={`${a.producao.ordensEmAndamento} OPs em andamento`} icon={Factory} tone="success" />
           <KpiCard label="Riscos críticos" value={a.coordenacao.criticos} hint={`${a.riscos.length} alertas totais`} icon={AlertTriangle} tone={a.coordenacao.criticos ? "danger" : "success"} />
@@ -120,7 +122,7 @@ export function ViewDiretor({ data }: { data: DashboardData; metasPorArea?: unkn
       </>}
 
       {aba === "negociacao" && <>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><KpiCard label="Valor aberto" value={formatBRLCompacto(a.negociacao.valorAberto)} hint={`${a.negociacao.abertas} negociações`} icon={Banknote} tone="primary" /><KpiCard label="Follow-ups vencidos" value={a.negociacao.followupsVencidos} hint="próxima ação atrasada" icon={Clock3} tone={a.negociacao.followupsVencidos ? "danger" : "success"}/><KpiCard label="Sem interação > 7d" value={a.negociacao.semInteracao7d} hint="carteira parada" icon={AlertTriangle} tone={a.negociacao.semInteracao7d ? "warning" : "success"}/><KpiCard label="Desconto médio" value={a.negociacao.descontoMedioPct == null ? "—" : `${a.negociacao.descontoMedioPct}%`} hint="sobre valor original disponível" icon={TrendingUp}/></div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><KpiCard label="Valor aberto" value={formatBRLCompacto(a.negociacao.valorAberto)} hint={`${a.negociacao.abertas} negociações`} icon={Banknote} tone="primary" onClick={() => setDrilldownAberto("valor-negociacao")} /><KpiCard label="Follow-ups vencidos" value={a.negociacao.followupsVencidos} hint="próxima ação atrasada" icon={Clock3} tone={a.negociacao.followupsVencidos ? "danger" : "success"}/><KpiCard label="Sem interação > 7d" value={a.negociacao.semInteracao7d} hint="carteira parada" icon={AlertTriangle} tone={a.negociacao.semInteracao7d ? "warning" : "success"} onClick={() => setDrilldownAberto("sem-interacao-7d")} /><KpiCard label="Desconto médio" value={a.negociacao.descontoMedioPct == null ? "—" : `${a.negociacao.descontoMedioPct}%`} hint="sobre valor original disponível" icon={TrendingUp}/></div>
         <Secao titulo="Perdas por motivo · 30 dias"><BarrasSimples dados={a.negociacao.motivosPerda.map((m) => ({ label: m.motivo, valor: m.valor }))} formato="moeda" /></Secao>
       </>}
 
@@ -140,6 +142,13 @@ export function ViewDiretor({ data }: { data: DashboardData; metasPorArea?: unkn
       </>}
 
       {aba === "riscos" && <Secao titulo={`Central de Riscos · ${a.riscos.length}`} descricao="Alertas objetivos, com origem e drill-down. Sem score arbitrário."><div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="border-b text-muted-foreground"><th className="py-2 text-left">Empreendimento</th><th className="text-left">Área</th><th className="text-left">Risco</th><th className="text-left">Responsável</th><th className="text-right">Severidade</th></tr></thead><tbody className="divide-y divide-border/60">{a.riscos.map((r)=><tr key={r.id}><td className="py-2"><Link href={r.href} className="font-medium hover:text-primary">{r.empreendimentoNome}</Link></td><td>{r.area}</td><td><p className="font-medium">{r.titulo}</p><p className="text-[11px] text-muted-foreground">{r.detalhe}</p></td><td>{r.responsavel ?? "—"}</td><td className="text-right"><Pill tone={r.severidade === "ALTA" ? "danger" : r.severidade === "MEDIA" ? "warning" : "default"}>{r.severidade}</Pill></td></tr>)}</tbody></table></div></Secao>}
+
+      <AnalyticsDrilldownDrawer
+        metricKey={drilldownAberto ?? ""}
+        filtros={{}}
+        aberto={drilldownAberto != null}
+        onFechar={() => setDrilldownAberto(null)}
+      />
     </div>
   );
 }
