@@ -11,6 +11,7 @@ import { classificarQuadrante, gerarAtencoesDaEquipe } from "@/core/produtividad
 import { QuadranteProdutividade } from "@/features/produtividade/components/quadrante-produtividade";
 import { SaudeGeral } from "@/features/produtividade/components/saude-geral";
 import { TempoDeCiclo } from "@/features/produtividade/components/tempo-de-ciclo";
+import { EngenhariaPerformance } from "@/features/produtividade/components/engenharia-performance";
 
 interface Props {
   searchParams: { periodo?: string };
@@ -62,7 +63,10 @@ export default async function ProdutividadePage({ searchParams }: Props) {
       <SecaoTitulo texto="Tempo Médio de Ciclo" />
       <TempoDeCiclo kpis={saudeGeral.kpisCronologicos} />
 
-      <SecaoTitulo texto="Produtividade por Pessoa" />
+      <SecaoTitulo texto="Engenharia — carga e complexidade" />
+      <EngenhariaPerformance dados={saudeGeral.engenhariaPerformance} />
+
+      <SecaoTitulo texto="Volume por Pessoa — Comercial e Orçamentação" />
       <QuadranteProdutividade pontos={pontos} precisamDeSuporte={precisamDeSuporte} destaques={destaques} periodoAtual={dias} />
     </div>
   );
