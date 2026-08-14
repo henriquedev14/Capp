@@ -194,7 +194,20 @@ export async function criarContaReceberAvulsa(
     return { erro: "Escolha um empreendimento cadastrado ou digite o nome do projeto (pré-implantação)." };
   }
   if (!Number.isFinite(dados.valor) || dados.valor <= 0) return { erro: "Valor inválido." };
-  if (dados.tipo === "REMESSA" && dados.empreendimentoId && !dados.pavimentoId) {
+
+  // Legado não tem torres/pavimentos — pavimento deixa de ser
+  // obrigatório em REMESSA quando o empreendimento está em Modo
+  // Legado. Empreendimento normal continua exigindo, sem mudança.
+  // Achado pelo Henrique em 13/08/2026.
+  let empreendimentoEhLegado = false;
+  if (dados.empreendimentoId) {
+    const emp = await prisma.empreendimento.findUnique({
+      where: { id: dados.empreendimentoId },
+      select: { origemLegado: true },
+    });
+    empreendimentoEhLegado = emp?.origemLegado ?? false;
+  }
+  if (dados.tipo === "REMESSA" && dados.empreendimentoId && !empreendimentoEhLegado && !dados.pavimentoId) {
     return { erro: "Escolha o pavimento (remessa) correspondente." };
   }
 
