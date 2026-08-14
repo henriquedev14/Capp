@@ -5,6 +5,8 @@ import { followupsVencidosHandler } from "@/features/analytics/lib/drilldown/han
 import { pedidosAtrasadosHandler } from "@/features/analytics/lib/drilldown/handlers/pedidos-atrasados";
 import { opsAtrasadasHandler } from "@/features/analytics/lib/drilldown/handlers/ops-atrasadas";
 import { financeiroVencidoHandler } from "@/features/analytics/lib/drilldown/handlers/financeiro-vencido";
+import { engenhariaAtrasadosHandler } from "@/features/analytics/lib/drilldown/handlers/engenharia-atrasados";
+import { engenhariaBloqueadosHandler } from "@/features/analytics/lib/drilldown/handlers/engenharia-bloqueados";
 import type { DrilldownHandler } from "@/features/analytics/lib/drilldown/types";
 
 /**
@@ -20,6 +22,8 @@ export const DRILLDOWN_HANDLERS: Record<string, DrilldownHandler> = {
   "pedidos-atrasados": pedidosAtrasadosHandler,
   "ops-atrasadas": opsAtrasadasHandler,
   "financeiro-vencido": financeiroVencidoHandler,
+  "engenharia-atrasados": engenhariaAtrasadosHandler,
+  "engenharia-bloqueados": engenhariaBloqueadosHandler,
 };
 
 export type MetricKey = keyof typeof DRILLDOWN_HANDLERS;
