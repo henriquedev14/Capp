@@ -39,6 +39,7 @@ const LABELS_MOTIVO_PERDA: Record<string, string> = {
 
 interface Props {
   empreendimentoId: string;
+  podeGerenciar: boolean;
   cotacoes: CotacaoDetalhe[];
   interacoes: InteracaoTimeline[];
   status: StatusNegociacao;
@@ -57,6 +58,7 @@ type FormAberto = "CONTATO" | "CONTRAPROPOSTA" | "PERDIDA" | "RETORNO_ENGENHARIA
 
 export function NegociacaoView({
   empreendimentoId,
+  podeGerenciar,
   cotacoes,
   interacoes,
   status,
@@ -95,7 +97,7 @@ export function NegociacaoView({
   const [erro, setErro] = React.useState<string | null>(null);
 
   const desconto = valorOriginal > 0 ? ((valorOriginal - valorAtual) / valorOriginal) * 100 : 0;
-  const podeAgir = status === "AGUARDANDO_CLIENTE" || status === "EM_REVISAO";
+  const podeAgir = podeGerenciar && (status === "AGUARDANDO_CLIENTE" || status === "EM_REVISAO");
   const statusInfo = LABELS_STATUS[status] ?? { label: status, classe: "bg-muted text-muted-foreground" };
 
   function limparForm() {
@@ -191,7 +193,7 @@ export function NegociacaoView({
             </div>
           )}
 
-          {status === "APROVADA" && (
+          {podeGerenciar && status === "APROVADA" && (
             <div className="mt-5">
               <Button
                 size="sm"
