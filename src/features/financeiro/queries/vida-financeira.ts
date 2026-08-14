@@ -1,4 +1,5 @@
 import { prisma } from "@/infra/db/prisma/client";
+import { calcularVidaFinanceiraLegado } from "@/core/empreendimentos/use-cases/calcular-vida-financeira-legado";
 
 export interface ContaReceberResumo {
   id: string;
@@ -19,24 +20,44 @@ export interface ContratoResumo {
 }
 
 export interface VidaFinanceira {
+  origemLegado: boolean;
   contrato: ContratoResumo | null;
   contas: ContaReceberResumo[];
+
+  // Empreendimento normal: totalContratado/totalRecebido/saldoAReceber.
+  // Legado: os 5 campos abaixo, vindos da fonte correta (nunca soma de
+  // ContaReceber pro "contratado"). Ver calcularVidaFinanceiraLegado.
   totalContratado: number;
   totalRecebido: number;
   saldoAReceber: number;
+
+  legado: {
+    faturadoHistoricoReal: number;
+    previstoAReceberPosErp: number;
+    saldoAFaturar: number;
+  } | null;
 }
 
 /**
- * "Vida Financeira" — panorama de Contas a Receber e Contrato de
- * QUALQUER empreendimento (não só Modo Legado). Mesmo espírito da
- * "Vida da Produção": uma tela de leitura, o registro em si continua
- * sendo feito no financeiro normal. Pedido pelo Henrique em
- * 13/08/2026.
+ * "Vida Financeira" — panorama de Contas a Receber de QUALQUER
+ * empreendimento. Modelagem revisada com o Henrique em 13/08/2026:
+ * pra Legado, "Contratado" vem do baseline (legadoValorContratado),
+ * NUNCA da soma de Contas a Receber — esse fallback foi a causa do
+ * "R$ 31.886,12" aparecendo errado. E "Faturado" não usa mais a
+ * palavra pra descrever Contas a Receber que só são previsão — só o
+ * histórico real conta como "Faturado"; o resto é rotulado como
+ * "Previsto a receber" no painel.
  */
 export async function buscarVidaFinanceira(empreendimentoId: string): Promise<VidaFinanceira | null> {
   const empreendimento = await prisma.empreendimento.findUnique({
     where: { id: empreendimentoId },
-    select: { id: true },
+    select: {
+      id: true,
+      origemLegado: true,
+      legadoValorContratado: true,
+      legadoFaturadoHistorico: true,
+      legadoRecebidoHistorico: true,
+    },
   });
   if (!empreendimento) return null;
 
@@ -79,11 +100,35 @@ export async function buscarVidaFinanceira(empreendimentoId: string): Promise<Vi
     };
   });
 
+  if (empreendimento.origemLegado) {
+    const v = calcularVidaFinanceiraLegado({
+      valorContratado: empreendimento.legadoValorContratado ? Number(empreendimento.legadoValorContratado) : null,
+      faturadoHistorico: empreendimento.legadoFaturadoHistorico ? Number(empreendimento.legadoFaturadoHistorico) : null,
+      recebidoHistorico: empreendimento.legadoRecebidoHistorico ? Number(empreendimento.legadoRecebidoHistorico) : null,
+      contasReceber: contas.map((c) => ({ valor: c.valor, recebido: c.recebido })),
+    });
+    return {
+      origemLegado: true,
+      contrato: null,
+      contas,
+      totalContratado: v.valorContratado,
+      totalRecebido: v.recebidoTotal,
+      saldoAReceber: v.saldoAReceber,
+      legado: {
+        faturadoHistoricoReal: v.faturadoHistoricoReal,
+        previstoAReceberPosErp: v.previstoAReceberPosErp,
+        saldoAFaturar: v.saldoAFaturar,
+      },
+    };
+  }
+
+  // Empreendimento normal — comportamento inalterado.
   const totalContratado = contrato ? Number(contrato.valorFinal) : contas.reduce((s, c) => s + c.valor, 0);
   const totalRecebido = contas.filter((c) => c.recebido).reduce((s, c) => s + c.valor, 0);
   const saldoAReceber = contas.filter((c) => !c.recebido).reduce((s, c) => s + c.valor, 0);
 
   return {
+    origemLegado: false,
     contrato: contrato
       ? {
           numero: contrato.numero,
@@ -96,5 +141,6 @@ export async function buscarVidaFinanceira(empreendimentoId: string): Promise<Vi
     totalContratado,
     totalRecebido,
     saldoAReceber,
+    legado: null,
   };
 }
