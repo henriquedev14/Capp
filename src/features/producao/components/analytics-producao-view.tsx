@@ -1,11 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { calcularProdutividadePorOperador, contarKitsFinalizados, type ProdutividadeLinha, type KitsFinalizados } from "@/features/producao/actions/producao-actions";
+import {
+  buscarMetaKitsFinalizadosDia,
+  buscarMetaProducaoDiaria,
+  calcularProdutividadePorOperador,
+  contarKitsFinalizados,
+  type ProdutividadeLinha,
+  type KitsFinalizados,
+} from "@/features/producao/actions/producao-actions";
 
 type Periodo = "hoje" | "semana" | "mes";
 
@@ -20,7 +27,10 @@ function calcularIntervalo(periodo: Periodo): { inicio: Date; fim: Date } {
   }
   if (periodo === "semana") {
     const inicio = new Date(hoje);
-    inicio.setDate(inicio.getDate() - inicio.getDay()); // volta pro domingo
+    // Semana operacional começa na segunda. Evita incluir produção de
+    // domingo em um período cuja meta considera somente dias úteis.
+    const diaSemana = inicio.getDay();
+    inicio.setDate(inicio.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1));
     return { inicio, fim };
   }
   // mês
@@ -34,23 +44,32 @@ function formatNum(v: number): string {
 
 /**
  * Analytics de Produção — substitui a planilha manual de produtividade.
- * Mesma lógica que já existia lá (U.H. Referência por bancada, meta
- * diária de 50 U.H./pessoa), só que calculado automático a partir dos
- * registros lançados no tablet, sem digitar nada em Excel.
+ * Preserva U.H. Referência por bancada, mas separa a meta de capacidade
+ * equivalente (U.H./pessoa/dia) da meta física de kits finalizados/dia.
+ * Ambas são configuráveis no sistema e usam o mesmo calendário operacional.
  */
 export function AnalyticsProducaoView() {
   const [periodo, setPeriodo] = React.useState<Periodo>("semana");
   const [linhas, setLinhas] = React.useState<ProdutividadeLinha[]>([]);
   const [kits, setKits] = React.useState<KitsFinalizados | null>(null);
+  const [metaUhDia, setMetaUhDia] = React.useState<number | null>(null);
+  const [metaKitsDia, setMetaKitsDia] = React.useState<number | null>(null);
   const [carregando, setCarregando] = React.useState(true);
 
   React.useEffect(() => {
     setCarregando(true);
     const { inicio, fim } = calcularIntervalo(periodo);
-    Promise.all([calcularProdutividadePorOperador(inicio, fim), contarKitsFinalizados(inicio, fim)])
-      .then(([prod, k]) => {
+    Promise.all([
+      calcularProdutividadePorOperador(inicio, fim),
+      contarKitsFinalizados(inicio, fim),
+      buscarMetaProducaoDiaria(),
+      buscarMetaKitsFinalizadosDia(),
+    ])
+      .then(([prod, k, metaUh, metaKits]) => {
         setLinhas(prod);
         setKits(k);
+        setMetaUhDia(metaUh);
+        setMetaKitsDia(metaKits);
       })
       .finally(() => setCarregando(false));
   }, [periodo]);
@@ -59,15 +78,19 @@ export function AnalyticsProducaoView() {
   // bancada no período) pra ter uma visão "resumo por pessoa" além do
   // detalhe por bancada.
   const porOperador = React.useMemo(() => {
-    const mapa = new Map<string, { nome: string; somaPercentual: number; qtdBancadas: number }>();
+    // Não faz média simples dos percentuais das bancadas: isso dava o mesmo
+    // peso a uma bancada onde a pessoa fez 1 UH e outra onde fez 80 UH.
+    // A pessoa tem UMA meta no período; somamos a produção equivalente e
+    // comparamos uma única vez contra essa meta.
+    const mapa = new Map<string, { nome: string; quantidadeUH: number; metaPeriodoUH: number }>();
     for (const l of linhas) {
-      const atual = mapa.get(l.operadorId) ?? { nome: l.operadorNome, somaPercentual: 0, qtdBancadas: 0 };
-      atual.somaPercentual += l.percentualMeta;
-      atual.qtdBancadas += 1;
+      const atual = mapa.get(l.operadorId) ?? { nome: l.operadorNome, quantidadeUH: 0, metaPeriodoUH: l.metaPeriodoUH };
+      atual.quantidadeUH += l.quantidadeUH;
+      atual.metaPeriodoUH = Math.max(atual.metaPeriodoUH, l.metaPeriodoUH);
       mapa.set(l.operadorId, atual);
     }
     return Array.from(mapa.values())
-      .map((o) => ({ nome: o.nome, mediaPercentual: o.somaPercentual / o.qtdBancadas }))
+      .map((o) => ({ ...o, mediaPercentual: o.metaPeriodoUH > 0 ? o.quantidadeUH / o.metaPeriodoUH : 0 }))
       .sort((a, b) => b.mediaPercentual - a.mediaPercentual);
   }, [linhas]);
 
@@ -79,6 +102,23 @@ export function AnalyticsProducaoView() {
             {p === "hoje" ? "Hoje" : p === "semana" ? "Esta semana" : "Este mês"}
           </Button>
         ))}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Meta de capacidade</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{metaUhDia == null ? "—" : `${formatNum(metaUhDia)} U.H.`}</p>
+            <p className="text-xs text-muted-foreground">por operador / dia útil</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Meta física</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{metaKitsDia == null ? "—" : `${formatNum(metaKitsDia)} kits`}</p>
+            <p className="text-xs text-muted-foreground">finalizados / dia útil</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Métrica principal — a que realmente importa pro chefe de
@@ -98,7 +138,7 @@ export function AnalyticsProducaoView() {
               <span className="text-2xl text-muted-foreground"> / {kits.meta}</span>
             </span>
             <span className="text-sm font-medium text-muted-foreground">
-              {(kits.percentual * 100).toFixed(0)}% da meta (50/dia)
+              {kits.meta > 0 ? `${(kits.percentual * 100).toFixed(0)}% da meta física do período` : "Sem meta operacional para este período"}
             </span>
           </CardContent>
         </Card>
