@@ -4,46 +4,55 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/infra/db/prisma/client";
 import { exigirPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
+import { calcularValorUnitarioBaseContratoLegado } from "@/core/empreendimentos/use-cases/calcular-valor-unitario-base-contrato-legado";
 
 export interface KitLegadoInput {
   kit: "ELETRICO" | "HIDRAULICO" | "QDC";
-  quantidadeTotal: number;
-  quantidadeEntregue: number;
-  valorContrato: number;
-  valorFaturado: number;
+  quantidadeContratada: number;
+  quantidadeEntregueHistorico: number;
+  quantidadeProduzidaHistorico?: number;
+}
+
+export interface BaselineFinanceiroInput {
+  valorContratado: number;
+  faturadoHistorico: number;
+  recebidoHistorico: number;
+  quantidadeBaseUnidades: number;
 }
 
 export interface KitLegadoView {
   id: string;
   kit: string;
-  quantidadeTotal: number;
-  quantidadeAprovada: number; // valor real, vindo da Ordem de Produção
-  valorContrato: number;
-  valorFaturadoInicial: number;
-  valorEntrada: number; // 20% do contrato
-  valorPorKit: number; // (contrato - entrada) / quantidadeTotal
-  saldoAReceber: number; // valor real, vindo das Contas a Receber (entrada + remessa)
+  quantidadeContratada: number;
+  quantidadeEntregueHistorico: number;
+  quantidadeProduzidaHistorico: number | null;
+  quantidadeProduzidaPosErp: number; // real, vindo da Ordem de Produção
+  totalEntregue: number; // histórico + pós-ERP
+  saldoRestante: number;
 }
 
-const LABEL_BANCADA_FINAL = "Finalização";
+const LABEL_KIT: Record<string, string> = { ELETRICO: "Elétrico", HIDRAULICO: "Hidráulico", QDC: "QDC" };
 
 /**
- * Modo Legado — pra empreendimentos que já estavam em andamento antes
- * do ConstruApp existir. Cada kit informado aqui gera, de verdade:
- *   - 1 Tipologia "Legado" (pra existir uma unidade de trabalho)
- *   - 1 Ordem de Produção na bancada final, já com o que foi entregue
- *     até aqui — dali pra frente, o tablet físico soma em cima normal
- *   - 1 Conta a Receber com o SALDO que falta faturar (valor do
- *     contrato menos o que já foi faturado) — o "já faturado" fica só
- *     como campo informativo, não vira lançamento retroativo no caixa
- *     (evita distorcer relatórios de um período que já passou)
- *
- * Chamar de novo com o mesmo kit ATUALIZA os registros existentes, não
- * duplica — identificado pela combinação (empreendimentoId, kit).
- * Desenhado com o Henrique em 12-13/08/2026.
+ * Salva/atualiza os kits do Modo Legado + o baseline financeiro do
+ * empreendimento. Modelagem final revisada com o Henrique em
+ * 13/08/2026:
+ *   - Financeiro fica no EMPREENDIMENTO (não no kit) — um recebimento
+ *     pode cobrir vários kits ao mesmo tempo, sem informação real de
+ *     rateio não faz sentido dividir por kit.
+ *   - A Ordem de Produção nasce ZERADA (quantidadeAprovada = 0) — o
+ *     histórico entregue fica só no KitLegado, nunca somado dentro da
+ *     Ordem de Produção. Produção nova registrada pelo Terminal cresce
+ *     a partir de zero, sem misturar com o passado.
+ *   - A Tipologia criada é TÉCNICA (tecnica: true) — existe só pra
+ *     satisfazer a estrutura interna (Ordem de Produção exige uma),
+ *     nunca conta nos indicadores de tipologia.
+ *   - Nenhuma Conta a Receber é criada aqui — financeiro posterior é
+ *     100% manual, no fluxo normal (ver bloco 5).
  */
 export async function salvarKitsLegado(
   empreendimentoId: string,
+  baseline: BaselineFinanceiroInput,
   kits: KitLegadoInput[]
 ): Promise<{ ok: true } | { erro: string }> {
   try {
@@ -52,103 +61,76 @@ export async function salvarKitsLegado(
     return { erro: e instanceof Error ? e.message : "Não autorizado." };
   }
 
+  if (baseline.valorContratado <= 0) return { erro: "Valor do contrato inválido." };
+  if (baseline.quantidadeBaseUnidades <= 0) return { erro: "Quantidade-base de unidades inválida." };
+  if (baseline.faturadoHistorico < 0 || baseline.faturadoHistorico > baseline.valorContratado) {
+    return { erro: "Valor faturado histórico inválido — não pode passar do contrato." };
+  }
+  if (baseline.recebidoHistorico < 0 || baseline.recebidoHistorico > baseline.faturadoHistorico) {
+    return { erro: "Valor recebido histórico inválido — não pode passar do faturado." };
+  }
   for (const k of kits) {
-    if (k.quantidadeTotal <= 0) return { erro: `Quantidade total inválida pro kit ${k.kit}.` };
-    if (k.quantidadeEntregue < 0 || k.quantidadeEntregue > k.quantidadeTotal) {
-      return { erro: `Quantidade entregue inválida pro kit ${k.kit} — não pode passar do total.` };
-    }
-    if (k.valorContrato <= 0) return { erro: `Valor do contrato inválido pro kit ${k.kit}.` };
-    if (k.valorFaturado < 0 || k.valorFaturado > k.valorContrato) {
-      return { erro: `Valor faturado inválido pro kit ${k.kit} — não pode passar do contrato.` };
+    if (k.quantidadeContratada <= 0) return { erro: `Quantidade contratada inválida pro kit ${k.kit}.` };
+    if (k.quantidadeEntregueHistorico < 0 || k.quantidadeEntregueHistorico > k.quantidadeContratada) {
+      return { erro: `Quantidade entregue histórico inválida pro kit ${k.kit} — não pode passar do contratado.` };
     }
   }
 
-  const bancadaFinal = await prisma.bancada.findFirst({
-    where: { nome: LABEL_BANCADA_FINAL },
-    select: { id: true },
-  });
-  if (!bancadaFinal) return { erro: `Bancada "${LABEL_BANCADA_FINAL}" não encontrada — configuração incompleta.` };
+  const bancadaFinal = await prisma.bancada.findFirst({ where: { nome: "Finalização" }, select: { id: true } });
+  if (!bancadaFinal) return { erro: 'Bancada "Finalização" não encontrada — configuração incompleta.' };
 
+  // Status PRODUCAO direto — Legado pula Comercial/Orçamentação/
+  // Negociação/Contrato/Suprimentos. Achado pelo Henrique em
+  // 13/08/2026: status errado (CONTRATADO) deixava o card de Produção
+  // bloqueado.
   await prisma.empreendimento.update({
     where: { id: empreendimentoId },
-    data: { origemLegado: true },
+    data: {
+      origemLegado: true,
+      status: "PRODUCAO",
+      legadoValorContratado: baseline.valorContratado,
+      legadoFaturadoHistorico: baseline.faturadoHistorico,
+      legadoRecebidoHistorico: baseline.recebidoHistorico,
+      legadoQuantidadeBaseUnidades: baseline.quantidadeBaseUnidades,
+    },
   });
 
   for (const k of kits) {
     const existente = await prisma.kitLegado.findUnique({
       where: { empreendimentoId_kit: { empreendimentoId, kit: k.kit } },
-      select: { id: true, tipologiaId: true, ordemProducaoId: true, contaReceberId: true, contaReceberRemessaId: true },
+      select: { id: true, tipologiaId: true, ordemProducaoId: true },
     });
 
-    // Padrão financeiro real: 20% de entrada, 80% dividido pela
-    // quantidade de unidades desse kit ("valor por kit"). O que já foi
-    // faturado abate primeiro da entrada, depois do restante. Pedido
-    // pelo Henrique em 13/08/2026.
-    const valorEntradaTotal = Math.round(k.valorContrato * 0.2 * 100) / 100;
-    const valorRemessaTotal = k.valorContrato - valorEntradaTotal;
-    const valorPorKit = k.quantidadeTotal > 0 ? valorRemessaTotal / k.quantidadeTotal : 0;
-
-    const faturadoNaEntrada = Math.min(k.valorFaturado, valorEntradaTotal);
-    const faturadoNaRemessa = Math.max(0, k.valorFaturado - valorEntradaTotal);
-    const saldoEntrada = valorEntradaTotal - faturadoNaEntrada;
-    const saldoRemessa = valorRemessaTotal - faturadoNaRemessa;
-
-    const obsRemessa = `Saldo do contrato legado (kit ${LABEL_KIT[k.kit]}) — valor por kit: R$ ${valorPorKit.toFixed(2)} (${k.quantidadeTotal} un.).`;
-
     if (existente) {
-      // Atualiza os 4 registros de verdade, sem duplicar.
       if (existente.tipologiaId) {
         await prisma.tipologia.update({
           where: { id: existente.tipologiaId },
-          data: { quantidadeUnidades: k.quantidadeTotal },
+          data: { quantidadeUnidades: k.quantidadeContratada },
         });
       }
       if (existente.ordemProducaoId) {
         await prisma.ordemProducao.update({
           where: { id: existente.ordemProducaoId },
-          data: {
-            quantidadeAlvo: k.quantidadeTotal,
-            quantidadeAprovada: k.quantidadeEntregue,
-            status: k.quantidadeEntregue >= k.quantidadeTotal ? "CONCLUIDA" : "PENDENTE",
-          },
-        });
-      }
-      if (existente.contaReceberId) {
-        await prisma.contaReceber.update({
-          where: { id: existente.contaReceberId },
-          data:
-            saldoEntrada <= 0
-              ? { valor: valorEntradaTotal, recebido: true, recebidoEm: new Date() }
-              : { valor: saldoEntrada, recebido: false, recebidoEm: null },
-        });
-      }
-      if (existente.contaReceberRemessaId) {
-        await prisma.contaReceber.update({
-          where: { id: existente.contaReceberRemessaId },
-          data:
-            saldoRemessa <= 0
-              ? { valor: valorRemessaTotal, recebido: true, recebidoEm: new Date(), observacoes: obsRemessa }
-              : { valor: saldoRemessa, recebido: false, recebidoEm: null, observacoes: obsRemessa },
+          data: { quantidadeAlvo: k.quantidadeContratada },
         });
       }
       await prisma.kitLegado.update({
         where: { id: existente.id },
         data: {
-          quantidadeTotal: k.quantidadeTotal,
-          valorContrato: k.valorContrato,
-          quantidadeEntregueInicial: k.quantidadeEntregue,
-          valorFaturadoInicial: k.valorFaturado,
+          quantidadeContratada: k.quantidadeContratada,
+          quantidadeEntregueHistorico: k.quantidadeEntregueHistorico,
+          quantidadeProduzidaHistorico: k.quantidadeProduzidaHistorico ?? null,
         },
       });
       continue;
     }
 
-    // Cria os 4 registros de verdade + o KitLegado que amarra tudo.
     const tipologia = await prisma.tipologia.create({
       data: {
         empreendimentoId,
         nome: `Legado — ${LABEL_KIT[k.kit]}`,
-        quantidadeUnidades: k.quantidadeTotal,
+        quantidadeUnidades: k.quantidadeContratada,
+        tecnica: true,
       },
     });
 
@@ -158,31 +140,9 @@ export async function salvarKitsLegado(
         numero: proximoNumero,
         tipologiaId: tipologia.id,
         bancadaId: bancadaFinal.id,
-        quantidadeAlvo: k.quantidadeTotal,
-        quantidadeAprovada: k.quantidadeEntregue,
-        status: k.quantidadeEntregue >= k.quantidadeTotal ? "CONCLUIDA" : "PENDENTE",
-      },
-    });
-
-    const contaEntrada = await prisma.contaReceber.create({
-      data: {
-        empreendimentoId,
-        tipo: "ENTRADA",
-        valor: saldoEntrada > 0 ? saldoEntrada : valorEntradaTotal,
-        recebido: saldoEntrada <= 0,
-        recebidoEm: saldoEntrada <= 0 ? new Date() : null,
-        observacoes: `Entrada (20%) do contrato legado — kit ${LABEL_KIT[k.kit]}.`,
-      },
-    });
-
-    const contaRemessa = await prisma.contaReceber.create({
-      data: {
-        empreendimentoId,
-        tipo: "REMESSA",
-        valor: saldoRemessa > 0 ? saldoRemessa : valorRemessaTotal,
-        recebido: saldoRemessa <= 0,
-        recebidoEm: saldoRemessa <= 0 ? new Date() : null,
-        observacoes: obsRemessa,
+        quantidadeAlvo: k.quantidadeContratada,
+        quantidadeAprovada: 0, // nasce ZERADA — nunca pré-preenchida com histórico
+        status: "PENDENTE",
       },
     });
 
@@ -190,14 +150,11 @@ export async function salvarKitsLegado(
       data: {
         empreendimentoId,
         kit: k.kit,
-        quantidadeTotal: k.quantidadeTotal,
-        valorContrato: k.valorContrato,
-        quantidadeEntregueInicial: k.quantidadeEntregue,
-        valorFaturadoInicial: k.valorFaturado,
+        quantidadeContratada: k.quantidadeContratada,
+        quantidadeEntregueHistorico: k.quantidadeEntregueHistorico,
+        quantidadeProduzidaHistorico: k.quantidadeProduzidaHistorico ?? null,
         tipologiaId: tipologia.id,
         ordemProducaoId: ordemProducao.id,
-        contaReceberId: contaEntrada.id,
-        contaReceberRemessaId: contaRemessa.id,
       },
     });
   }
@@ -213,9 +170,8 @@ export async function desativarModoLegado(empreendimentoId: string): Promise<{ o
     return { erro: e instanceof Error ? e.message : "Não autorizado." };
   }
 
-  // Só tira a flag — os registros criados (Tipologia, Ordem de
-  // Produção, Conta a Receber) continuam existindo normalmente, como
-  // qualquer outro dado real do sistema. "Tudo guardado", como pedido.
+  // Só tira a flag — Tipologia, Ordem de Produção e o baseline
+  // continuam existindo normalmente. "Tudo guardado", como pedido.
   await prisma.empreendimento.update({
     where: { id: empreendimentoId },
     data: { origemLegado: false },
@@ -228,35 +184,25 @@ export async function desativarModoLegado(empreendimentoId: string): Promise<{ o
 export async function buscarKitsLegado(empreendimentoId: string): Promise<KitLegadoView[]> {
   const kits = await prisma.kitLegado.findMany({
     where: { empreendimentoId },
-    include: {
-      ordemProducao: { select: { quantidadeAprovada: true } },
-      contaReceber: { select: { valor: true, recebido: true } },
-      contaReceberRemessa: { select: { valor: true, recebido: true } },
-    },
+    include: { ordemProducao: { select: { quantidadeAprovada: true } } },
     orderBy: { kit: "asc" },
   });
 
   return kits.map((k) => {
-    const saldoEntrada = k.contaReceber && !k.contaReceber.recebido ? Number(k.contaReceber.valor) : 0;
-    const saldoRemessa = k.contaReceberRemessa && !k.contaReceberRemessa.recebido ? Number(k.contaReceberRemessa.valor) : 0;
+    const produzidoPosErp = k.ordemProducao?.quantidadeAprovada ?? 0;
+    const totalEntregue = k.quantidadeEntregueHistorico + produzidoPosErp;
     return {
       id: k.id,
       kit: k.kit,
-      quantidadeTotal: k.quantidadeTotal,
-      quantidadeAprovada: k.ordemProducao?.quantidadeAprovada ?? k.quantidadeEntregueInicial,
-      valorContrato: Number(k.valorContrato),
-      valorFaturadoInicial: Number(k.valorFaturadoInicial),
-      valorEntrada: Math.round(Number(k.valorContrato) * 0.2 * 100) / 100,
-      valorPorKit:
-        k.quantidadeTotal > 0
-          ? Math.round(((Number(k.valorContrato) - Number(k.valorContrato) * 0.2) / k.quantidadeTotal) * 100) / 100
-          : 0,
-      saldoAReceber: saldoEntrada + saldoRemessa,
+      quantidadeContratada: k.quantidadeContratada,
+      quantidadeEntregueHistorico: k.quantidadeEntregueHistorico,
+      quantidadeProduzidaHistorico: k.quantidadeProduzidaHistorico,
+      quantidadeProduzidaPosErp: produzidoPosErp,
+      totalEntregue,
+      saldoRestante: Math.max(0, k.quantidadeContratada - totalEntregue),
     };
   });
 }
-
-const LABEL_KIT: Record<string, string> = { ELETRICO: "Elétrico", HIDRAULICO: "Hidráulico", QDC: "QDC" };
 
 async function proximoNumeroOp(): Promise<string> {
   const ultima = await prisma.ordemProducao.findFirst({ orderBy: { numero: "desc" }, select: { numero: true } });
@@ -265,12 +211,9 @@ async function proximoNumeroOp(): Promise<string> {
 }
 
 /**
- * Criação SIMPLIFICADA de empreendimento em Modo Legado — pra quando
- * não tem nada além do básico (sem torres, sem tipologias detalhadas,
- * sem planilha de material, sem levantamento). Cria o empreendimento
- * com o mínimo necessário e já ativa o Legado com os kits informados,
- * tudo numa ação só. Pedido pelo Henrique em 13/08/2026: "desde o
- * começo já mostre a opção do legado".
+ * Criação simplificada de empreendimento Legado — mínimo necessário,
+ * sem torres/tipologias detalhadas/planilha/levantamento. Cria tudo
+ * numa ação só. Pedido pelo Henrique em 13/08/2026.
  */
 export async function criarEmpreendimentoLegado(input: {
   nome: string;
@@ -281,6 +224,7 @@ export async function criarEmpreendimentoLegado(input: {
   tipo: string;
   construtora: string;
   responsavelComercial: string;
+  baseline: BaselineFinanceiroInput;
   kits: KitLegadoInput[];
 }): Promise<{ id: string } | { erro: string }> {
   try {
@@ -307,17 +251,17 @@ export async function criarEmpreendimentoLegado(input: {
       tipo: input.tipo as never,
       construtora: input.construtora.trim() || input.nome.trim(),
       responsavelComercial: input.responsavelComercial.trim() || "—",
-      status: "CONTRATADO",
+      status: "PROSPECCAO", // provisório — salvarKitsLegado abaixo já sobrescreve pra PRODUCAO
       origemLegado: true,
     },
   });
 
-  const resultado = await salvarKitsLegado(empreendimento.id, input.kits);
+  const resultado = await salvarKitsLegado(empreendimento.id, input.baseline, input.kits);
   if ("erro" in resultado) {
-    // Empreendimento já foi criado — não desfaz, só avisa. É mais
-    // seguro corrigir os kits depois do que perder o cadastro todo.
     return { erro: `Empreendimento criado, mas houve erro nos kits: ${resultado.erro}` };
   }
 
   return { id: empreendimento.id };
 }
+
+export { calcularValorUnitarioBaseContratoLegado };
