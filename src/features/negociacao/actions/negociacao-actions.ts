@@ -156,7 +156,7 @@ interface RegistrarInteracaoInput {
 export async function registrarInteracao(input: RegistrarInteracaoInput): Promise<{ ok: true } | { erro: string }> {
   let sessao;
   try {
-    sessao = await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
+    sessao = await exigirPermissao(PERMISSOES.NEGOCIACAO_GERENCIAR);
   } catch (e) {
     return { erro: e instanceof Error ? e.message : "Não autorizado." };
   }
@@ -289,7 +289,7 @@ export async function registrarGanhaEGerarContrato(
 ): Promise<{ ok: true; contratoId: string } | { erro: string }> {
   let sessao;
   try {
-    sessao = await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
+    sessao = await exigirPermissao(PERMISSOES.NEGOCIACAO_GERENCIAR);
   } catch (e) {
     return { erro: e instanceof Error ? e.message : "Não autorizado." };
   }
@@ -372,7 +372,7 @@ export async function reverterAprovacaoNegociacao(
 ): Promise<{ ok: true } | { erro: string }> {
   let sessao;
   try {
-    sessao = await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
+    sessao = await exigirPermissao(PERMISSOES.NEGOCIACAO_GERENCIAR);
   } catch (e) {
     return { erro: e instanceof Error ? e.message : "Não autorizado." };
   }
