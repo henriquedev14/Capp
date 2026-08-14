@@ -1,3 +1,4 @@
+import { diasUteisEntre } from "@/core/analytics/calendario-operacional";
 // Consultas agregadas para o Painel com visão por papel.
 // Executadas em paralelo no server component para reduzir latência.
 // Nenhuma delas depende do papel do usuário — a filtragem/apresentação é
@@ -5,8 +6,12 @@
 // mostra o subconjunto relevante para a aba ativa.
 
 import { prisma } from "@/infra/db/prisma/client";
+import { carregarAnalyticsData } from "@/features/analytics/lib/queries";
+import type { AnalyticsData } from "@/features/analytics/lib/types";
 
 export interface DashboardData {
+  // Camada gerencial normalizada — fonte única para Diretoria/Coordenação.
+  analytics: AnalyticsData;
   // Empreendimentos com dados essenciais para todos os widgets
   empreendimentos: EmpreendimentoResumo[];
   // Orçamentos com status + totais + responsáveis
@@ -133,6 +138,9 @@ export interface LevantamentoResumo {
 }
 
 export async function carregarDashboardData(): Promise<DashboardData> {
+  // Dispara junto com as consultas legadas do painel; as views antigas continuam
+  // funcionando enquanto Diretoria/Coordenação migram para a fonte normalizada.
+  const analyticsPromise = carregarAnalyticsData();
   const inicioMes = new Date();
   inicioMes.setDate(1);
   inicioMes.setHours(0, 0, 0, 0);
@@ -518,7 +526,7 @@ export async function carregarDashboardData(): Promise<DashboardData> {
   // enum, tipo "NEGOCIACAO", seja pelo rótulo em português, tipo
   // "Negociação" — os vários pontos do sistema que geram esses eventos ao
   // longo da vida do projeto escreveram de jeitos um pouco diferentes).
-  const diffDias = (inicio: Date, fim: Date) => (fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24);
+  const diffDias = (inicio: Date, fim: Date) => diasUteisEntre(inicio, fim);
   const media = (valores: number[]) => (valores.length === 0 ? null : valores.reduce((s, v) => s + v, 0) / valores.length);
 
   // Engenharia: Comercial concluído → Engenharia concluída
@@ -638,7 +646,10 @@ export async function carregarDashboardData(): Promise<DashboardData> {
     },
   };
 
+  const analytics = await analyticsPromise;
+
   return {
+    analytics,
     empreendimentos,
     orcamentos,
     levantamentos: {
