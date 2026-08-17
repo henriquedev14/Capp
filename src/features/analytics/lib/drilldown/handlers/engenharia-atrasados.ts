@@ -5,10 +5,15 @@ const LABEL_DISC: Record<string, string> = { ELETRICA: "Elétrica", HIDRAULICA: 
 
 /**
  * "Atrasados" (Engenharia) — pacotes com prazo vencido registrado em
- * EngenhariaControle. Limitação conhecida: não cruza com o status do
- * Levantamento (RASCUNHO/VALIDADO) — em tese um pacote validado logo
- * após o prazo vencer ainda apareceria aqui por alguns instantes.
- * Aceitável dado o volume baixo; revisar se virar ruído na prática.
+ * EngenhariaControle. `empreendimentoId` é um campo solto (sem
+ * @relation nomeada no schema — instrumentação evita FK pesada de
+ * propósito), então o empreendimento é buscado numa segunda query e
+ * unido em memória, em vez de um include direto.
+ *
+ * Limitação conhecida: não cruza com o status do Levantamento
+ * (RASCUNHO/VALIDADO) — em tese um pacote validado logo após o prazo
+ * vencer ainda apareceria aqui por alguns instantes. Aceitável dado o
+ * volume baixo; revisar se virar ruído na prática.
  */
 export const engenhariaAtrasadosHandler: DrilldownHandler = {
   titulo: "Pacotes de Engenharia atrasados",
@@ -30,7 +35,7 @@ export const engenhariaAtrasadosHandler: DrilldownHandler = {
           id: true,
           referenciaTipo: true,
           prazo: true,
-          empreendimento: { select: { id: true, nome: true } },
+          empreendimentoId: true,
           executor: { select: { nome: true } },
         },
         orderBy: { prazo: "asc" },
@@ -39,18 +44,24 @@ export const engenhariaAtrasadosHandler: DrilldownHandler = {
       }),
     ]);
 
+    const empreendimentos = await prisma.empreendimento.findMany({
+      where: { id: { in: itens.map((i) => i.empreendimentoId) } },
+      select: { id: true, nome: true },
+    });
+    const nomePorId = new Map(empreendimentos.map((e) => [e.id, e.nome]));
+
     const linhas = itens.map((c) => {
       const diasAtraso = c.prazo ? Math.floor((agora.getTime() - c.prazo.getTime()) / (1000 * 60 * 60 * 24)) : 0;
       return {
         id: c.id,
-        empreendimentoId: c.empreendimento.id,
-        empreendimentoNome: c.empreendimento.nome,
+        empreendimentoId: c.empreendimentoId,
+        empreendimentoNome: nomePorId.get(c.empreendimentoId) ?? "—",
         cliente: null,
         etapa: LABEL_DISC[c.referenciaTipo] ?? c.referenciaTipo,
         valor: null,
         responsavel: c.executor?.nome ?? "Não atribuído",
         detalhe: `Atrasado há ${diasAtraso} dia(s)`,
-        href: `/empreendimentos/${c.empreendimento.id}`,
+        href: `/empreendimentos/${c.empreendimentoId}`,
       };
     });
 
