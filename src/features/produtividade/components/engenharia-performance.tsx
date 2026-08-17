@@ -23,11 +23,11 @@ export function EngenhariaPerformance({ dados }: { dados: AnalyticsData["engenha
           <CardContent className="pt-4">
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
-                <thead><tr className="border-b text-muted-foreground"><th className="py-2 text-left">Pessoa</th><th className="text-left">Disciplina</th><th className="text-right">WIP</th><th className="text-right">Carga pts</th><th className="text-right">Entregue pts</th><th className="text-right">Bloq.</th><th className="text-right">FPY</th><th className="text-right">Lead</th><th className="text-right">No prazo</th></tr></thead>
+                <thead><tr className="border-b text-muted-foreground"><th className="py-2 text-left">Pessoa</th><th className="text-left">Disciplinas</th><th className="text-right">WIP</th><th className="text-right">Carga pts</th><th className="text-right">Entregue pts</th><th className="text-right">Bloq.</th><th className="text-right">FPY</th><th className="text-right">Lead</th><th className="text-right">No prazo</th></tr></thead>
                 <tbody className="divide-y divide-border/60">
                   {dados.porPessoa.map((p) => (
-                    <tr key={`${p.usuarioId}-${p.disciplina}`}>
-                      <td className="py-2 font-medium">{p.nome}</td><td>{p.disciplina}</td><td className="text-right">{p.wip}</td><td className="text-right font-semibold">{p.backlogPontos}</td><td className="text-right font-semibold">{p.entreguePontos}</td><td className="text-right">{p.pacotesBloqueados}</td><td className="text-right">{p.qualidadePct == null ? "—" : `${p.qualidadePct}%`}</td><td className="text-right">{p.leadTimeMedioDias == null ? "—" : `${p.leadTimeMedioDias}d`}</td><td className="text-right">{p.noPrazoPct == null ? "—" : `${p.noPrazoPct}%`}</td>
+                    <tr key={p.usuarioId}>
+                      <td className="py-2 font-medium">{p.nome}</td><td>{p.disciplinas.join(" + ")}</td><td className="text-right">{p.wip}</td><td className="text-right font-semibold">{p.backlogPontos}</td><td className="text-right font-semibold">{p.entreguePontos}</td><td className="text-right">{p.pacotesBloqueados}</td><td className="text-right">{p.qualidadePct == null ? "—" : `${p.qualidadePct}%`}</td><td className="text-right">{p.leadTimeMedioDias == null ? "—" : `${p.leadTimeMedioDias}d`}</td><td className="text-right">{p.noPrazoPct == null ? "—" : `${p.noPrazoPct}%`}</td>
                     </tr>
                   ))}
                 </tbody>
