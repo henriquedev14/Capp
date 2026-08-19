@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/infra/db/prisma/client";
 import { exigirPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
-import { calcularValorUnitarioBaseContratoLegado } from "@/core/empreendimentos/use-cases/calcular-valor-unitario-base-contrato-legado";
 
 export interface KitLegadoInput {
   kit: "ELETRICO" | "HIDRAULICO" | "QDC";
@@ -283,5 +282,3 @@ export async function criarEmpreendimentoLegado(input: {
 
   return { id: empreendimento.id };
 }
-
-export { calcularValorUnitarioBaseContratoLegado };
