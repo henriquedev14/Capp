@@ -72,3 +72,30 @@ export function calcularPrioridade(
 
   return { prioridade, diasSemInteracao, followUpVencido, proximaAcaoData: ultima.proximaAcaoData };
 }
+
+export interface InteracaoParaValor {
+  createdAt: Date;
+  valorNegociado: number | null;
+}
+
+/**
+ * Valor NEGOCIADO atual — a interação mais recente (por data) que
+ * realmente teve um `valorNegociado` preenchido, não simplesmente a
+ * interação mais recente de qualquer tipo. Um follow-up ou uma
+ * anotação sem valor não deve "esconder" o último valor renegociado
+ * de verdade. Se nenhuma interação teve valor ainda, usa `valorBase`
+ * (orçamento, contrato ou baseline Legado — decidido por quem chama).
+ *
+ * Fonte única a partir de 19/08/2026 — antes existiam 2 versões
+ * ligeiramente diferentes: `queries.ts` já fazia essa busca certa
+ * (percorrendo todo o histórico), mas `valor-negociacao.ts` só
+ * conferia a interação mais recente de qualquer tipo (`take: 1`),
+ * podendo "perder" um valor negociado se a interação mais recente
+ * fosse só uma anotação sem valor.
+ */
+export function resolverValorNegociadoAtual(interacoes: InteracaoParaValor[], valorBase: number): number {
+  const comValor = interacoes.filter((i) => i.valorNegociado != null);
+  if (comValor.length === 0) return valorBase;
+  const maisRecente = comValor.reduce((mais, atual) => (atual.createdAt > mais.createdAt ? atual : mais));
+  return maisRecente.valorNegociado as number;
+}
