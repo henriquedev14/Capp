@@ -7,6 +7,9 @@ import { logger } from "@/infra/logger/logger";
 import { exigirPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 import { verificarEmpreendimentoAtivo } from "@/infra/db/guardas/verificar-empreendimento-ativo";
+import { OrcamentacaoPrismaRepository } from "@/infra/db/prisma/repositories/orcamentacao-prisma-repository";
+
+const orcamentacaoRepo = new OrcamentacaoPrismaRepository();
 
 interface Resultado {
   erro?: string;
@@ -114,6 +117,7 @@ export async function confirmarAplicacaoTabelaPreco(
   const bloqueio = await verificarEmpreendimentoAtivo(empreendimentoId);
   if (!bloqueio.permitido) return { erro: bloqueio.motivo! };
 
+  const orcamentoIds = new Set<string>();
   for (const escolha of escolhas) {
     const item = await prisma.itemMaterialOrcamento.findUnique({ where: { id: escolha.itemOrcamentoId } });
     if (!item) continue;
@@ -128,6 +132,15 @@ export async function confirmarAplicacaoTabelaPreco(
         situacao: "NORMAL",
       },
     });
+    orcamentoIds.add(item.orcamentoId);
+  }
+
+  // Muda o total de cada item -> precisa recalcular o total do orçamento.
+  // Achado numa auditoria em 19/08/2026: esse recalculo não acontecia
+  // aqui, deixando Orcamento.totalMateriais desatualizado depois de
+  // aplicar Tabela de Preços em lote.
+  for (const orcamentoId of orcamentoIds) {
+    await orcamentacaoRepo.recalcularTotalMateriais(orcamentoId);
   }
 
   logger.info(
@@ -196,6 +209,9 @@ export async function definirFornecedorItemOrcamento(
       situacao: "NORMAL",
     },
   });
+  // Mudou o total do item -> recalcula o total do orçamento (mesmo
+  // achado de 19/08/2026 do outro fluxo acima).
+  await orcamentacaoRepo.recalcularTotalMateriais(item.orcamentoId);
   revalidatePath(`/empreendimentos/${empreendimentoId}/orcamento`);
   return { ok: true };
 }
