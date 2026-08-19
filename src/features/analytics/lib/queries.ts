@@ -1,6 +1,7 @@
 import { prisma } from "@/infra/db/prisma/client";
 import { PERMISSOES } from "@/core/auth/permissions";
 import { diasUteisEntre } from "@/core/analytics/calendario-operacional";
+import { resolverValorNegociadoAtual } from "@/core/negociacao/use-cases/status-negociacao";
 import {
   calcularComplexidadeEletrica,
   calcularComplexidadeHidraulica,
@@ -382,13 +383,30 @@ export async function carregarAnalyticsData(): Promise<AnalyticsData> {
   const valorNegociacaoAtualPorEmp = new Map<string, number>();
   for (const [empreendimentoId, its] of interacoesPorEmp) {
     const base = valorEmp.get(empreendimentoId) ?? 0;
-    const ultimaComValor = [...its].reverse().find((i) => i.valorNegociado != null);
-    valorNegociacaoAtualPorEmp.set(empreendimentoId, ultimaComValor ? n(ultimaComValor.valorNegociado) : base);
+    const itsConvertidas = its.map((i) => ({ createdAt: i.createdAt, valorNegociado: i.valorNegociado != null ? n(i.valorNegociado) : null }));
+    valorNegociacaoAtualPorEmp.set(empreendimentoId, resolverValorNegociadoAtual(itsConvertidas, base));
+  }
+
+  /**
+   * Valor ATUAL de um empreendimento pra qualquer soma/KPI — não é
+   * sempre `valorEmp` puro. Achado numa auditoria em 19/08/2026: "Valor
+   * da carteira" (Visão Executiva) somava `valorEmp` (valor de
+   * orçamento) mesmo pra quem já estava em NEGOCIACAO com desconto
+   * aplicado, enquanto Pipeline e a aba Negociação já usavam o valor
+   * renegociado (`valorNegociacaoAtualPorEmp`) — dois números
+   * diferentes pro mesmo empreendimento, em telas diferentes. Fonte
+   * única a partir de agora: em NEGOCIACAO usa o valor renegociado (se
+   * já teve alguma interação com valor); fora disso, `valorEmp` já é
+   * a fonte certa (contrato fechado, orçamento, ou baseline Legado).
+   */
+  function valorAtualEmp(e: { id: string; status: string }): number {
+    if (e.status === "NEGOCIACAO") return valorNegociacaoAtualPorEmp.get(e.id) ?? valorEmp.get(e.id) ?? 0;
+    return valorEmp.get(e.id) ?? 0;
   }
 
   const ativos = empreendimentos.filter((e) => !["CONCLUIDO", "ARQUIVADO"].includes(e.status));
   const clientesAtivos = new Set(ativos.map((e) => e.cliente.id)).size;
-  const valorCarteira = ativos.reduce((s, e) => s + (valorEmp.get(e.id) ?? 0), 0);
+  const valorCarteira = ativos.reduce((s, e) => s + valorAtualEmp(e), 0);
   const valorContratado = ativos
     .filter((e) => ["CONTRATADO", "SUPRIMENTOS", "PRODUCAO"].includes(e.status))
     .reduce((s, e) => s + (valorEmp.get(e.id) ?? 0), 0);
@@ -418,7 +436,7 @@ export async function carregarAnalyticsData(): Promise<AnalyticsData> {
       status,
       label: LABEL_STATUS[status] ?? status,
       quantidade: itens.length,
-      valor: itens.reduce((s, e) => s + (status === "NEGOCIACAO" ? (valorNegociacaoAtualPorEmp.get(e.id) ?? valorEmp.get(e.id) ?? 0) : (valorEmp.get(e.id) ?? 0)), 0),
+      valor: itens.reduce((s, e) => s + valorAtualEmp(e), 0),
       agingMedioDias: media(agings),
       foraSla: sla == null ? 0 : agings.filter((d) => d > sla).length,
     };
