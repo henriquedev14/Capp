@@ -13,6 +13,9 @@ import { proximoNumeroCotacao } from "@/features/cotacoes/lib/numero-cotacao";
 import { proximoNumeroRodada } from "@/features/cotacoes/lib/numero-rodada";
 import type { CotacaoDetalhe } from "@/features/cotacoes/components/cotacao-detail-view";
 import { construirMapaPrecoResolvido } from "@/core/fornecedores/use-cases/construir-mapa-preco-resolvido";
+import { OrcamentacaoPrismaRepository } from "@/infra/db/prisma/repositories/orcamentacao-prisma-repository";
+
+const orcamentacaoRepo = new OrcamentacaoPrismaRepository();
 
 // --------------------------------------------------------------------------
 // Preview de fornecedores para o modal "Gerar Cotação"
@@ -523,16 +526,11 @@ export async function mudarStatusCotacao(
       }
     }
 
-    // Recalcula o total de materiais do orçamento com os preços novos.
-    const itensAtualizados = await prisma.itemMaterialOrcamento.findMany({
-      where: { orcamentoId: cotacao.orcamentoId },
-      select: { total: true },
-    });
-    const totalMateriais = itensAtualizados.reduce((acc, i) => acc + Number(i.total ?? 0), 0);
-    await prisma.orcamento.update({
-      where: { id: cotacao.orcamentoId },
-      data: { totalMateriais },
-    });
+    // Recalcula o total de materiais do orçamento com os preços novos —
+    // via método compartilhado (já inclui a margem de 10%; antes esse
+    // cálculo era duplicado aqui sem a margem, risco de divergir do
+    // resto do sistema).
+    await orcamentacaoRepo.recalcularTotalMateriais(cotacao.orcamentoId);
   }
 
   revalidatePath(`/empreendimentos/${cotacao.orcamento.empreendimentoId}/orcamento`);
