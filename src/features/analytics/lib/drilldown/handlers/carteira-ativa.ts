@@ -1,5 +1,6 @@
 import { prisma } from "@/infra/db/prisma/client";
 import type { DrilldownHandler, DrilldownFiltros } from "@/features/analytics/lib/drilldown/types";
+import { resolverValorNegociadoAtual } from "@/core/negociacao/use-cases/status-negociacao";
 
 function n(v: unknown): number {
   return v == null ? 0 : Number(v);
@@ -9,6 +10,14 @@ function n(v: unknown): number {
  * "Carteira ativa" — todo empreendimento que não chegou em
  * CONCLUIDO/ARQUIVADO. Mesmo filtro usado em carregarAnalyticsData
  * (linha "const ativos = ..."), pra nunca divergir do card.
+ *
+ * Valor de cada linha: pra quem está em NEGOCIACAO, usa o valor
+ * renegociado atual (resolverValorNegociadoAtual) — igual "Valor da
+ * carteira" e o Pipeline já fazem. Antes essa lista usava só o valor
+ * de orçamento puro pra todo mundo, então concordava com "Carteira
+ * ativa" (contagem) mas discordava do valor mostrado em Pipeline/
+ * Negociação pra quem tinha desconto negociado. Corrigido numa
+ * auditoria em 19/08/2026, junto com o mesmo achado em queries.ts.
  */
 export const carteiraAtivaHandler: DrilldownHandler = {
   titulo: "Carteira ativa",
@@ -40,6 +49,7 @@ export const carteiraAtivaHandler: DrilldownHandler = {
           cliente: { select: { razaoSocial: true, nomeFantasia: true } },
           responsavelComercialUser: { select: { nome: true } },
           orcamentos: { orderBy: { revisao: "desc" }, take: 1, select: { totalServicosHgi: true, totalMateriais: true } },
+          interacoesNegociacao: { select: { createdAt: true, valorNegociado: true } },
         },
         orderBy: { updatedAt: "desc" },
         skip: (pagina - 1) * tamanhoPagina,
@@ -48,9 +58,14 @@ export const carteiraAtivaHandler: DrilldownHandler = {
     ]);
 
     const linhas = itens.map((e) => {
-      const valor = e.origemLegado
-        ? n(e.legadoValorContratado)
-        : n(e.orcamentos[0]?.totalServicosHgi) + n(e.orcamentos[0]?.totalMateriais);
+      const valorOrcamento = n(e.orcamentos[0]?.totalServicosHgi) + n(e.orcamentos[0]?.totalMateriais);
+      const valorBase = e.origemLegado ? n(e.legadoValorContratado) : valorOrcamento;
+      const valor = e.status === "NEGOCIACAO"
+        ? resolverValorNegociadoAtual(
+            e.interacoesNegociacao.map((i) => ({ createdAt: i.createdAt, valorNegociado: i.valorNegociado != null ? n(i.valorNegociado) : null })),
+            valorBase
+          )
+        : valorBase;
       return {
         id: e.id,
         empreendimentoId: e.id,
