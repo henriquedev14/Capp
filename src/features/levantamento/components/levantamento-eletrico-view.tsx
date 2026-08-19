@@ -111,8 +111,8 @@ export function LevantamentoEletricoView({
     setMensagem({
       tipo: "ok",
       texto: `${resultado.totalPecas} peças importadas com sucesso.${
-        resultado.avisos.length > 0 ? ` Avisos: ${resultado.avisos.join(" ")}` : ""
-      }`,
+        resultado.totalMateriais > 0 ? ` ${resultado.totalMateriais} materiais importados automaticamente.` : ""
+      }${resultado.avisos.length > 0 ? ` Avisos: ${resultado.avisos.join(" ")}` : ""}`,
     });
     router.refresh();
   }
