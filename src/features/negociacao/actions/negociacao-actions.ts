@@ -14,6 +14,25 @@ import {
   type PrioridadeNegociacao,
 } from "@/core/negociacao/use-cases/status-negociacao";
 
+/**
+ * Mesmo padrão já usado em Expedição (expedicao-actions.ts) — erro de
+ * serialização do Postgres (duas transações concorrentes mexendo no
+ * mesmo dado) vira mensagem acionável em vez do erro cru do banco.
+ * Achado numa auditoria em 19/08/2026: fechar duas negociações ao
+ * mesmo tempo podia gerar o mesmo número de contrato; agora as duas
+ * disputam a mesma transação Serializable e uma delas recebe este erro
+ * — pede pra tentar de novo, sem deixar nada pela metade no banco.
+ */
+function tratarErroNegociacao(e: unknown): { erro: string } {
+  if (e instanceof Error) {
+    if ("code" in e && (e as { code?: string }).code === "40001") {
+      return { erro: "Outra pessoa confirmou uma negociação ao mesmo tempo. Tente de novo." };
+    }
+    return { erro: e.message };
+  }
+  return { erro: "Erro inesperado." };
+}
+
 export interface LinhaHubNegociacao {
   empreendimentoId: string;
   nome: string;
@@ -299,65 +318,73 @@ export async function registrarGanhaEGerarContrato(
     return { erro: "Confirme os dados do cliente antes de gerar o contrato." };
   }
 
-  await prisma.interacaoNegociacao.create({
-    data: {
-      empreendimentoId: input.empreendimentoId,
-      tipo: "GANHA",
-      valorNegociado: input.valorFinal,
-      cotacaoVencedoraId: input.cotacaoVencedoraId ?? null,
-      observacoes: input.observacoes?.trim() || null,
-      registradoPorId: sessao.user.id,
-    },
-  });
-
-  if (input.cotacaoVencedoraId) {
-    const cotacaoVencedora = await prisma.cotacao.findUnique({
-      where: { id: input.cotacaoVencedoraId },
-      select: { rodadaId: true },
-    });
-    if (cotacaoVencedora?.rodadaId) {
-      await prisma.cotacao.updateMany({
-        where: { rodadaId: cotacaoVencedora.rodadaId, id: { not: input.cotacaoVencedoraId } },
-        data: { status: "RECUSADA" },
+  try {
+    const contratoId = await prisma.$transaction(async (tx) => {
+      await tx.interacaoNegociacao.create({
+        data: {
+          empreendimentoId: input.empreendimentoId,
+          tipo: "GANHA",
+          valorNegociado: input.valorFinal,
+          cotacaoVencedoraId: input.cotacaoVencedoraId ?? null,
+          observacoes: input.observacoes?.trim() || null,
+          registradoPorId: sessao.user.id,
+        },
       });
-    }
-    await prisma.cotacao.update({ where: { id: input.cotacaoVencedoraId }, data: { status: "ACEITA" } });
+
+      if (input.cotacaoVencedoraId) {
+        const cotacaoVencedora = await tx.cotacao.findUnique({
+          where: { id: input.cotacaoVencedoraId },
+          select: { rodadaId: true },
+        });
+        if (cotacaoVencedora?.rodadaId) {
+          await tx.cotacao.updateMany({
+            where: { rodadaId: cotacaoVencedora.rodadaId, id: { not: input.cotacaoVencedoraId } },
+            data: { status: "RECUSADA" },
+          });
+        }
+        await tx.cotacao.update({ where: { id: input.cotacaoVencedoraId }, data: { status: "ACEITA" } });
+      }
+
+      await tx.empreendimento.update({
+        where: { id: input.empreendimentoId },
+        data: { status: "CONTRATADO" },
+      });
+
+      // Só nasce a Conta a Receber quando o cliente REALMENTE aceitou — antes
+      // existia um código velho (removido em 09/08/2026) que disparava isso
+      // já na geração da Proposta, achando que "gerou proposta em Negociação"
+      // significava "cliente aceitou". Agora só acontece aqui, no fluxo real
+      // de Ganha, junto com o Contrato.
+      await criarContaReceberAutomatica(input.empreendimentoId, tx);
+
+      const numero = await proximoNumeroContrato(tx);
+      const contrato = await tx.contrato.create({
+        data: {
+          numero,
+          empreendimentoId: input.empreendimentoId,
+          empresaGrupoId: input.empresaGrupoId,
+          clienteRazaoSocial: input.clienteRazaoSocial.trim(),
+          clienteCnpj: input.clienteCnpj.trim(),
+          clienteEndereco: input.clienteEndereco?.trim() || null,
+          clienteCidade: input.clienteCidade?.trim() || null,
+          clienteEstado: input.clienteEstado?.trim() || null,
+          valorFinal: input.valorFinal,
+          geradoPorId: sessao.user.id,
+        },
+        select: { id: true },
+      });
+
+      return contrato.id;
+    }, { isolationLevel: "Serializable" });
+
+    revalidatePath(`/empreendimentos/${input.empreendimentoId}/negociacao`);
+    revalidatePath(`/empreendimentos/${input.empreendimentoId}`);
+    revalidatePath("/negociacao");
+
+    return { ok: true, contratoId };
+  } catch (e) {
+    return tratarErroNegociacao(e);
   }
-
-  await prisma.empreendimento.update({
-    where: { id: input.empreendimentoId },
-    data: { status: "CONTRATADO" },
-  });
-
-  // Só nasce a Conta a Receber quando o cliente REALMENTE aceitou — antes
-  // existia um código velho (removido em 09/08/2026) que disparava isso
-  // já na geração da Proposta, achando que "gerou proposta em Negociação"
-  // significava "cliente aceitou". Agora só acontece aqui, no fluxo real
-  // de Ganha, junto com o Contrato.
-  await criarContaReceberAutomatica(input.empreendimentoId);
-
-  const numero = await proximoNumeroContrato();
-  const contrato = await prisma.contrato.create({
-    data: {
-      numero,
-      empreendimentoId: input.empreendimentoId,
-      empresaGrupoId: input.empresaGrupoId,
-      clienteRazaoSocial: input.clienteRazaoSocial.trim(),
-      clienteCnpj: input.clienteCnpj.trim(),
-      clienteEndereco: input.clienteEndereco?.trim() || null,
-      clienteCidade: input.clienteCidade?.trim() || null,
-      clienteEstado: input.clienteEstado?.trim() || null,
-      valorFinal: input.valorFinal,
-      geradoPorId: sessao.user.id,
-    },
-    select: { id: true },
-  });
-
-  revalidatePath(`/empreendimentos/${input.empreendimentoId}/negociacao`);
-  revalidatePath(`/empreendimentos/${input.empreendimentoId}`);
-  revalidatePath("/negociacao");
-
-  return { ok: true, contratoId: contrato.id };
 }
 
 /**
@@ -386,26 +413,32 @@ export async function reverterAprovacaoNegociacao(
     return { erro: "Essa negociação não está aprovada — nada pra reverter." };
   }
 
-  await prisma.contaReceber.deleteMany({ where: { empreendimentoId } });
-  await prisma.contrato.deleteMany({ where: { empreendimentoId } });
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.contaReceber.deleteMany({ where: { empreendimentoId } });
+      await tx.contrato.deleteMany({ where: { empreendimentoId } });
 
-  await prisma.empreendimento.update({
-    where: { id: empreendimentoId },
-    data: { status: "NEGOCIACAO" },
-  });
+      await tx.empreendimento.update({
+        where: { id: empreendimentoId },
+        data: { status: "NEGOCIACAO" },
+      });
 
-  await prisma.interacaoNegociacao.create({
-    data: {
-      empreendimentoId,
-      tipo: "APROVACAO_REVERTIDA",
-      observacoes: "Aprovação revertida — Contrato e Contas a Receber gerados automaticamente foram apagados.",
-      registradoPorId: sessao.user.id,
-    },
-  });
+      await tx.interacaoNegociacao.create({
+        data: {
+          empreendimentoId,
+          tipo: "APROVACAO_REVERTIDA",
+          observacoes: "Aprovação revertida — Contrato e Contas a Receber gerados automaticamente foram apagados.",
+          registradoPorId: sessao.user.id,
+        },
+      });
+    }, { isolationLevel: "Serializable" });
 
-  revalidatePath(`/empreendimentos/${empreendimentoId}/negociacao`);
-  revalidatePath(`/empreendimentos/${empreendimentoId}`);
-  revalidatePath("/negociacao");
+    revalidatePath(`/empreendimentos/${empreendimentoId}/negociacao`);
+    revalidatePath(`/empreendimentos/${empreendimentoId}`);
+    revalidatePath("/negociacao");
 
-  return { ok: true };
+    return { ok: true };
+  } catch (e) {
+    return tratarErroNegociacao(e);
+  }
 }
