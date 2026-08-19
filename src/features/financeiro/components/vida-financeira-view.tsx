@@ -9,6 +9,7 @@ function formatData(iso: string): string {
 }
 
 const LABEL_TIPO: Record<string, string> = { ENTRADA: "Entrada", REMESSA: "Remessa" };
+const LABEL_KIT: Record<string, string> = { ELETRICO: "Elétrico", HIDRAULICO: "Hidráulico", QDC: "QDC" };
 
 /**
  * "Vida Financeira" — panorama de Contas a Receber de QUALQUER
@@ -42,6 +43,44 @@ export function VidaFinanceiraView({ dados }: { dados: VidaFinanceira }) {
             <p className="text-[10px] font-medium uppercase tracking-wide text-warning">A receber</p>
             <p className="mt-1 text-base font-bold tabular-nums text-warning">{formatBRL(dados.saldoAReceber)}</p>
           </div>
+        </div>
+      )}
+
+      {dados.origemLegado && dados.legado && dados.legado.porKit.length > 0 && (
+        <div className="rounded-xl border border-border bg-card">
+          <div className="border-b border-border px-5 py-3.5">
+            <p className="text-sm font-semibold text-foreground">Valor estimado por kit</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {formatBRL(dados.legado.porKit.reduce((s, k) => s + k.valorEstimado, 0))} (80% do contrato) repartido entre os
+              kits — por quantidade contratada, exceto onde há valor específico informado.
+            </p>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs text-muted-foreground">
+                <th className="px-4 py-2 text-left font-medium">Kit</th>
+                <th className="px-2 py-2 text-right font-medium">Qtd. contratada</th>
+                <th className="px-2 py-2 text-left font-medium">Origem</th>
+                <th className="px-4 py-2 text-right font-medium">Valor estimado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {dados.legado.porKit.map((k) => (
+                <tr key={k.kit}>
+                  <td className="px-4 py-2.5 font-medium">{LABEL_KIT[k.kit] ?? k.kit}</td>
+                  <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{k.quantidadeContratada}</td>
+                  <td className="px-2 py-2.5">
+                    {k.origem === "informado" ? (
+                      <span className="rounded-md bg-success/10 px-2 py-0.5 text-xs font-medium text-success">Informado</span>
+                    ) : (
+                      <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">Estimado</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-medium tabular-nums">{formatBRL(k.valorEstimado)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
