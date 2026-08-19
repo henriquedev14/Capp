@@ -191,14 +191,38 @@ export async function uploadMateriaisTipologia(
     return { erro: "Formato inválido. Envie um arquivo .xlsx, .xlsm ou .xltx." };
   }
 
+  const buffer = Buffer.from(await arquivo.arrayBuffer());
+  return processarUploadMateriais(empreendimentoId, tipologiaId, buffer, sessao.user.id, arquivo.name);
+}
+
+/**
+ * Núcleo do upload de materiais — separado de `uploadMateriaisTipologia`
+ * (que cuida de auth/guarda/validação de arquivo) pra poder ser chamado
+ * de dois lugares: o upload manual de materiais (aqui) E o import do
+ * Levantamento Elétrico (`levantamento-actions.ts`), que agora lê a aba
+ * "MATERIAL" automaticamente do MESMO arquivo, sem precisar de um
+ * segundo upload. Pedido pelo Henrique em 19/08/2026: "a planilha de
+ * import é a mesma tanto pra material quanto pro levantamento elétrico,
+ * eu queria importar ela só uma vez".
+ *
+ * Quem chama já validou auth/arquivo/guarda — esta função só cuida da
+ * regra de negócio (status VALIDADO trava reimport, parse, casamento
+ * com catálogo, persistência).
+ */
+export async function processarUploadMateriais(
+  empreendimentoId: string,
+  tipologiaId: string,
+  buffer: Buffer,
+  usuarioId: string,
+  nomeArquivo: string
+): Promise<ResultadoUploadMateriais | { erro: string }> {
   // Levantamento já validado não pode ser sobrescrito por upload — precisa
   // reverter pra rascunho antes (mesma regra do resto da tela).
   const existente = await repo.buscar(empreendimentoId, tipologiaId);
   if (existente?.status === "VALIDADO") {
-    return { erro: "Este levantamento já foi validado. Reverta para rascunho antes de subir uma nova planilha." };
+    return { erro: "Este levantamento de materiais já foi validado. Reverta para rascunho antes de subir uma nova planilha." };
   }
 
-  const buffer = Buffer.from(await arquivo.arrayBuffer());
   const { linhas, avisos } = importarPlanilhaMateriais(buffer);
   if (linhas.length === 0) {
     return { erro: avisos[0] ?? "Não encontrei nenhum material pra importar nesta planilha." };
@@ -223,7 +247,7 @@ export async function uploadMateriaisTipologia(
     };
   });
 
-  const lev = await repo.criarOuBuscar(empreendimentoId, tipologiaId, sessao.user.id);
+  const lev = await repo.criarOuBuscar(empreendimentoId, tipologiaId, usuarioId);
   await repo.substituirItensPorUpload(lev.id, itensParaSalvar);
 
   const todosAvisos = [...avisos];
@@ -237,8 +261,8 @@ export async function uploadMateriaisTipologia(
     empreendimentoId,
     tipo: "DOCUMENTO",
     titulo: "Materiais importados via planilha",
-    descricao: `${itensParaSalvar.length} materiais importados de "${arquivo.name}" para a tipologia.`,
-    usuarioId: sessao.user.id,
+    descricao: `${itensParaSalvar.length} materiais importados de "${nomeArquivo}" para a tipologia.`,
+    usuarioId,
   });
 
   revalidar(empreendimentoId);
