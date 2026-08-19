@@ -6,10 +6,10 @@ import { Loader2, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import {
   salvarKitsLegado,
   desativarModoLegado,
-  calcularValorUnitarioBaseContratoLegado,
   type KitLegadoInput,
   type BaselineFinanceiroInput,
 } from "@/features/empreendimentos/actions/legado-actions";
+import { calcularValorUnitarioBaseContratoLegado } from "@/core/empreendimentos/use-cases/calcular-valor-unitario-base-contrato-legado";
 
 const LABEL_KIT: Record<string, string> = { ELETRICO: "Elétrico", HIDRAULICO: "Hidráulico", QDC: "QDC" };
 const KITS_DISPONIVEIS = ["ELETRICO", "HIDRAULICO", "QDC"] as const;
