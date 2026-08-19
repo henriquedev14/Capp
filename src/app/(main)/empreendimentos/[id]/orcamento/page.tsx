@@ -30,7 +30,7 @@ import { podeGerenciarJornada } from "@/features/orcamentacao/actions/jornada-ac
 import { ValorLivreCard } from "@/features/orcamentacao/components/valor-livre-card";
 import { prisma } from "@/infra/db/prisma/client";
 import { buscarInfoPropostaOrcamento, listarCotacoesDoOrcamento, listarFornecedoresAtivosResumo } from "@/features/orcamentacao/actions/orcamento-actions";
-import { consolidarItensPorMaterial } from "@/core/orcamentacao/use-cases/consolidar-itens-material";
+import { aplicarMargemMaterial } from "@/core/orcamentacao/use-cases/consolidar-itens-material";
 import { CotacoesUnificadas } from "@/features/cotacoes/components/cotacoes-unificadas";
 import { buscarTodasCotacoesDetalhadas } from "@/features/cotacoes/actions/buscar-todas-detalhadas";
 import { getTierOption } from "@/features/tiers/constants";
@@ -186,7 +186,13 @@ export default async function OrcamentoPage({ params, searchParams }: Props) {
   // lugar nenhum — 4 pontos diferentes do código adicionam/alteram
   // itens de material sem nunca atualizar esse campo. Em vez de caçar
   // os 4 lugares (risco de esquecer um quinto), calcula direto.
-  const totalMateriaisReal = orcamento?.itensMaterial.reduce((s, i) => s + (i.total ?? 0), 0) ?? 0;
+  // Atualização 19/08/2026: os 4 lugares foram corrigidos (todos
+  // chamam recalcularTotalMateriais agora), mas o cálculo ao vivo
+  // continua como segurança extra — só precisa incluir a mesma margem
+  // de 10% que o valor persistido já inclui, senão os dois divergem.
+  const totalMateriaisReal = aplicarMargemMaterial(
+    orcamento?.itensMaterial.reduce((s, i) => s + (i.total ?? 0), 0) ?? 0
+  );
 
   // Kits contratados
   const kitsAtivos = [
