@@ -7,6 +7,7 @@ import { TimelinePrismaRepository } from "@/infra/db/prisma/repositories/timelin
 import { exigirPermissao } from "@/infra/auth/exigir-permissao";
 import { PERMISSOES } from "@/core/auth/permissions";
 import type { CircuitoPeca } from "@/core/empreendimentos/entities/levantamento-eletrico";
+import { processarUploadMateriais } from "@/features/orcamentacao/actions/levantamento-materiais-actions";
 
 /**
  * Resumo do catálogo PEX (total ativo + agrupado por categoria) —
@@ -211,7 +212,7 @@ export async function importarPlanilha(
   empreendimentoId: string,
   tipologiaId: string,
   formData: FormData
-): Promise<{ ok: true; totalPecas: number; avisos: string[] } | { erro: string }> {
+): Promise<{ ok: true; totalPecas: number; totalMateriais: number; avisos: string[] } | { erro: string }> {
   let sessao;
   try {
     sessao = await exigirPermissao(PERMISSOES.EMPREENDIMENTO_EDITAR);
@@ -333,7 +334,48 @@ export async function importarPlanilha(
       usuarioId: sessao.user.id,
     });
 
-    return { ok: true, totalPecas: resultado.pecas.length, avisos: resultado.avisos };
+    // Mesmo arquivo, mesma planilha: se tiver uma aba "MATERIAL" (o
+    // mesmo template usado no Levantamento Elétrico já pode trazer
+    // essa aba pronta), importa os materiais automaticamente também —
+    // sem precisar subir o arquivo de novo na tela de Materiais.
+    // Pedido pelo Henrique em 19/08/2026. Não bloqueia o import do
+    // levantamento se a aba MATERIAL não existir ou der erro — isso é
+    // só um bônus em cima do que já funcionou.
+    const avisosFinal = [...resultado.avisos];
+    const temAbaMaterial = wbProbe.SheetNames.some((n) => n.trim().toUpperCase() === "MATERIAL");
+    let totalMateriais = 0;
+    if (temAbaMaterial) {
+      try {
+        const materiaisResultado = await processarUploadMateriais(
+          empreendimentoId,
+          tipologiaId,
+          buffer,
+          sessao.user.id,
+          arquivo.name
+        );
+        if ("erro" in materiaisResultado) {
+          avisosFinal.push(`Aba MATERIAL encontrada, mas não importada: ${materiaisResultado.erro}`);
+        } else {
+          totalMateriais = materiaisResultado.totalItens;
+          avisosFinal.push(
+            `${materiaisResultado.totalItens} material(is) importado(s) automaticamente da aba MATERIAL.`
+          );
+          if (materiaisResultado.codigosNaoEncontrados.length > 0) {
+            avisosFinal.push(
+              `${materiaisResultado.codigosNaoEncontrados.length} código(s) de material sem correspondência no catálogo.`
+            );
+          }
+        }
+      } catch (e) {
+        // Nunca deixa um erro na parte de materiais derrubar o import do
+        // levantamento, que já foi salvo com sucesso acima.
+        avisosFinal.push(
+          `Aba MATERIAL encontrada, mas houve erro ao importar: ${e instanceof Error ? e.message : "erro desconhecido"}.`
+        );
+      }
+    }
+
+    return { ok: true, totalPecas: resultado.pecas.length, totalMateriais, avisos: avisosFinal };
   } catch (e) {
     return {
       erro: e instanceof Error ? `Erro ao processar planilha: ${e.message}` : "Erro ao importar.",
