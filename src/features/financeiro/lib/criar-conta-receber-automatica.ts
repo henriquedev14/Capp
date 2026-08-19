@@ -1,4 +1,5 @@
 import { prisma } from "@/infra/db/prisma/client";
+import type { Prisma } from "@/generated/prisma";
 
 const PERCENTUAL_ENTRADA = 0.2; // 20% na assinatura
 const DIAS_PRAZO_PAGAMENTO = 28; // 28 dias após assinatura OU após envio da remessa
@@ -21,15 +22,22 @@ const DIAS_PRAZO_PAGAMENTO = 28; // 28 dias após assinatura OU após envio da r
  * Idempotente: se já existir QUALQUER Conta a Receber pra esse
  * empreendimento, não cria de novo (evita duplicar se os dois gatilhos de
  * status acabarem chamando pro mesmo empreendimento).
+ *
+ * Aceita um cliente de transação opcional (`db`) — passe o `tx` de quem
+ * chamou quando isso fizer parte de um fluxo maior que precisa ser
+ * atômico (ex: registrarGanhaEGerarContrato), senão usa o client normal.
  */
-export async function criarContaReceberAutomatica(empreendimentoId: string): Promise<void> {
-  const jaExiste = await prisma.contaReceber.findFirst({
+export async function criarContaReceberAutomatica(
+  empreendimentoId: string,
+  db: Prisma.TransactionClient | typeof prisma = prisma
+): Promise<void> {
+  const jaExiste = await db.contaReceber.findFirst({
     where: { empreendimentoId },
     select: { id: true },
   });
   if (jaExiste) return;
 
-  const orcamento = await prisma.orcamento.findFirst({
+  const orcamento = await db.orcamento.findFirst({
     where: { empreendimentoId },
     orderBy: { revisao: "desc" },
     select: { id: true, totalServicosHgi: true, totalMateriais: true },
@@ -48,7 +56,7 @@ export async function criarContaReceberAutomatica(empreendimentoId: string): Pro
   const dataEntrada = new Date();
   dataEntrada.setDate(dataEntrada.getDate() + DIAS_PRAZO_PAGAMENTO);
 
-  await prisma.contaReceber.create({
+  await db.contaReceber.create({
     data: {
       empreendimentoId,
       orcamentoId: orcamento.id,
@@ -63,7 +71,7 @@ export async function criarContaReceberAutomatica(empreendimentoId: string): Pro
   // a data prevista de remessa que o Comercial cadastrou (se cadastrou)
   // — assim a Conta a Receber já nasce com a data, sem precisar que o
   // Financeiro preencha na mão depois.
-  const torres = await prisma.torre.findMany({
+  const torres = await db.torre.findMany({
     where: { empreendimentoId },
     include: {
       pavimentos: { select: { id: true, dataPrevistaRemessa: true }, orderBy: { ordem: "asc" } },
@@ -88,7 +96,7 @@ export async function criarContaReceberAutomatica(empreendimentoId: string): Pro
     // saber em quantas remessas dividir. Cria os 80% restantes como uma
     // única remessa "genérica", sem pavimento vinculado, também
     // aguardando alguém registrar quando isso foi/será entregue.
-    await prisma.contaReceber.create({
+    await db.contaReceber.create({
       data: {
         empreendimentoId,
         orcamentoId: orcamento.id,
@@ -101,7 +109,7 @@ export async function criarContaReceberAutomatica(empreendimentoId: string): Pro
 
   const valorPorPavimento = Math.round((valorRestante / pavimentos.length) * 100) / 100;
 
-  await prisma.contaReceber.createMany({
+  await db.contaReceber.createMany({
     data: pavimentos.map((p) => ({
       empreendimentoId,
       orcamentoId: orcamento.id,
