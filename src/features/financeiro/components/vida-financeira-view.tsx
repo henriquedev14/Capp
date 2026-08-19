@@ -18,30 +18,30 @@ const LABEL_KIT: Record<string, string> = { ELETRICO: "Elétrico", HIDRAULICO: "
  */
 export function VidaFinanceiraView({ dados }: { dados: VidaFinanceira }) {
   const pctRecebido = dados.totalContratado > 0 ? Math.min(100, (dados.totalRecebido / dados.totalContratado) * 100) : 0;
+  // 80% pra kits calculado a partir da SOMA real do breakdown (não repete o
+  // 0,8 aqui de novo) — a entrada é o que sobra do total menos esse pool.
+  // Fonte do 0,8: calcularValorEstimadoPorKitLegado, core/empreendimentos.
+  const poolKits = dados.legado?.porKit.reduce((s, k) => s + k.valorEstimado, 0) ?? 0;
+  const entrada = dados.origemLegado ? dados.totalContratado - poolKits : 0;
 
   return (
     <div className="flex flex-col gap-6">
       {dados.origemLegado && dados.legado && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <div className="rounded-lg border border-border bg-card p-3.5">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Contratado</p>
-            <p className="mt-1 text-base font-bold tabular-nums text-foreground">{formatBRL(dados.totalContratado)}</p>
-          </div>
-          <div className="rounded-lg border border-border bg-card p-3.5">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Faturado (histórico)</p>
-            <p className="mt-1 text-base font-bold tabular-nums text-foreground">{formatBRL(dados.legado.faturadoHistoricoReal)}</p>
-          </div>
-          <div className="rounded-lg border border-success/30 bg-success/5 p-3.5">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-success">Recebido</p>
-            <p className="mt-1 text-base font-bold tabular-nums text-success">{formatBRL(dados.totalRecebido)}</p>
-          </div>
-          <div className="rounded-lg border border-warning/30 bg-warning/5 p-3.5">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-warning">A faturar</p>
-            <p className="mt-1 text-base font-bold tabular-nums text-warning">{formatBRL(dados.legado.saldoAFaturar)}</p>
-          </div>
-          <div className="rounded-lg border border-warning/30 bg-warning/5 p-3.5">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-warning">A receber</p>
-            <p className="mt-1 text-base font-bold tabular-nums text-warning">{formatBRL(dados.saldoAReceber)}</p>
+        <div>
+          <p className="mb-2 text-sm font-semibold text-foreground">Composição do contrato</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-border bg-card p-3.5">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Valor total contratado</p>
+              <p className="mt-1 text-lg font-bold tabular-nums text-foreground">{formatBRL(dados.totalContratado)}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-3.5">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Entrada (20%)</p>
+              <p className="mt-1 text-lg font-bold tabular-nums text-foreground">{formatBRL(entrada)}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-3.5">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Restante — dividido entre os kits (80%)</p>
+              <p className="mt-1 text-lg font-bold tabular-nums text-foreground">{formatBRL(poolKits)}</p>
+            </div>
           </div>
         </div>
       )}
@@ -49,10 +49,9 @@ export function VidaFinanceiraView({ dados }: { dados: VidaFinanceira }) {
       {dados.origemLegado && dados.legado && dados.legado.porKit.length > 0 && (
         <div className="rounded-xl border border-border bg-card">
           <div className="border-b border-border px-5 py-3.5">
-            <p className="text-sm font-semibold text-foreground">Valor estimado por kit</p>
+            <p className="text-sm font-semibold text-foreground">Valor por kit</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {formatBRL(dados.legado.porKit.reduce((s, k) => s + k.valorEstimado, 0))} (80% do contrato) repartido entre os
-              kits — por quantidade contratada, exceto onde há valor específico informado.
+              Os {formatBRL(poolKits)} acima repartidos por quantidade contratada — exceto onde há valor específico informado.
             </p>
           </div>
           <table className="w-full text-sm">
@@ -61,39 +60,59 @@ export function VidaFinanceiraView({ dados }: { dados: VidaFinanceira }) {
                 <th className="px-4 py-2 text-left font-medium">Kit</th>
                 <th className="px-2 py-2 text-right font-medium">Qtd. contratada</th>
                 <th className="px-2 py-2 text-left font-medium">Origem</th>
-                <th className="px-4 py-2 text-right font-medium">Valor estimado</th>
+                <th className="px-2 py-2 text-right font-medium">Valor unitário</th>
+                <th className="px-4 py-2 text-right font-medium">Valor total estimado</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {dados.legado.porKit.map((k) => (
-                <tr key={k.kit}>
-                  <td className="px-4 py-2.5 font-medium">{LABEL_KIT[k.kit] ?? k.kit}</td>
-                  <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{k.quantidadeContratada}</td>
-                  <td className="px-2 py-2.5">
-                    {k.origem === "informado" ? (
-                      <span className="rounded-md bg-success/10 px-2 py-0.5 text-xs font-medium text-success">Informado</span>
-                    ) : (
-                      <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">Estimado</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 text-right font-medium tabular-nums">{formatBRL(k.valorEstimado)}</td>
-                </tr>
-              ))}
+              {dados.legado.porKit.map((k) => {
+                const valorUnitario = k.quantidadeContratada > 0 ? k.valorEstimado / k.quantidadeContratada : 0;
+                return (
+                  <tr key={k.kit}>
+                    <td className="px-4 py-2.5 font-medium">{LABEL_KIT[k.kit] ?? k.kit}</td>
+                    <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{k.quantidadeContratada}</td>
+                    <td className="px-2 py-2.5">
+                      {k.origem === "informado" ? (
+                        <span className="rounded-md bg-success/10 px-2 py-0.5 text-xs font-medium text-success">Informado</span>
+                      ) : (
+                        <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">Estimado</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2.5 text-right font-semibold tabular-nums text-foreground">{formatBRL(valorUnitario)}</td>
+                    <td className="px-4 py-2.5 text-right font-medium tabular-nums text-muted-foreground">{formatBRL(k.valorEstimado)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Valor total</p>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums text-foreground">{formatBRL(dados.totalContratado)}</p>
-          {dados.contrato && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Contrato {dados.contrato.numero} · {dados.contrato.empresaGrupoNome}
-            </p>
-          )}
+      {dados.origemLegado && dados.legado && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-border bg-card p-3.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Faturado (histórico pré-ERP)</p>
+            <p className="mt-1 text-base font-bold tabular-nums text-foreground">{formatBRL(dados.legado.faturadoHistoricoReal)}</p>
+          </div>
+          <div className="rounded-lg border border-warning/30 bg-warning/5 p-3.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-warning">Saldo a faturar (do histórico)</p>
+            <p className="mt-1 text-base font-bold tabular-nums text-warning">{formatBRL(dados.legado.saldoAFaturar)}</p>
+          </div>
         </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {!dados.origemLegado && (
+          <div className="rounded-xl border border-border bg-card p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Valor total</p>
+            <p className="mt-1.5 text-2xl font-bold tabular-nums text-foreground">{formatBRL(dados.totalContratado)}</p>
+            {dados.contrato && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Contrato {dados.contrato.numero} · {dados.contrato.empresaGrupoNome}
+              </p>
+            )}
+          </div>
+        )}
         <div className="rounded-xl border border-success/30 bg-success/5 p-5">
           <p className="text-xs font-medium uppercase tracking-wide text-success">Já recebido</p>
           <p className="mt-1.5 text-2xl font-bold tabular-nums text-success">{formatBRL(dados.totalRecebido)}</p>
@@ -113,7 +132,6 @@ export function VidaFinanceiraView({ dados }: { dados: VidaFinanceira }) {
           <span className="font-medium text-foreground">{formatBRL(dados.legado.previstoAReceberPosErp)}</span>
         </p>
       )}
-
 
       <div className="rounded-xl border border-border bg-card">
         <div className="border-b border-border px-5 py-3.5">
