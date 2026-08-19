@@ -11,6 +11,7 @@ import type {
   EtapaJornada,
 } from "@/core/orcamentacao/entities/orcamento";
 import { jornadaInicial } from "@/core/orcamentacao/use-cases/jornada-orcamento";
+import { aplicarMargemMaterial } from "@/core/orcamentacao/use-cases/consolidar-itens-material";
 
 // ---------------------------------------------------------------------------
 // Helpers de conversão Decimal → number
@@ -323,12 +324,25 @@ export class OrcamentacaoPrismaRepository {
     });
   }
 
+  /**
+   * Recalcula e GRAVA o total de materiais do orçamento — fonte única
+   * de verdade. Já inclui a margem de perda de 10% (achado numa
+   * auditoria em 19/08/2026: esse campo tinha histórico de ficar
+   * desatualizado porque nem todo lugar que mexe em ItemMaterialOrcamento
+   * chamava esta função — corrigido nos mesmos arquivos, chamando este
+   * método sempre que um item muda). Pedido pelo Henrique: a margem
+   * precisa refletir em tudo que deriva daqui pra frente (valor do
+   * orçamento, valor do contrato), sem aparecer visível em lugar
+   * nenhum — por isso ela entra bem aqui, na gravação, não em cada
+   * tela que lê o campo depois.
+   */
   async recalcularTotalMateriais(orcamentoId: string): Promise<void> {
     const itens = await prisma.itemMaterialOrcamento.findMany({
       where: { orcamentoId },
       select: { total: true },
     });
-    const totalMateriais = itens.reduce((acc, i) => acc + toNum(i.total ?? 0), 0);
+    const totalBruto = itens.reduce((acc, i) => acc + toNum(i.total ?? 0), 0);
+    const totalMateriais = aplicarMargemMaterial(totalBruto);
     await prisma.orcamento.update({
       where: { id: orcamentoId },
       data: { totalMateriais },
