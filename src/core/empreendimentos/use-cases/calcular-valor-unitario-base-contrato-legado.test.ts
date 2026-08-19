@@ -19,7 +19,8 @@ describe("calcularValorUnitarioBaseContratoLegado", () => {
 
 describe("calcularValorEstimadoPorKitLegado", () => {
   it("reparte o pool de 80% proporcionalmente à quantidade quando nenhum kit tem valor específico", () => {
-    // pool = 1.000.000 * 0.8 = 800.000, repartido 50/50/50 (soma 150) -> 1/3 pra cada
+    // pool = 1.000.000 * 0.8 = 800.000, repartido 50/50/50 (soma 150) -> 1/3 pra cada,
+    // com o método do maior resto os 2 primeiros levam o centavo que sobra (soma exata)
     const resultado = calcularValorEstimadoPorKitLegado(1_000_000, [
       { kit: "ELETRICO", quantidadeContratada: 50 },
       { kit: "HIDRAULICO", quantidadeContratada: 50 },
@@ -27,8 +28,10 @@ describe("calcularValorEstimadoPorKitLegado", () => {
     ]);
     expect(resultado).toHaveLength(3);
     expect(resultado.every((r) => r.origem === "estimado")).toBe(true);
-    expect(resultado.reduce((s, r) => s + r.valorEstimado, 0)).toBeCloseTo(800_000, 2);
-    expect(resultado[0].valorEstimado).toBeCloseTo(266_666.67, 2);
+    expect(resultado.reduce((s, r) => s + r.valorEstimado, 0)).toBe(800_000);
+    expect(resultado[0].valorEstimado).toBe(266_666.67);
+    expect(resultado[1].valorEstimado).toBe(266_666.67);
+    expect(resultado[2].valorEstimado).toBe(266_666.66);
   });
 
   it("reparte proporcionalmente por quantidade quando as quantidades diferem entre kits", () => {

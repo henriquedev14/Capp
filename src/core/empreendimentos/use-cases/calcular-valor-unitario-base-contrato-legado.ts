@@ -74,20 +74,45 @@ export function calcularValorEstimadoPorKitLegado(
   if (!valorContratado || kits.length === 0) return [];
 
   const baseValorKits = valorContratado * PERCENTUAL_DESTINADO_AOS_KITS;
+  const temValorReal = (k: (typeof kits)[number]) => k.valorContratoEspecifico != null && k.valorContratoEspecifico > 0;
 
-  const comValorReal = kits.filter((k) => k.valorContratoEspecifico != null && k.valorContratoEspecifico > 0);
-  const semValorReal = kits.filter((k) => !(k.valorContratoEspecifico != null && k.valorContratoEspecifico > 0));
-
-  const somaValorReal = comValorReal.reduce((s, k) => s + (k.valorContratoEspecifico ?? 0), 0);
-  const poolRestante = Math.max(0, baseValorKits - somaValorReal);
+  const somaValorReal = kits.filter(temValorReal).reduce((s, k) => s + (k.valorContratoEspecifico ?? 0), 0);
+  const poolRestanteCentavos = Math.round(Math.max(0, baseValorKits - somaValorReal) * 100);
+  const semValorReal = kits.filter((k) => !temValorReal(k));
   const somaQuantidadesSemValorReal = semValorReal.reduce((s, k) => s + k.quantidadeContratada, 0);
 
+  // Rateio do pool restante em CENTAVOS INTEIROS pelo método do maior
+  // resto (largest remainder) — sem isso, arredondar cada linha
+  // separadamente pode deixar a soma 1 centavo acima ou abaixo do
+  // pool (achado rodando o teste real em 19/08/2026: 3 kits de
+  // R$266.666,666... arredondados cada um pra R$266.666,67 somam
+  // R$800.000,01, um centavo a mais que o contrato permite).
+  const partes = semValorReal.map((k) => {
+    const exato = somaQuantidadesSemValorReal > 0 ? (poolRestanteCentavos * k.quantidadeContratada) / somaQuantidadesSemValorReal : 0;
+    return { k, centavos: Math.floor(exato), resto: exato - Math.floor(exato) };
+  });
+  let sobra = poolRestanteCentavos - partes.reduce((s, p) => s + p.centavos, 0);
+  for (const p of [...partes].sort((a, b) => b.resto - a.resto)) {
+    if (sobra <= 0) break;
+    p.centavos += 1;
+    sobra--;
+  }
+  const centavosPorKit = new Map(partes.map((p) => [p.k, p.centavos]));
+
   return kits.map((k) => {
-    if (k.valorContratoEspecifico != null && k.valorContratoEspecifico > 0) {
-      return { kit: k.kit, quantidadeContratada: k.quantidadeContratada, valorEstimado: Math.round(k.valorContratoEspecifico * 100) / 100, origem: "informado" as const };
+    if (temValorReal(k)) {
+      return {
+        kit: k.kit,
+        quantidadeContratada: k.quantidadeContratada,
+        valorEstimado: Math.round((k.valorContratoEspecifico as number) * 100) / 100,
+        origem: "informado" as const,
+      };
     }
-    const proporcao = somaQuantidadesSemValorReal > 0 ? k.quantidadeContratada / somaQuantidadesSemValorReal : 0;
-    const valorEstimado = Math.round(poolRestante * proporcao * 100) / 100;
-    return { kit: k.kit, quantidadeContratada: k.quantidadeContratada, valorEstimado, origem: "estimado" as const };
+    return {
+      kit: k.kit,
+      quantidadeContratada: k.quantidadeContratada,
+      valorEstimado: (centavosPorKit.get(k) ?? 0) / 100,
+      origem: "estimado" as const,
+    };
   });
 }
