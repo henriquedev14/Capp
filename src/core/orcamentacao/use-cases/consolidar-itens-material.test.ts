@@ -17,15 +17,24 @@ function item(overrides: Partial<ItemMaterialParaConsolidar>): ItemMaterialParaC
 }
 
 describe("consolidarItensPorMaterial", () => {
-  it("soma quantidade e total do mesmo material vindo de tipologias diferentes", () => {
+  it("soma quantidade e total do mesmo material vindo de tipologias diferentes, com 10% de margem de perda", () => {
     const r = consolidarItensPorMaterial([
       item({ id: "i1", tipologiaNome: "Tipo A", quantidade: 100, total: 200 }),
       item({ id: "i2", tipologiaNome: "Tipo B", quantidade: 50, total: 100 }),
     ]);
     expect(r).toHaveLength(1);
-    expect(r[0]!.quantidade).toBe(150);
-    expect(r[0]!.total).toBe(300);
+    // bruto: 150 / 300 -> com 10% de margem: 165 / 330
+    expect(r[0]!.quantidade).toBeCloseTo(165, 5);
+    expect(r[0]!.total).toBeCloseTo(330, 5);
+    // preço unitário é o preço REAL do material — a margem não mexe nele
     expect(r[0]!.precoUnitario).toBe(2);
+  });
+
+  it("a margem de 10% nunca muda o preço unitário, só quantidade/total", () => {
+    const r = consolidarItensPorMaterial([item({ id: "i1", quantidade: 10, total: 50, precoUnitario: 5 })]);
+    expect(r[0]!.quantidade).toBeCloseTo(11, 5); // 10 * 1.1
+    expect(r[0]!.total).toBeCloseTo(55, 5); // 50 * 1.1
+    expect(r[0]!.precoUnitario).toBe(5); // inalterado
   });
 
   it("lista as tipologias que contribuíram, sem duplicar", () => {
