@@ -1,5 +1,9 @@
 import { prisma } from "@/infra/db/prisma/client";
 import { calcularVidaFinanceiraLegado } from "@/core/empreendimentos/use-cases/calcular-vida-financeira-legado";
+import {
+  calcularValorEstimadoPorKitLegado,
+  type ValorEstimadoKitLegado,
+} from "@/core/empreendimentos/use-cases/calcular-valor-unitario-base-contrato-legado";
 
 export interface ContaReceberResumo {
   id: string;
@@ -35,6 +39,9 @@ export interface VidaFinanceira {
     faturadoHistoricoReal: number;
     previstoAReceberPosErp: number;
     saldoAFaturar: number;
+    /** Valor estimado por tipo de kit (Elétrico/Hidráulico/QDC) — pedido
+     *  pelo Henrique em 19/08/2026. Ver calcularValorEstimadoPorKitLegado. */
+    porKit: ValorEstimadoKitLegado[];
   } | null;
 }
 
@@ -107,6 +114,21 @@ export async function buscarVidaFinanceira(empreendimentoId: string): Promise<Vi
       recebidoHistorico: empreendimento.legadoRecebidoHistorico ? Number(empreendimento.legadoRecebidoHistorico) : null,
       contasReceber: contas.map((c) => ({ valor: c.valor, recebido: c.recebido })),
     });
+
+    const kitsLegado = await prisma.kitLegado.findMany({
+      where: { empreendimentoId },
+      select: { kit: true, quantidadeContratada: true, valorContratoEspecifico: true },
+      orderBy: { kit: "asc" },
+    });
+    const porKit = calcularValorEstimadoPorKitLegado(
+      empreendimento.legadoValorContratado ? Number(empreendimento.legadoValorContratado) : null,
+      kitsLegado.map((k) => ({
+        kit: k.kit,
+        quantidadeContratada: k.quantidadeContratada,
+        valorContratoEspecifico: k.valorContratoEspecifico ? Number(k.valorContratoEspecifico) : null,
+      }))
+    );
+
     return {
       origemLegado: true,
       contrato: null,
@@ -118,6 +140,7 @@ export async function buscarVidaFinanceira(empreendimentoId: string): Promise<Vi
         faturadoHistoricoReal: v.faturadoHistoricoReal,
         previstoAReceberPosErp: v.previstoAReceberPosErp,
         saldoAFaturar: v.saldoAFaturar,
+        porKit,
       },
     };
   }
